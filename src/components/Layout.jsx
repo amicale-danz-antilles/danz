@@ -46,7 +46,10 @@ export default function Layout() {
       <div className="main-column">
         <header className="topbar">
           <button className="menu-button" aria-label="Ouvrir le menu" onClick={() => setOpen(!open)}>☰</button>
-          <div><strong>Espace amicalistes</strong><span>{isAdmin ? 'Administration et vie de l’amicale' : 'Réservé aux membres de la DANZ Antilles'}</span></div>
+          <div>
+            <strong>{isAdmin ? 'Espace administrateur' : 'Espace amicalistes'}</strong>
+            <span>{isAdmin ? 'Administration et vie de l’amicale' : 'Réservé aux membres de la DANZ Antilles'}</span>
+          </div>
         </header>
         <main className="page"><Outlet /></main>
         <footer>Amicale DANZ Antilles · Espace privé</footer>
