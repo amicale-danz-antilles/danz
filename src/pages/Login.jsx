@@ -8,7 +8,10 @@ export default function Login() {
   const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [fullName, setFullName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [applicantType, setApplicantType] = useState('military')
+  const [militaryReference, setMilitaryReference] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -25,8 +28,15 @@ export default function Login() {
       if (mode === 'login') {
         await signIn(email.trim(), password)
       } else {
+        const normalizedFirstName = firstName.trim()
+        const normalizedLastName = lastName.trim()
+        const fullName = `${normalizedFirstName} ${normalizedLastName}`.trim()
         const { error: requestError } = await supabase.from('membership_requests').insert({
-          full_name: fullName.trim(),
+          full_name: fullName,
+          first_name: normalizedFirstName,
+          last_name: normalizedLastName,
+          applicant_type: applicantType,
+          military_reference: applicantType === 'spouse' ? militaryReference.trim() : null,
           email: email.trim().toLowerCase(),
           message: message.trim() || null,
         })
@@ -35,7 +45,10 @@ export default function Login() {
           throw requestError
         }
         setSuccess('Votre demande a bien été transmise au bureau. Vous recevrez une invitation après validation.')
-        setFullName('')
+        setFirstName('')
+        setLastName('')
+        setApplicantType('military')
+        setMilitaryReference('')
         setEmail('')
         setMessage('')
       }
@@ -63,7 +76,17 @@ export default function Login() {
           {!configured && <div className="alert warning"><strong>Configuration nécessaire.</strong><br />Les variables Supabase doivent être ajoutées avant la première connexion.</div>}
           {error && <div className="alert error">{error}</div>}
           {success && <div className="alert">{success}</div>}
-          {mode === 'request' && <label>Nom et prénom<input type="text" required minLength="2" maxLength="120" autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} /></label>}
+          {mode === 'request' && <>
+            <label>Prénom<input type="text" required minLength="2" maxLength="80" autoComplete="given-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} /></label>
+            <label>Nom<input type="text" required minLength="2" maxLength="80" autoComplete="family-name" value={lastName} onChange={(e) => setLastName(e.target.value)} /></label>
+            <label>Vous êtes
+              <select value={applicantType} onChange={(e) => setApplicantType(e.target.value)}>
+                <option value="military">Militaire</option>
+                <option value="spouse">Conjoint(e)</option>
+              </select>
+            </label>
+            {applicantType === 'spouse' && <label>Nom et prénom du militaire de rattachement<input type="text" required minLength="2" maxLength="120" value={militaryReference} onChange={(e) => setMilitaryReference(e.target.value)} /></label>}
+          </>}
           <label>Adresse e-mail<input type="email" required autoComplete="email" placeholder="prenom.nom@exemple.fr" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
           {mode === 'login' ? (
             <label>Mot de passe<input type="password" required autoComplete="current-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
