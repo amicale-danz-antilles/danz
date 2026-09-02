@@ -9,6 +9,7 @@ import Documents from './pages/Documents.jsx'
 import Galerie from './pages/Galerie.jsx'
 import Amicale from './pages/Amicale.jsx'
 import Profile from './pages/Profile.jsx'
+import AdminRequests from './pages/AdminRequests.jsx'
 
 export default function App(){
  return <Routes>
@@ -21,6 +22,7 @@ export default function App(){
     <Route path="galerie" element={<Galerie/>}/>
     <Route path="amicale" element={<Amicale/>}/>
     <Route path="profil" element={<Profile/>}/>
+    <Route path="administration/demandes" element={<AdminRequests/>}/>
   </Route>
   <Route path="*" element={<Navigate to="/" replace/>}/>
  </Routes>
