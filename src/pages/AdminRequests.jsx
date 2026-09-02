@@ -16,7 +16,7 @@ export default function AdminRequests() {
     setError('')
     const { data, error: loadError } = await supabase
       .from('membership_requests')
-      .select('id, full_name, email, message, status, created_at')
+      .select('id, full_name, first_name, last_name, email, applicant_type, military_reference, message, status, created_at')
       .order('created_at', { ascending: false })
     if (loadError) setError(loadError.message)
     setRequests(data || [])
@@ -60,17 +60,23 @@ export default function AdminRequests() {
       <div className="empty-state">Aucune demande pour le moment.</div>
     ) : (
       <div className="card-grid">
-        {requests.map((request) => <article className="content-card" key={request.id}>
-          <time>{new Date(request.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</time>
-          <h3>{request.full_name}</h3>
-          <p><strong>{request.email}</strong></p>
-          {request.message && <p>{request.message}</p>}
-          <p><span className="role-badge">{request.status === 'pending' ? 'En attente' : request.status === 'approved' ? 'Approuvée' : 'Refusée'}</span></p>
-          {request.status === 'pending' && <div style={{display:'flex',gap:'.75rem',flexWrap:'wrap'}}>
-            <button className="primary-button" disabled={busyId === request.id} onClick={() => approve(request.id)}>{busyId === request.id ? 'Traitement…' : 'Approuver et inviter'}</button>
-            <button className="ghost-button" disabled={busyId === request.id} onClick={() => reject(request.id)}>Refuser</button>
-          </div>}
-        </article>)}
+        {requests.map((request) => {
+          const displayName = [request.first_name, request.last_name].filter(Boolean).join(' ') || request.full_name
+          const typeLabel = request.applicant_type === 'spouse' ? 'Conjoint(e)' : 'Militaire'
+          return <article className="content-card" key={request.id}>
+            <time>{new Date(request.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</time>
+            <h3>{displayName}</h3>
+            <p><span className="role-badge">{typeLabel}</span></p>
+            <p><strong>{request.email}</strong></p>
+            {request.applicant_type === 'spouse' && request.military_reference && <p><strong>Militaire de rattachement :</strong> {request.military_reference}</p>}
+            {request.message && <p>{request.message}</p>}
+            <p><span className="role-badge">{request.status === 'pending' ? 'En attente' : request.status === 'approved' ? 'Approuvée' : 'Refusée'}</span></p>
+            {request.status === 'pending' && <div style={{display:'flex',gap:'.75rem',flexWrap:'wrap'}}>
+              <button className="primary-button" disabled={busyId === request.id} onClick={() => approve(request.id)}>{busyId === request.id ? 'Traitement…' : 'Approuver et inviter'}</button>
+              <button className="ghost-button" disabled={busyId === request.id} onClick={() => reject(request.id)}>Refuser</button>
+            </div>}
+          </article>
+        })}
       </div>
     )}
   </>
