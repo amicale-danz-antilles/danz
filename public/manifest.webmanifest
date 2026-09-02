@@ -9,7 +9,7 @@
   "theme_color": "#0b5165",
   "icons": [
     {
-      "src": "/danz/amicale-danz-icon.png",
+      "src": "/danz/app-icon.png",
       "sizes": "any",
       "type": "image/png",
       "purpose": "any maskable"
