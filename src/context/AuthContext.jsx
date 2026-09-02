@@ -5,6 +5,7 @@ const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -13,22 +14,48 @@ export function AuthProvider({ children }) {
       return undefined
     }
 
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      setLoading(false)
+    let mounted = true
+
+    const loadProfile = async (nextSession) => {
+      if (!nextSession?.user) {
+        if (mounted) setProfile(null)
+        return
+      }
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, role')
+        .eq('id', nextSession.user.id)
+        .maybeSingle()
+      if (mounted) setProfile(data ?? null)
+    }
+
+    supabase.auth.getSession().then(async ({ data, error }) => {
+      if (!mounted) return
+      if (!error) {
+        setSession(data.session)
+        await loadProfile(data.session)
+      }
+      if (mounted) setLoading(false)
     })
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+      if (!mounted) return
       setSession(nextSession)
-      setLoading(false)
+      await loadProfile(nextSession)
+      if (mounted) setLoading(false)
     })
 
-    return () => listener.subscription.unsubscribe()
+    return () => {
+      mounted = false
+      listener.subscription.unsubscribe()
+    }
   }, [])
 
   const value = useMemo(() => ({
     session,
     user: session?.user ?? null,
+    profile,
+    isAdmin: profile?.role === 'admin',
     loading,
     configured: isSupabaseConfigured,
     signIn: async (email, password) => {
@@ -39,7 +66,7 @@ export function AuthProvider({ children }) {
     signOut: async () => {
       if (supabase) await supabase.auth.signOut()
     },
-  }), [session, loading])
+  }), [session, profile, loading])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
