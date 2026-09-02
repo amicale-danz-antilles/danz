@@ -19,14 +19,22 @@ export function AuthProvider({ children }) {
     const loadProfile = async (nextSession) => {
       if (!nextSession?.user) {
         if (mounted) setProfile(null)
-        return
+        return null
       }
       const { data } = await supabase
         .from('profiles')
-        .select('id, full_name, role')
+        .select('id, full_name, email, role, active')
         .eq('id', nextSession.user.id)
         .maybeSingle()
-      if (mounted) setProfile(data ?? null)
+
+      if (!data?.active) {
+        if (mounted) setProfile(null)
+        await supabase.auth.signOut({ scope: 'local' })
+        return null
+      }
+
+      if (mounted) setProfile(data)
+      return data
     }
 
     supabase.auth.getSession().then(async ({ data, error }) => {
@@ -55,13 +63,33 @@ export function AuthProvider({ children }) {
     session,
     user: session?.user ?? null,
     profile,
-    isAdmin: profile?.role === 'admin',
+    isAdmin: profile?.role === 'admin' && profile?.active === true,
+    hasAccess: profile?.active === true,
     loading,
     configured: isSupabaseConfigured,
-    signIn: async (email, password) => {
+    requestMemberLogin: async (email) => {
       if (!supabase) throw new Error('Supabase n’est pas encore configuré.')
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      const { data, error } = await supabase.functions.invoke('send-member-login-link', {
+        body: { email: email.trim().toLowerCase() },
+      })
       if (error) throw error
+      if (data?.error) throw new Error(data.error)
+    },
+    signInAdmin: async (email, password) => {
+      if (!supabase) throw new Error('Supabase n’est pas encore configuré.')
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw error
+
+      const { data: adminProfile } = await supabase
+        .from('profiles')
+        .select('role, active')
+        .eq('id', data.user.id)
+        .maybeSingle()
+
+      if (adminProfile?.role !== 'admin' || adminProfile?.active !== true) {
+        await supabase.auth.signOut({ scope: 'local' })
+        throw new Error('Cet accès est réservé aux administrateurs validés.')
+      }
     },
     signOut: async () => {
       if (supabase) await supabase.auth.signOut()
