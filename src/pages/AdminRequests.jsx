@@ -30,11 +30,11 @@ export default function AdminRequests() {
 
   if (!authLoading && !isAdmin) return <Navigate to="/" replace />
 
-  const approve = async (id) => {
+  const approve = async (id, role) => {
     setBusyId(id)
     setError('')
     const { data, error: fnError } = await supabase.functions.invoke('approve-membership-request', {
-      body: { requestId: id },
+      body: { requestId: id, role },
     })
     if (fnError || data?.error) setError(data?.error || fnError?.message || 'Impossible d’approuver la demande.')
     else await load()
@@ -54,7 +54,7 @@ export default function AdminRequests() {
   }
 
   return <>
-    <PageTitle eyebrow="Administration" title="Demandes d’accès" text="Validez ou refusez les nouvelles demandes d’inscription à l’espace amicaliste." />
+    <PageTitle eyebrow="Administration" title="Demandes d’accès" text="Chaque compte est créé uniquement après votre validation. Vous choisissez également s’il s’agit d’un amicaliste ou d’un administrateur." />
     {error && <div className="alert error">{error}</div>}
     {loading ? <div className="skeleton-card" /> : requests.length === 0 ? (
       <div className="empty-state">Aucune demande pour le moment.</div>
@@ -72,7 +72,10 @@ export default function AdminRequests() {
             {request.message && <p>{request.message}</p>}
             <p><span className="role-badge">{request.status === 'pending' ? 'En attente' : request.status === 'approved' ? 'Approuvée' : 'Refusée'}</span></p>
             {request.status === 'pending' && <div style={{display:'flex',gap:'.75rem',flexWrap:'wrap'}}>
-              <button className="primary-button" disabled={busyId === request.id} onClick={() => approve(request.id)}>{busyId === request.id ? 'Traitement…' : 'Approuver et inviter'}</button>
+              <button className="primary-button" disabled={busyId === request.id} onClick={() => approve(request.id, 'member')}>
+                {busyId === request.id ? 'Traitement…' : 'Approuver comme amicaliste'}
+              </button>
+              <button className="ghost-button" disabled={busyId === request.id} onClick={() => approve(request.id, 'admin')}>Approuver comme administrateur</button>
               <button className="ghost-button" disabled={busyId === request.id} onClick={() => reject(request.id)}>Refuser</button>
             </div>}
           </article>
