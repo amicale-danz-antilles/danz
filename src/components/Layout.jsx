@@ -22,11 +22,23 @@ export default function Layout() {
     navigate('/connexion')
   }
 
+  const spaceTitle = isAdmin
+    ? 'Espace administrateur'
+    : profile?.access_type === 'personnel_danz'
+      ? 'Espace personnel DANZ'
+      : 'Espace amicaliste'
+
+  const spaceSubtitle = isAdmin
+    ? 'Administration et vie de l’amicale'
+    : profile?.access_type === 'personnel_danz'
+      ? 'Accès réservé au personnel validé de la DANZ'
+      : 'Accès réservé aux amicalistes validés'
+
   return (
     <div className="app-shell">
       <aside className={`sidebar ${open ? 'open' : ''}`}>
         <div className="brand">
-          <div className="brand-mark">DA</div>
+          <img src="/danz/Insigne%20CND%20-%20ANTILLES.png" alt="Insigne DANZ Antilles" style={{width:52,height:52,objectFit:'contain',borderRadius:'12px'}} />
           <div><strong>Amicale DANZ</strong><span>Antilles</span></div>
         </div>
         <nav>
@@ -47,8 +59,8 @@ export default function Layout() {
         <header className="topbar">
           <button className="menu-button" aria-label="Ouvrir le menu" onClick={() => setOpen(!open)}>☰</button>
           <div>
-            <strong>{isAdmin ? 'Espace administrateur' : 'Espace amicalistes'}</strong>
-            <span>{isAdmin ? 'Administration et vie de l’amicale' : 'Réservé aux membres de la DANZ Antilles'}</span>
+            <strong>{spaceTitle}</strong>
+            <span>{spaceSubtitle}</span>
           </div>
         </header>
         <main className="page"><Outlet /></main>
