@@ -3,16 +3,22 @@ import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { supabase } from '../lib/supabase.js'
 
+const accessLabels = {
+  admin: 'Admin',
+  amicaliste: 'Amicaliste',
+  personnel_danz: 'Personnel de la DANZ',
+}
+
 export default function Login() {
   const { user, hasAccess, requestMemberLogin, signInAdmin, configured } = useAuth()
-  const [mode, setMode] = useState('member')
+  const [mode, setMode] = useState(null)
+  const [registering, setRegistering] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [applicantType, setApplicantType] = useState('military')
-  const [militaryReference, setMilitaryReference] = useState('')
-  const [message, setMessage] = useState('')
+  const [isAmicaliste, setIsAmicaliste] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [busy, setBusy] = useState(false)
@@ -21,9 +27,18 @@ export default function Login() {
 
   const changeMode = (nextMode) => {
     setMode(nextMode)
+    setRegistering(false)
     setError('')
     setSuccess('')
     setPassword('')
+  }
+
+  const resetRegistration = () => {
+    setFirstName('')
+    setLastName('')
+    setApplicantType('military')
+    setIsAmicaliste('')
+    setEmail('')
   }
 
   const submit = async (event) => {
@@ -33,35 +48,34 @@ export default function Login() {
     setBusy(true)
 
     try {
-      if (mode === 'member') {
-        await requestMemberLogin(email)
-        setSuccess('Si cette adresse correspond à un compte amicaliste validé, un lien de connexion vient de vous être envoyé par e-mail.')
-      } else if (mode === 'admin') {
-        await signInAdmin(email.trim(), password)
-      } else {
+      if (registering) {
         const normalizedFirstName = firstName.trim()
         const normalizedLastName = lastName.trim()
         const fullName = `${normalizedFirstName} ${normalizedLastName}`.trim()
+
         const { error: requestError } = await supabase.from('membership_requests').insert({
           full_name: fullName,
           first_name: normalizedFirstName,
           last_name: normalizedLastName,
           applicant_type: applicantType,
-          military_reference: applicantType === 'spouse' ? militaryReference.trim() : null,
+          is_amicaliste: isAmicaliste === 'yes',
+          requested_access: mode,
           email: email.trim().toLowerCase(),
-          message: message.trim() || null,
         })
+
         if (requestError) {
           if (requestError.code === '23505') throw new Error('Une demande est déjà en attente pour cette adresse e-mail.')
           throw requestError
         }
-        setSuccess('Votre demande a bien été transmise au bureau. Aucun accès n’est créé avant validation par un administrateur.')
-        setFirstName('')
-        setLastName('')
-        setApplicantType('military')
-        setMilitaryReference('')
-        setEmail('')
-        setMessage('')
+
+        setSuccess(`Votre demande « ${accessLabels[mode]} » a bien été transmise. Un administrateur doit la valider avant toute connexion.`)
+        resetRegistration()
+        setRegistering(false)
+      } else if (mode === 'admin') {
+        await signInAdmin(email, password)
+      } else {
+        await requestMemberLogin(email, mode)
+        setSuccess('Si cette adresse correspond à un compte validé dans cette catégorie, un lien de connexion vient de vous être envoyé par e-mail.')
       }
     } catch (err) {
       setError(err.message === 'Invalid login credentials' ? 'Identifiants administrateur incorrects.' : err.message)
@@ -74,60 +88,94 @@ export default function Login() {
     <div className="login-page">
       <section className="login-visual">
         <div className="login-overlay">
-          <div className="brand brand-light"><div className="brand-mark">DA</div><div><strong>Amicale DANZ</strong><span>Antilles</span></div></div>
-          <div className="welcome-copy"><span className="eyebrow">Bienvenue</span><h1>Notre amicale,<br />notre espace.</h1><p>Actualités, rendez-vous, documents et souvenirs de l'Amicale DANZ Antilles, réunis dans un espace réservé aux adhérents validés.</p></div>
+          <div className="brand brand-light">
+            <img src="/danz/Insigne%20CND%20-%20ANTILLES.png" alt="Insigne DANZ Antilles" style={{width:64,height:64,objectFit:'contain',borderRadius:'14px'}} />
+            <div><strong>Amicale DANZ</strong><span>Antilles</span></div>
+          </div>
+          <div className="welcome-copy">
+            <span className="eyebrow">Bienvenue</span>
+            <h1>Espace privé<br />DANZ Antilles</h1>
+            <p>Choisissez votre type d’accès. Toute nouvelle inscription doit être approuvée par un administrateur.</p>
+          </div>
         </div>
       </section>
 
       <section className="login-panel">
         <form className="login-card" onSubmit={submit}>
-          <div className="mobile-logo"><div className="brand-mark">DA</div></div>
-          <span className="eyebrow">Espace privé</span>
-
-          <div style={{display:'flex',gap:'.5rem',flexWrap:'wrap',marginBottom:'1rem'}}>
-            <button type="button" className={mode === 'member' ? 'primary-button' : 'ghost-button'} onClick={() => changeMode('member')}>Amicaliste</button>
-            <button type="button" className={mode === 'admin' ? 'primary-button' : 'ghost-button'} onClick={() => changeMode('admin')}>Administrateur</button>
+          <div className="mobile-logo">
+            <img src="/danz/Insigne%20CND%20-%20ANTILLES.png" alt="Insigne DANZ Antilles" style={{width:72,height:72,objectFit:'contain'}} />
           </div>
+          <span className="eyebrow">Espace privé</span>
+          <h2>Choisissez votre accès</h2>
 
-          <h2>{mode === 'member' ? 'Connexion amicaliste' : mode === 'admin' ? 'Accès administrateur' : 'Demander un accès'}</h2>
-          <p className="muted">
-            {mode === 'member' && 'Saisissez uniquement l’adresse e-mail validée par le bureau. Vous recevrez un lien de connexion sécurisé.'}
-            {mode === 'admin' && 'Connexion réservée aux administrateurs validés avec adresse e-mail et mot de passe.'}
-            {mode === 'request' && 'Votre demande sera examinée manuellement avant toute création d’accès.'}
-          </p>
+          <div style={{display:'grid',gridTemplateColumns:'1fr',gap:'.65rem',margin:'1rem 0 1.25rem'}}>
+            <button type="button" className={mode === 'admin' ? 'primary-button' : 'ghost-button'} onClick={() => changeMode('admin')}>Admin</button>
+            <button type="button" className={mode === 'amicaliste' ? 'primary-button' : 'ghost-button'} onClick={() => changeMode('amicaliste')}>Amicaliste</button>
+            <button type="button" className={mode === 'personnel_danz' ? 'primary-button' : 'ghost-button'} onClick={() => changeMode('personnel_danz')}>Personnel de la DANZ</button>
+          </div>
 
           {!configured && <div className="alert warning"><strong>Configuration nécessaire.</strong><br />Les variables Supabase doivent être ajoutées avant la première connexion.</div>}
           {error && <div className="alert error">{error}</div>}
           {success && <div className="alert">{success}</div>}
 
-          {mode === 'request' && <>
-            <label>Prénom<input type="text" required minLength="2" maxLength="80" autoComplete="given-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} /></label>
-            <label>Nom<input type="text" required minLength="2" maxLength="80" autoComplete="family-name" value={lastName} onChange={(e) => setLastName(e.target.value)} /></label>
-            <label>Vous êtes
-              <select value={applicantType} onChange={(e) => setApplicantType(e.target.value)}>
-                <option value="military">Militaire</option>
-                <option value="spouse">Conjoint(e)</option>
-              </select>
-            </label>
-            {applicantType === 'spouse' && <label>Nom et prénom du militaire de rattachement<input type="text" required minLength="2" maxLength="120" value={militaryReference} onChange={(e) => setMilitaryReference(e.target.value)} /></label>}
-          </>}
+          {!mode ? (
+            <p className="muted">Sélectionnez votre catégorie pour vous connecter ou demander un accès.</p>
+          ) : registering ? (
+            <>
+              <h3>Demande d’accès — {accessLabels[mode]}</h3>
+              <p className="muted">La demande restera en attente jusqu’à validation par un administrateur.</p>
 
-          <label>Adresse e-mail<input type="email" required autoComplete="email" placeholder="prenom.nom@exemple.fr" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+              <label>Nom
+                <input type="text" required minLength="2" maxLength="80" autoComplete="family-name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+              </label>
+              <label>Prénom
+                <input type="text" required minLength="2" maxLength="80" autoComplete="given-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+              </label>
+              <label>Situation
+                <select required value={applicantType} onChange={(e) => setApplicantType(e.target.value)}>
+                  <option value="military">Militaire</option>
+                  <option value="spouse">Conjoint(e)</option>
+                </select>
+              </label>
+              <label>Êtes-vous amicaliste ?
+                <select required value={isAmicaliste} onChange={(e) => setIsAmicaliste(e.target.value)}>
+                  <option value="" disabled>Choisir</option>
+                  <option value="yes">Oui</option>
+                  <option value="no">Non</option>
+                </select>
+              </label>
+              <label>Adresse e-mail
+                <input type="email" required autoComplete="email" placeholder="prenom.nom@exemple.fr" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </label>
 
-          {mode === 'admin' && <label>Mot de passe<input type="password" required autoComplete="current-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} /></label>}
-          {mode === 'request' && <label>Message au bureau (facultatif)<textarea rows="3" maxLength="500" value={message} onChange={(e) => setMessage(e.target.value)} /></label>}
-
-          <button className="primary-button" disabled={busy || !configured}>
-            {busy ? 'Traitement…' : mode === 'member' ? 'Recevoir mon lien de connexion' : mode === 'admin' ? 'Se connecter' : 'Envoyer ma demande'}
-          </button>
-
-          {mode !== 'request' ? (
-            <button type="button" className="ghost-button" onClick={() => changeMode('request')}>Je n’ai pas encore d’accès</button>
+              <button className="primary-button" disabled={busy || !configured}>{busy ? 'Envoi…' : 'Envoyer ma demande'}</button>
+              <button type="button" className="ghost-button" onClick={() => { setRegistering(false); setError(''); setSuccess('') }}>Retour à la connexion</button>
+            </>
           ) : (
-            <button type="button" className="ghost-button" onClick={() => changeMode('member')}>J’ai déjà un compte</button>
+            <>
+              <h3>{accessLabels[mode]}</h3>
+              <p className="muted">
+                {mode === 'admin'
+                  ? 'Connexion par adresse e-mail et mot de passe. Le compte doit avoir été validé comme administrateur.'
+                  : 'Connexion par adresse e-mail uniquement. Après validation, un lien sécurisé vous est envoyé par e-mail.'}
+              </p>
+
+              <label>Adresse e-mail
+                <input type="email" required autoComplete="email" placeholder="prenom.nom@exemple.fr" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </label>
+
+              {mode === 'admin' && <label>Mot de passe
+                <input type="password" required autoComplete="current-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
+              </label>}
+
+              <button className="primary-button" disabled={busy || !configured}>
+                {busy ? 'Traitement…' : mode === 'admin' ? 'Se connecter' : 'Recevoir mon lien de connexion'}
+              </button>
+              <button type="button" className="ghost-button" onClick={() => { setRegistering(true); setError(''); setSuccess('') }}>Demander un accès</button>
+            </>
           )}
 
-          <p className="login-help">Tous les nouveaux comptes, y compris administrateurs, doivent être validés par un administrateur existant.</p>
+          <p className="login-help">Aucun nouveau compte n’accède au site sans validation préalable d’un administrateur.</p>
         </form>
       </section>
     </div>
