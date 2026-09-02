@@ -13,7 +13,7 @@ const links = [
 ]
 
 export default function Layout() {
-  const { user, signOut } = useAuth()
+  const { user, profile, isAdmin, signOut } = useAuth()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
 
@@ -35,9 +35,10 @@ export default function Layout() {
               <span className="nav-icon">{icon}</span>{label}
             </NavLink>
           ))}
+          {isAdmin && <NavLink to="/administration/demandes" onClick={() => setOpen(false)}><span className="nav-icon">⚙</span>Administration</NavLink>}
         </nav>
         <div className="sidebar-footer">
-          <div className="member-chip"><span>{user?.email?.[0]?.toUpperCase()}</span><small>{user?.email}</small></div>
+          <div className="member-chip"><span>{(profile?.full_name || user?.email || 'A')[0].toUpperCase()}</span><small>{profile?.full_name || user?.email}</small></div>
           <button className="ghost-button" onClick={logout}>Se déconnecter</button>
         </div>
       </aside>
@@ -45,7 +46,7 @@ export default function Layout() {
       <div className="main-column">
         <header className="topbar">
           <button className="menu-button" aria-label="Ouvrir le menu" onClick={() => setOpen(!open)}>☰</button>
-          <div><strong>Espace amicalistes</strong><span>Réservé aux membres de la DANZ Antilles</span></div>
+          <div><strong>Espace amicalistes</strong><span>{isAdmin ? 'Administration et vie de l’amicale' : 'Réservé aux membres de la DANZ Antilles'}</span></div>
         </header>
         <main className="page"><Outlet /></main>
         <footer>Amicale DANZ Antilles · Espace privé</footer>
