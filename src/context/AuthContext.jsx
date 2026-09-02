@@ -16,41 +16,15 @@ export function AuthProvider({ children }) {
 
     let mounted = true
 
-    const loadProfile = async (nextSession) => {
-      if (!nextSession?.user) {
-        if (mounted) setProfile(null)
-        return null
-      }
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, role, active')
-        .eq('id', nextSession.user.id)
-        .maybeSingle()
-
-      if (!data?.active) {
-        if (mounted) setProfile(null)
-        await supabase.auth.signOut({ scope: 'local' })
-        return null
-      }
-
-      if (mounted) setProfile(data)
-      return data
-    }
-
-    supabase.auth.getSession().then(async ({ data, error }) => {
+    supabase.auth.getSession().then(({ data, error }) => {
       if (!mounted) return
-      if (!error) {
-        setSession(data.session)
-        await loadProfile(data.session)
-      }
-      if (mounted) setLoading(false)
+      if (!error) setSession(data.session)
+      setLoading(false)
     })
 
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!mounted) return
       setSession(nextSession)
-      await loadProfile(nextSession)
-      if (mounted) setLoading(false)
     })
 
     return () => {
@@ -58,6 +32,41 @@ export function AuthProvider({ children }) {
       listener.subscription.unsubscribe()
     }
   }, [])
+
+  useEffect(() => {
+    if (!supabase) return
+
+    let cancelled = false
+
+    const loadProfile = async () => {
+      if (!session?.user) {
+        setProfile(null)
+        return
+      }
+
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, role, active')
+        .eq('id', session.user.id)
+        .maybeSingle()
+
+      if (cancelled) return
+
+      if (error || !data?.active) {
+        setProfile(null)
+        setLoading(false)
+        await supabase.auth.signOut({ scope: 'local' })
+        return
+      }
+
+      setProfile(data)
+      setLoading(false)
+    }
+
+    loadProfile()
+    return () => { cancelled = true }
+  }, [session?.user?.id])
 
   const value = useMemo(() => ({
     session,
@@ -77,19 +86,22 @@ export function AuthProvider({ children }) {
     },
     signInAdmin: async (email, password) => {
       if (!supabase) throw new Error('Supabase n’est pas encore configuré.')
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password })
       if (error) throw error
 
-      const { data: adminProfile } = await supabase
+      const { data: adminProfile, error: profileError } = await supabase
         .from('profiles')
-        .select('role, active')
+        .select('id, full_name, email, role, active')
         .eq('id', data.user.id)
-        .maybeSingle()
+        .single()
 
-      if (adminProfile?.role !== 'admin' || adminProfile?.active !== true) {
+      if (profileError || adminProfile?.role !== 'admin' || adminProfile?.active !== true) {
         await supabase.auth.signOut({ scope: 'local' })
         throw new Error('Cet accès est réservé aux administrateurs validés.')
       }
+
+      setProfile(adminProfile)
+      setSession(data.session)
     },
     signOut: async () => {
       if (supabase) await supabase.auth.signOut()
