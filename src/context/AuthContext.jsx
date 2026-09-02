@@ -47,7 +47,7 @@ export function AuthProvider({ children }) {
       setLoading(true)
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, email, role, active')
+        .select('id, full_name, email, role, active, access_type, applicant_type, is_amicaliste')
         .eq('id', session.user.id)
         .maybeSingle()
 
@@ -72,14 +72,14 @@ export function AuthProvider({ children }) {
     session,
     user: session?.user ?? null,
     profile,
-    isAdmin: profile?.role === 'admin' && profile?.active === true,
+    isAdmin: profile?.role === 'admin' && profile?.access_type === 'admin' && profile?.active === true,
     hasAccess: profile?.active === true,
     loading,
     configured: isSupabaseConfigured,
-    requestMemberLogin: async (email) => {
+    requestMemberLogin: async (email, accessType) => {
       if (!supabase) throw new Error('Supabase n’est pas encore configuré.')
       const { data, error } = await supabase.functions.invoke('send-member-login-link', {
-        body: { email: email.trim().toLowerCase() },
+        body: { email: email.trim().toLowerCase(), accessType },
       })
       if (error) throw error
       if (data?.error) throw new Error(data.error)
@@ -91,11 +91,11 @@ export function AuthProvider({ children }) {
 
       const { data: adminProfile, error: profileError } = await supabase
         .from('profiles')
-        .select('id, full_name, email, role, active')
+        .select('id, full_name, email, role, active, access_type, applicant_type, is_amicaliste')
         .eq('id', data.user.id)
         .single()
 
-      if (profileError || adminProfile?.role !== 'admin' || adminProfile?.active !== true) {
+      if (profileError || adminProfile?.role !== 'admin' || adminProfile?.access_type !== 'admin' || adminProfile?.active !== true) {
         await supabase.auth.signOut({ scope: 'local' })
         throw new Error('Cet accès est réservé aux administrateurs validés.')
       }
