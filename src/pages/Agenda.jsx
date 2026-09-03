@@ -20,11 +20,27 @@ const toLocalInput = (value) => {
   return local.toISOString().slice(0, 16)
 }
 
+function AppleCalendarIcon() {
+  return <span className="calendar-app-icon apple-calendar-icon" aria-hidden="true">
+    <span className="calendar-icon-bar" />
+    <strong>17</strong>
+  </span>
+}
+
+function GoogleCalendarIcon() {
+  return <span className="calendar-app-icon google-calendar-icon" aria-hidden="true">
+    <span className="google-calendar-corner google-calendar-blue" />
+    <span className="google-calendar-corner google-calendar-green" />
+    <span className="google-calendar-corner google-calendar-yellow" />
+    <span className="google-calendar-corner google-calendar-red" />
+    <strong>31</strong>
+  </span>
+}
+
 export default function Agenda(){
  const { isAdmin } = useAuth()
  const [items,setItems]=useState([])
  const [loading,setLoading]=useState(true)
- const [openId,setOpenId]=useState(null)
  const [editingId,setEditingId]=useState(null)
  const [edit,setEdit]=useState(null)
  const [saving,setSaving]=useState(false)
@@ -86,6 +102,7 @@ export default function Agenda(){
  }
 
  const beginEdit = (event) => {
+  if (!isAdmin) return
   setEditingId(event.id)
   setError('')
   setEdit({
@@ -133,33 +150,56 @@ export default function Agenda(){
   }
  }
 
+ const formatEnd = (event) => {
+  if (!event.ends_at) return null
+  const start = new Date(event.starts_at)
+  const end = new Date(event.ends_at)
+  const sameDay = start.toDateString() === end.toDateString()
+  return sameDay
+    ? end.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})
+    : end.toLocaleString('fr-FR',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'})
+ }
+
  return <>
-  <PageTitle eyebrow="Vie de l'amicale" title="Agenda" text="Réunions, sorties, rencontres et temps forts à venir. Touchez un événement pour voir les détails et l’ajouter à votre calendrier." />
+  <PageTitle eyebrow="Vie de l'amicale" title="Agenda" text={isAdmin ? "Toutes les informations sont visibles directement. Touchez une tuile pour modifier l’événement." : "Toutes les informations sont visibles directement. Ajoutez un rendez-vous à votre calendrier en touchant simplement son icône."} />
   {error && <div className="alert error" style={{marginBottom:'1rem'}}>{error}</div>}
   {loading?<div className="skeleton-card tall"/>:<div className="timeline">
    {items.length?items.map(x=>{
     const d=new Date(x.starts_at)
-    const expanded=openId===x.id
     const isEditing=editingId===x.id
+    const endLabel=formatEnd(x)
     return <article className="timeline-item" key={x.id}>
       <div className="timeline-date"><strong>{d.getDate()}</strong><span>{d.toLocaleDateString('fr-FR',{month:'short',year:'numeric'})}</span></div>
-      <div className="timeline-card" role="button" tabIndex="0" onClick={()=>{ if(!isEditing) setOpenId(expanded?null:x.id) }} onKeyDown={(e)=>{if(!isEditing&&(e.key==='Enter'||e.key===' ')){e.preventDefault();setOpenId(expanded?null:x.id)}}} style={{cursor:isEditing?'default':'pointer'}}>
+      <div
+        className={`timeline-card ${isAdmin && !isEditing ? 'admin-editable-event' : ''}`}
+        role={isAdmin && !isEditing ? 'button' : undefined}
+        tabIndex={isAdmin && !isEditing ? 0 : undefined}
+        onClick={isAdmin && !isEditing ? ()=>beginEdit(x) : undefined}
+        onKeyDown={isAdmin && !isEditing ? (e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();beginEdit(x)}} : undefined}
+      >
         {!isEditing && <>
-          <span className="event-time">{d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</span>
-          <h2>{x.title}</h2>
-          {x.location&&<p>📍 {x.location}</p>}
-          {x.description&&<p>{x.description}</p>}
-        </>}
-
-        {expanded && !isEditing && <div style={{marginTop:'1rem',paddingTop:'1rem',borderTop:'1px solid rgba(0,0,0,.1)'}} onClick={(e)=>e.stopPropagation()}>
-          {x.ends_at&&<p><strong>Fin :</strong> {new Date(x.ends_at).toLocaleString('fr-FR')}</p>}
-          <div style={{display:'flex',gap:'.65rem',flexWrap:'wrap'}}>
-            <button type="button" className="primary-button" style={{width:'auto',marginTop:0}} onClick={()=>addApple(x)}>📅 Ajouter calendrier Apple</button>
-            <button type="button" className="primary-button" style={{width:'auto',marginTop:0}} onClick={()=>addGoogle(x)}>📅 Ajouter calendrier Google</button>
-            {isAdmin && <button type="button" className="secondary-button" onClick={()=>beginEdit(x)}>✏️ Modifier l’événement</button>}
+          <div className="event-card-heading">
+            <div>
+              <span className="event-time">
+                {d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}
+                {endLabel ? ` → ${endLabel}` : ''}
+              </span>
+              <h2>{x.title}</h2>
+            </div>
+            {isAdmin && <span className="admin-edit-hint">✏️ Modifier</span>}
           </div>
-          {isAdmin && <small style={{display:'block',marginTop:'.65rem',color:'var(--muted)'}}>La modification d’un événement déjà publié ne renvoie pas automatiquement une nouvelle notification.</small>}
-        </div>}
+          {x.location&&<p><strong>Lieu :</strong> 📍 {x.location}</p>}
+          {x.description&&<p>{x.description}</p>}
+          <div className="calendar-quick-add" onClick={(e)=>e.stopPropagation()}>
+            <span>Ajouter au calendrier</span>
+            <button type="button" className="calendar-logo-button" title="Ajouter à Apple Calendrier" aria-label="Ajouter à Apple Calendrier" onClick={()=>addApple(x)}>
+              <AppleCalendarIcon />
+            </button>
+            <button type="button" className="calendar-logo-button" title="Ajouter à Google Agenda" aria-label="Ajouter à Google Agenda" onClick={()=>addGoogle(x)}>
+              <GoogleCalendarIcon />
+            </button>
+          </div>
+        </>}
 
         {isEditing && edit && <form className="inline-event-edit" onSubmit={saveEdit} onClick={(e)=>e.stopPropagation()}>
           <span className="eyebrow">Modification administrateur</span>
@@ -191,6 +231,7 @@ export default function Agenda(){
             <button className="primary-button" style={{width:'auto',marginTop:0}} disabled={saving}>{saving?'Enregistrement…':'Enregistrer les modifications'}</button>
             <button type="button" className="secondary-button" disabled={saving} onClick={cancelEdit}>Annuler</button>
           </div>
+          <small style={{display:'block',marginTop:'.65rem',color:'var(--muted)'}}>Une correction simple ne renvoie pas automatiquement une nouvelle notification.</small>
         </form>}
       </div>
     </article>
