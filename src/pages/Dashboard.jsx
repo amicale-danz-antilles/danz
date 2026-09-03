@@ -33,14 +33,14 @@ export default function Dashboard() {
     })
   }, [])
 
-  const firstName = (profile?.full_name || '').trim().split(/\s+/)[0] || ''
+  const fullName = (profile?.full_name || '').trim()
 
   return <div className="home-dashboard">
     <section className="home-welcome">
       <div className="home-welcome-copy">
         <span className="eyebrow">Amicale DANZ Antilles</span>
-        <h1>{firstName ? `Bonjour ${firstName} !` : 'Bienvenue !'}</h1>
-        <p>Votre espace rassemble les informations utiles de la DANZ et de l’Amicale. Retrouvez directement les prochains rendez-vous, les dernières informations, les documents, les photos et les bons plans en Martinique.</p>
+        <h1>{fullName ? `Bonjour ${fullName}` : 'Bienvenue !'}</h1>
+        <p>Votre espace rassemble les informations utiles de la DANZ et de l’Amicale. Retrouvez directement les prochains rendez-vous, les dernières informations, les sondages, les documents, les photos et les bons plans en Martinique.</p>
       </div>
       <img className="home-welcome-logo" src="/danz/amicale-danz-icon.png" alt="Insigne DANZ Antilles" />
     </section>
@@ -90,6 +90,7 @@ export default function Dashboard() {
       </div>
       <div className="home-shortcuts" style={{marginTop:'16px'}}>
         <Link className="home-shortcut" to="/agenda"><span className="home-shortcut-icon">📅</span><strong>Agenda</strong><span>Événements, horaires et ajout au calendrier personnel.</span></Link>
+        <Link className="home-shortcut" to="/sondages"><span className="home-shortcut-icon">✓</span><strong>Sondages</strong><span>Votez pour les futures activités et consultez les résultats.</span></Link>
         <Link className="home-shortcut" to="/actualites"><span className="home-shortcut-icon">📣</span><strong>Actualités</strong><span>Informations et messages publiés pour votre profil.</span></Link>
         <Link className="home-shortcut" to="/bons-plans"><span className="home-shortcut-icon">⭐</span><strong>Bons plans</strong><span>Adresses, avantages, sorties et idées utiles en Martinique.</span></Link>
         <Link className="home-shortcut" to="/documents"><span className="home-shortcut-icon">📄</span><strong>Documents</strong><span>Notes, fichiers et ressources internes à consulter.</span></Link>
