@@ -54,11 +54,13 @@ export default function Amicale(){
   return <>
     <PageTitle eyebrow="Qui sommes-nous ?" title="L'Amicale" text="Un espace de convivialité, d'entraide et de partage pour les membres de la DANZ Antilles." />
 
-    <div className="mission-grid">
-      <article className="mission-card"><span>01</span><h2>Créer du lien</h2><p>Favoriser les rencontres entre collègues et entre générations, dans un cadre convivial au-delà de l'activité professionnelle.</p></article>
-      <article className="mission-card"><span>02</span><h2>Partager</h2><p>Faire circuler les informations utiles, valoriser les initiatives et conserver les souvenirs de nos moments communs.</p></article>
-      <article className="mission-card"><span>03</span><h2>Se retrouver</h2><p>Organiser des activités culturelles, sportives, familiales et festives adaptées aux attentes des amicalistes.</p></article>
-    </div>
+    <section className="text-panel">
+      <span className="eyebrow">L’association</span>
+      <h2>Amicale DANZ Antilles</h2>
+      <p><span className="role-badge">Depuis début 2025 · Association loi 1901</span></p>
+      <p>Créée au début de l’année 2025, l’Amicale DANZ Antilles est une association régie par la loi du 1er juillet 1901 relative au contrat d’association.</p>
+      <p>Elle a pour vocation de créer du lien entre les membres, de faciliter le partage d’informations et d’initiatives, et d’organiser des moments de rencontre conviviaux, culturels, sportifs, familiaux ou festifs.</p>
+    </section>
 
     <section className="text-panel bureau-panel">
       <div className="bureau-heading">
