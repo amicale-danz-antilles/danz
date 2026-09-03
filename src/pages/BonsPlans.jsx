@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { PageTitle } from './Actualites.jsx'
 import '../extra.css'
+import '../good-deals-submissions.css'
 
 const CATEGORIES = [
   ['restaurant', 'Restaurants & gourmandises', '🍴'],
@@ -22,18 +23,24 @@ const EMPTY_FORM = {
   title: '', category: 'restaurant', description: '', offer_text: '', address: '', municipality: '',
   latitude: '', longitude: '', map_verified: false, phone: '', email: '', website_url: '', valid_until: '', audience: 'everyone',
 }
+const EMPTY_PROPOSAL = {
+  title: '', category: 'restaurant', description: '', offer_text: '', address: '', municipality: '',
+  phone: '', email: '', website_url: '',
+}
 
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]))
 const fullAddress = (deal) => [deal.address, deal.municipality, 'Martinique'].filter(Boolean).join(', ')
+const placeSearchText = (deal) => [deal.title, deal.address, deal.municipality, 'Martinique'].filter(Boolean).join(', ')
 const normalizeUrl = (value) => !value ? null : /^https?:\/\//i.test(value) ? value : `https://${value}`
 const isExpired = (deal) => Boolean(deal.valid_until && new Date(`${deal.valid_until}T23:59:59`).getTime() < Date.now())
 const isMartiniqueCoords = (lat, lng) => Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))
   && Number(lat) >= MARTINIQUE.minLat && Number(lat) <= MARTINIQUE.maxLat
   && Number(lng) >= MARTINIQUE.minLng && Number(lng) <= MARTINIQUE.maxLng
 const isMapEligible = (deal) => deal.map_verified === true && isMartiniqueCoords(deal.latitude, deal.longitude)
+const googleSearchUrl = (deal) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(placeSearchText(deal))}`
 
 function navigationUrls(deal) {
-  const query = encodeURIComponent(fullAddress(deal) || deal.title)
+  const query = encodeURIComponent(fullAddress(deal) || placeSearchText(deal))
   const hasCoords = isMapEligible(deal)
   const coords = hasCoords ? `${deal.latitude},${deal.longitude}` : null
   return {
@@ -43,6 +50,45 @@ function navigationUrls(deal) {
       ? `https://www.waze.com/ul?ll=${encodeURIComponent(coords)}&navigate=yes`
       : `https://www.waze.com/ul?q=${query}&navigate=yes`,
   }
+}
+
+async function lookupMartiniqueLocation(place) {
+  const queries = [
+    [place.address, place.municipality, 'Martinique'].filter(Boolean).join(', '),
+    [place.title, place.address, place.municipality, 'Martinique'].filter(Boolean).join(', '),
+    [place.title, place.municipality, 'Martinique'].filter(Boolean).join(', '),
+    [place.title, 'Martinique'].filter(Boolean).join(', '),
+  ].filter((value, index, array) => value.trim() && array.indexOf(value) === index)
+
+  for (let stage = 0; stage < queries.length; stage += 1) {
+    const params = new URLSearchParams({
+      format: 'jsonv2',
+      limit: '5',
+      addressdetails: '1',
+      namedetails: '1',
+      countrycodes: 'fr',
+      bounded: '1',
+      viewbox: '-61.25,14.95,-60.75,14.35',
+      q: queries[stage],
+    })
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+      headers: { 'Accept-Language': 'fr' },
+    })
+    if (!response.ok) continue
+    const data = await response.json()
+    const match = (data || []).find((item) => {
+      const lat = Number(item.lat)
+      const lng = Number(item.lon)
+      const rank = Number(item.place_rank || 0)
+      const type = String(item.type || '')
+      return isMartiniqueCoords(lat, lng)
+        && rank >= (stage === 0 ? 20 : 16)
+        && String(item.display_name || '').toLowerCase().includes('martinique')
+        && !['administrative', 'island', 'region', 'state'].includes(type)
+    })
+    if (match) return { latitude: Number(match.lat), longitude: Number(match.lon), displayName: match.display_name }
+  }
+  return null
 }
 
 function loadLeaflet() {
@@ -104,20 +150,26 @@ function GoodDealsMap({ deals }) {
         const lng = Number(deal.longitude)
         const urls = navigationUrls(deal)
         const category = CATEGORY_MAP[deal.category] || CATEGORY_MAP.autre
-        const emailLink = deal.email ? `<a href="mailto:${escapeHtml(deal.email)}">E-mail</a>` : ''
+        const phone = deal.phone ? String(deal.phone).replace(/\s/g, '') : ''
         const popup = `
           <div class="deal-map-popup">
             <strong>${escapeHtml(category.icon)} ${escapeHtml(deal.title)}</strong>
-            <span>${escapeHtml(fullAddress(deal))}</span>
-            ${emailLink}
-            <small>Ouvrir avec :</small>
+            ${deal.offer_text ? `<div class="deal-map-offer">★ ${escapeHtml(deal.offer_text)}</div>` : ''}
+            ${deal.description ? `<p>${escapeHtml(deal.description)}</p>` : ''}
+            ${(deal.address || deal.municipality) ? `<span>📍 ${escapeHtml([deal.address, deal.municipality].filter(Boolean).join(', '))}</span>` : ''}
+            <div class="deal-map-contacts">
+              ${phone ? `<a href="tel:${escapeHtml(phone)}">☎ Appeler</a>` : ''}
+              ${deal.email ? `<a href="mailto:${escapeHtml(deal.email)}">✉ E-mail</a>` : ''}
+              ${deal.website_url ? `<a href="${escapeHtml(deal.website_url)}" target="_blank" rel="noopener noreferrer">Site web ↗</a>` : ''}
+            </div>
+            <small>Itinéraire :</small>
             <div>
               <a href="${urls.apple}" target="_blank" rel="noopener noreferrer">Apple Plans</a>
               <a href="${urls.google}" target="_blank" rel="noopener noreferrer">Google Maps</a>
               <a href="${urls.waze}" target="_blank" rel="noopener noreferrer">Waze</a>
             </div>
           </div>`
-        L.marker([lat, lng]).addTo(layerRef.current).bindPopup(popup)
+        L.marker([lat, lng]).addTo(layerRef.current).bindPopup(popup, { maxWidth: 320 })
         bounds.push([lat, lng])
       })
 
@@ -158,6 +210,7 @@ function DirectionsMenu({ deal, open, onToggle }) {
 export default function BonsPlans() {
   const { user, isAdmin } = useAuth()
   const [items, setItems] = useState([])
+  const [submissions, setSubmissions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -170,18 +223,29 @@ export default function BonsPlans() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [geocoding, setGeocoding] = useState(false)
+  const [showProposal, setShowProposal] = useState(false)
+  const [proposal, setProposal] = useState(EMPTY_PROPOSAL)
+  const [proposalBusy, setProposalBusy] = useState(false)
+  const [proposalLocation, setProposalLocation] = useState(null)
+  const [reviewBusy, setReviewBusy] = useState(null)
 
   const load = async () => {
     setLoading(true)
-    const { data, error: loadError } = await supabase.from('good_deals').select('*').order('created_at', { ascending: false })
-    if (loadError) setError(loadError.message)
-    setItems(data || [])
+    const [dealsResult, submissionsResult] = await Promise.all([
+      supabase.from('good_deals').select('*').order('created_at', { ascending: false }),
+      supabase.from('good_deal_submissions').select('*').order('submitted_at', { ascending: false }),
+    ])
+    if (dealsResult.error) setError(dealsResult.error.message)
+    if (submissionsResult.error) setError(submissionsResult.error.message)
+    setItems(dealsResult.data || [])
+    setSubmissions(submissionsResult.data || [])
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
 
   const availableItems = useMemo(() => isAdmin ? items : items.filter((item) => !isExpired(item)), [items, isAdmin])
+  const pendingSubmissions = useMemo(() => submissions.filter((item) => item.status === 'pending'), [submissions])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -203,41 +267,106 @@ export default function BonsPlans() {
   }, [availableItems, category, search, sort])
 
   const geocode = async (nextForm = form) => {
-    const query = [nextForm.address, nextForm.municipality, 'Martinique'].filter(Boolean).join(', ')
-    if (!nextForm.address.trim()) return { latitude: null, longitude: null, map_verified: false }
+    if (!nextForm.address.trim() && !nextForm.title.trim()) return { latitude: null, longitude: null, map_verified: false }
     setGeocoding(true)
     try {
-      const params = new URLSearchParams({
-        format: 'jsonv2',
-        limit: '3',
-        addressdetails: '1',
-        countrycodes: 'fr',
-        bounded: '1',
-        viewbox: '-61.25,14.95,-60.75,14.35',
-        q: query,
-      })
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
-        headers: { 'Accept-Language': 'fr' },
-      })
-      if (!response.ok) throw new Error('Service de localisation indisponible.')
-      const data = await response.json()
-      const match = (data || []).find((item) => {
-        const lat = Number(item.lat)
-        const lng = Number(item.lon)
-        return isMartiniqueCoords(lat, lng)
-          && Number(item.place_rank || 0) >= 20
-          && String(item.display_name || '').toLowerCase().includes('martinique')
-      })
+      const match = await lookupMartiniqueLocation(nextForm)
       if (!match) {
         setForm((current) => ({ ...current, latitude: '', longitude: '', map_verified: false }))
-        throw new Error('Adresse trop imprécise pour être placée de façon fiable en Martinique. Elle restera visible dans la liste mais pas sur la carte.')
+        throw new Error('Lieu non retrouvé avec suffisamment de précision en Martinique. Il pourra rester dans la liste sans point carte.')
       }
-      const coords = { latitude: Number(match.lat), longitude: Number(match.lon), map_verified: true }
+      const coords = { latitude: match.latitude, longitude: match.longitude, map_verified: true }
       setForm((current) => ({ ...current, latitude: String(coords.latitude), longitude: String(coords.longitude), map_verified: true }))
       return coords
     } finally {
       setGeocoding(false)
     }
+  }
+
+  const previewProposal = async () => {
+    setProposalBusy(true)
+    setError('')
+    try {
+      const match = await lookupMartiniqueLocation(proposal)
+      setProposalLocation(match)
+      if (!match) setError('Cette adresse n’est pas encore reconnue avec précision. Vous pouvez quand même proposer le bon plan : un admin pourra la corriger avant validation.')
+    } catch (_) {
+      setProposalLocation(null)
+      setError('La vérification automatique de l’adresse n’est pas disponible pour le moment.')
+    } finally {
+      setProposalBusy(false)
+    }
+  }
+
+  const submitProposal = async (event) => {
+    event.preventDefault()
+    setProposalBusy(true)
+    setError('')
+    setSuccess('')
+    const { error: submitError } = await supabase.from('good_deal_submissions').insert({
+      title: proposal.title.trim(),
+      category: proposal.category,
+      description: proposal.description.trim() || null,
+      offer_text: proposal.offer_text.trim() || null,
+      address: proposal.address.trim() || null,
+      municipality: proposal.municipality.trim() || null,
+      phone: proposal.phone.trim() || null,
+      email: proposal.email.trim().toLowerCase() || null,
+      website_url: normalizeUrl(proposal.website_url.trim()),
+      submitted_by: user.id,
+    })
+    if (submitError) setError(submitError.message)
+    else {
+      setSuccess('Merci ! Votre bon plan a été envoyé au bureau. Il apparaîtra dans l’application après validation par un administrateur.')
+      setProposal(EMPTY_PROPOSAL)
+      setProposalLocation(null)
+      setShowProposal(false)
+      await load()
+    }
+    setProposalBusy(false)
+  }
+
+  const approveSubmission = async (submission) => {
+    setReviewBusy(submission.id)
+    setError('')
+    const { error: insertError } = await supabase.from('good_deals').insert({
+      title: submission.title,
+      category: submission.category,
+      description: submission.description,
+      offer_text: submission.offer_text,
+      address: submission.address,
+      municipality: submission.municipality,
+      phone: submission.phone,
+      email: submission.email,
+      website_url: submission.website_url,
+      audience: 'everyone',
+      created_by: user.id,
+    })
+    if (insertError) {
+      setError(insertError.message)
+      setReviewBusy(null)
+      return
+    }
+    const { error: updateError } = await supabase.from('good_deal_submissions').update({
+      status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: user.id,
+    }).eq('id', submission.id)
+    if (updateError) setError(updateError.message)
+    else {
+      setSuccess(`« ${submission.title} » a été validé. Sa position est maintenant recalculée côté serveur avant d’apparaître sur la carte.`)
+      await load()
+    }
+    setReviewBusy(null)
+  }
+
+  const rejectSubmission = async (submission) => {
+    if (!window.confirm(`Refuser la proposition « ${submission.title} » ?`)) return
+    setReviewBusy(submission.id)
+    const { error: updateError } = await supabase.from('good_deal_submissions').update({
+      status: 'rejected', reviewed_at: new Date().toISOString(), reviewed_by: user.id,
+    }).eq('id', submission.id)
+    if (updateError) setError(updateError.message)
+    else await load()
+    setReviewBusy(null)
   }
 
   const resetForm = () => {
@@ -270,7 +399,7 @@ export default function BonsPlans() {
 
       if (Number.isFinite(latitude) || Number.isFinite(longitude)) {
         if (!isMartiniqueCoords(latitude, longitude)) {
-          throw new Error('Ces coordonnées sont hors de la Martinique. Corrigez-les ou laissez-les vides pour ne pas afficher ce bon plan sur la carte.')
+          throw new Error('Ces coordonnées sont hors de la Martinique. Corrigez-les ou laissez-les vides.')
         }
         mapVerified = true
       }
@@ -311,7 +440,7 @@ export default function BonsPlans() {
       const { error: saveError } = await query
       if (saveError) throw saveError
 
-      setSuccess(editing ? 'Bon plan modifié.' : 'Bon plan ajouté.')
+      setSuccess(editing ? 'Bon plan modifié. La position est revérifiée automatiquement si l’adresse a changé.' : 'Bon plan ajouté. La position est revérifiée automatiquement côté serveur.')
       resetForm()
       await load()
     } catch (err) {
@@ -329,12 +458,67 @@ export default function BonsPlans() {
   }
 
   return <>
-    <PageTitle eyebrow="Martinique" title="Bons plans" text="Les bonnes adresses et idées utiles partagées par l’Amicale. La carte n’affiche que les positions vérifiées avec suffisamment de précision en Martinique." />
+    <PageTitle eyebrow="Martinique" title="Bons plans" text="Les bonnes adresses et idées utiles partagées par l’Amicale. La carte croise l’adresse, la commune et le nom du lieu pour afficher un maximum de positions fiables en Martinique." />
+
+    <section className="good-deals-contribute-bar">
+      <div><strong>Vous connaissez un bon plan ?</strong><span>Tout membre peut le proposer. Le bureau le vérifie avant sa publication dans l’application.</span></div>
+      <button type="button" className="secondary-button" onClick={() => { setShowProposal(!showProposal); setProposalLocation(null); setError('') }}>{showProposal ? 'Fermer' : '＋ Proposer un bon plan'}</button>
+    </section>
+
+    {showProposal && <section className="good-deals-admin-panel good-deals-proposal-panel">
+      <h2>Proposer un bon plan</h2>
+      <p className="muted">Indiquez le nom exact du lieu et son adresse. La position est recherchée automatiquement en Martinique, puis recalculée côté serveur après validation par un admin.</p>
+      <form onSubmit={submitProposal} className="good-deals-form">
+        <label>Nom du lieu<input required maxLength="160" value={proposal.title} onChange={(e) => { setProposal({ ...proposal, title: e.target.value }); setProposalLocation(null) }} /></label>
+        <label>Rubrique<select value={proposal.category} onChange={(e) => setProposal({ ...proposal, category: e.target.value })}>{CATEGORIES.map(([value, label, icon]) => <option key={value} value={value}>{icon} {label}</option>)}</select></label>
+        <label className="full">Le bon plan / avantage<input maxLength="250" placeholder="Réduction, tarif, avantage…" value={proposal.offer_text} onChange={(e) => setProposal({ ...proposal, offer_text: e.target.value })} /></label>
+        <label className="full">Description<textarea rows="3" value={proposal.description} onChange={(e) => setProposal({ ...proposal, description: e.target.value })} /></label>
+        <label>Adresse<input required value={proposal.address} onChange={(e) => { setProposal({ ...proposal, address: e.target.value }); setProposalLocation(null) }} placeholder="Numéro, rue, quartier…" /></label>
+        <label>Commune<input required value={proposal.municipality} onChange={(e) => { setProposal({ ...proposal, municipality: e.target.value }); setProposalLocation(null) }} placeholder="Fort-de-France, Le Marin…" /></label>
+        <div className="full proposal-location-check">
+          <button type="button" className="secondary-button" disabled={proposalBusy || (!proposal.address.trim() && !proposal.title.trim())} onClick={previewProposal}>{proposalBusy ? 'Vérification…' : '📍 Vérifier la position'}</button>
+          <a className="secondary-button" href={googleSearchUrl(proposal)} target="_blank" rel="noopener noreferrer">Comparer dans Google Maps ↗</a>
+          {proposalLocation && <small>✓ Lieu repéré en Martinique : {proposalLocation.displayName}</small>}
+        </div>
+        <label>Téléphone<input type="tel" value={proposal.phone} onChange={(e) => setProposal({ ...proposal, phone: e.target.value })} /></label>
+        <label>E-mail<input type="email" value={proposal.email} onChange={(e) => setProposal({ ...proposal, email: e.target.value })} /></label>
+        <label className="full">Site internet<input type="text" inputMode="url" placeholder="www.exemple.fr" value={proposal.website_url} onChange={(e) => setProposal({ ...proposal, website_url: e.target.value })} /></label>
+        <div className="full good-deals-form-actions"><button className="primary-button" disabled={proposalBusy}>{proposalBusy ? 'Envoi…' : 'Envoyer au bureau pour validation'}</button></div>
+      </form>
+    </section>}
+
+    {success && <div className="alert" style={{marginBottom:'1rem'}}>{success}</div>}
+    {error && <div className="alert error" style={{marginBottom:'1rem'}}>{error}</div>}
 
     {isAdmin && <div className="good-deals-admin-bar">
-      <div><strong>Gestion des bons plans</strong><span>Ajoutez, corrigez ou supprimez les recommandations de l’application.</span></div>
+      <div><strong>Gestion des bons plans</strong><span>Ajoutez ou corrigez les fiches publiées. {pendingSubmissions.length ? `${pendingSubmissions.length} proposition${pendingSubmissions.length > 1 ? 's' : ''} à valider.` : 'Aucune proposition en attente.'}</span></div>
       <button type="button" className="secondary-button" onClick={() => { setShowAdmin(!showAdmin); if (showAdmin) resetForm() }}>{showAdmin ? 'Fermer la gestion' : '＋ Ajouter / gérer'}</button>
     </div>}
+
+    {isAdmin && pendingSubmissions.length > 0 && <section className="good-deal-submissions-review">
+      <div className="section-heading"><div><span className="eyebrow">Validation admin</span><h2>Propositions des membres</h2></div></div>
+      <div className="submission-review-grid">
+        {pendingSubmissions.map((submission) => {
+          const cat = CATEGORY_MAP[submission.category] || CATEGORY_MAP.autre
+          return <article className="submission-review-card" key={submission.id}>
+            <span className="good-deal-category">{cat.icon} {cat.label}</span>
+            <h3>{submission.title}</h3>
+            {submission.offer_text && <div className="good-deal-offer">★ {submission.offer_text}</div>}
+            {submission.description && <p>{submission.description}</p>}
+            {(submission.address || submission.municipality) && <p>📍 {[submission.address, submission.municipality].filter(Boolean).join(', ')}</p>}
+            <div className="submission-contact-line">
+              {submission.phone && <a href={`tel:${submission.phone.replace(/\s/g,'')}`}>☎ {submission.phone}</a>}
+              {submission.email && <a href={`mailto:${submission.email}`}>✉ {submission.email}</a>}
+              <a href={googleSearchUrl(submission)} target="_blank" rel="noopener noreferrer">Vérifier Google Maps ↗</a>
+            </div>
+            <div className="good-deals-form-actions">
+              <button className="primary-button" disabled={reviewBusy === submission.id} onClick={() => approveSubmission(submission)}>{reviewBusy === submission.id ? 'Traitement…' : '✓ Valider et publier'}</button>
+              <button className="secondary-button" disabled={reviewBusy === submission.id} onClick={() => rejectSubmission(submission)}>Refuser</button>
+            </div>
+          </article>
+        })}
+      </div>
+    </section>}
 
     {isAdmin && showAdmin && <section className="good-deals-admin-panel">
       <h2>{editing ? 'Modifier le bon plan' : 'Ajouter un bon plan'}</h2>
@@ -346,19 +530,22 @@ export default function BonsPlans() {
         <label>Adresse<input type="text" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value, latitude: '', longitude: '', map_verified: false })} /></label>
         <label>Commune<input type="text" placeholder="Fort-de-France, Le Marin…" value={form.municipality} onChange={(e) => setForm({ ...form, municipality: e.target.value, latitude: '', longitude: '', map_verified: false })} /></label>
         <div className="full good-deals-geocode-row">
-          <button type="button" className="secondary-button" disabled={geocoding || !form.address.trim()} onClick={() => geocode().catch((err) => setError(err.message))}>{geocoding ? 'Localisation…' : '📍 Vérifier précisément cette adresse'}</button>
-          {form.map_verified && form.latitude && form.longitude && <small>Position vérifiée : {Number(form.latitude).toFixed(5)}, {Number(form.longitude).toFixed(5)}</small>}
+          <button type="button" className="secondary-button" disabled={geocoding || (!form.address.trim() && !form.title.trim())} onClick={() => geocode().catch((err) => setError(err.message))}>{geocoding ? 'Localisation…' : '📍 Rechercher la position'}</button>
+          <a className="secondary-button" href={googleSearchUrl(form)} target="_blank" rel="noopener noreferrer">Comparer dans Google Maps ↗</a>
+          {form.map_verified && form.latitude && form.longitude && <small>Prévisualisation : {Number(form.latitude).toFixed(5)}, {Number(form.longitude).toFixed(5)}</small>}
         </div>
-        <details className="full good-deals-advanced"><summary>Coordonnées avancées (uniquement si vous connaissez la position exacte)</summary><div><label>Latitude<input type="number" step="any" min={MARTINIQUE.minLat} max={MARTINIQUE.maxLat} value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value, map_verified: false })} /></label><label>Longitude<input type="number" step="any" min={MARTINIQUE.minLng} max={MARTINIQUE.maxLng} value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value, map_verified: false })} /></label></div></details>
+        <details className="full good-deals-advanced"><summary>Coordonnées avancées</summary><div><label>Latitude<input type="number" step="any" min={MARTINIQUE.minLat} max={MARTINIQUE.maxLat} value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value, map_verified: false })} /></label><label>Longitude<input type="number" step="any" min={MARTINIQUE.minLng} max={MARTINIQUE.maxLng} value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value, map_verified: false })} /></label></div></details>
         <label>Téléphone<input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
         <label>E-mail<input type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
         <label>Site internet<input type="text" inputMode="url" placeholder="www.exemple.fr" value={form.website_url} onChange={(e) => setForm({ ...form, website_url: e.target.value })} /></label>
         <label>Valable jusqu’au (facultatif)<input type="date" value={form.valid_until} onChange={(e) => setForm({ ...form, valid_until: e.target.value })} /></label>
         <label>Audience<select value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })}><option value="everyone">Tout le monde</option><option value="military">Militaires DANZ uniquement</option><option value="amicaliste">Amicalistes uniquement</option><option value="admin">Bureau / Admin uniquement</option></select></label>
-        {error && <div className="alert error full">{error}</div>}
-        {success && <div className="alert full">{success}</div>}
         <div className="full good-deals-form-actions"><button className="primary-button" disabled={saving}>{saving ? 'Enregistrement…' : editing ? 'Enregistrer les modifications' : 'Ajouter le bon plan'}</button>{editing && <button type="button" className="secondary-button" onClick={resetForm}>Annuler</button>}</div>
       </form>
+    </section>}
+
+    {!isAdmin && submissions.length > 0 && <section className="my-good-deal-submissions">
+      <details><summary>Mes propositions ({submissions.length})</summary><div>{submissions.map((submission) => <p key={submission.id}><strong>{submission.title}</strong> — {submission.status === 'pending' ? 'En attente de validation' : submission.status === 'approved' ? 'Validée' : 'Non retenue'}</p>)}</div></details>
     </section>}
 
     <section className="good-deals-tools">
