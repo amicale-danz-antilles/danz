@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { resolvePrivateMedia } from '../lib/mediaStorage.js'
 import { PageTitle } from './Actualites.jsx'
 import '../extra.css'
+import '../home-refactor.css'
 
 const escapeIcs=(value='')=>String(value).replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;')
 const icsDate=(value)=>new Date(value).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z')
