@@ -24,17 +24,16 @@ export default function Layout() {
     navigate('/connexion')
   }
 
-  const spaceTitle = isAdmin
-    ? 'Espace administrateur'
-    : profile?.access_type === 'personnel_danz'
-      ? 'Espace Militaire DANZ'
-      : 'Espace amicaliste'
+  const memberDetails = []
+  if (!isAdmin) {
+    memberDetails.push(profile?.applicant_type === 'spouse' ? 'Conjoint(e)' : 'Militaire DANZ')
+    if (profile?.is_amicaliste === true) memberDetails.push('Amicaliste')
+  }
 
+  const spaceTitle = isAdmin ? 'Espace administrateur' : 'Espace membre'
   const spaceSubtitle = isAdmin
     ? 'Administration et vie de l’amicale'
-    : profile?.access_type === 'personnel_danz'
-      ? 'Accès réservé aux militaires validés de la DANZ'
-      : 'Accès réservé aux amicalistes validés'
+    : memberDetails.join(' · ') || 'Compte membre validé'
 
   return (
     <div className="app-shell">
