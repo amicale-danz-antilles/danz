@@ -13,7 +13,7 @@ const typeLabels = {
 
 const audienceLabels = {
   everyone: 'Tout le monde',
-  military: 'Militaires uniquement',
+  military: 'Militaires DANZ uniquement',
   amicaliste: 'Amicalistes uniquement',
   admin: 'Bureau / Admin uniquement',
 }
@@ -191,7 +191,7 @@ export default function AdminContent() {
         <label>Audience
           <select value={audience} onChange={(e) => setAudience(e.target.value)}>
             <option value="everyone">Tout le monde</option>
-            <option value="military">Militaires uniquement</option>
+            <option value="military">Militaires DANZ uniquement</option>
             <option value="amicaliste">Amicalistes uniquement</option>
             <option value="admin">Bureau / Admin uniquement</option>
           </select>
