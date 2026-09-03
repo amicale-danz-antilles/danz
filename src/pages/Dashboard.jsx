@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { resolvePrivateMedia } from '../lib/mediaStorage.js'
 import '../extra.css'
+import '../home-refactor.css'
 import '../polls-bureau.css'
 
 const formatDate=(value)=>new Date(value).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})
