@@ -10,7 +10,6 @@ export default function Sondages() {
   const [polls, setPolls] = useState([])
   const [options, setOptions] = useState({})
   const [votes, setVotes] = useState({})
-  const [results, setResults] = useState({})
   const [loading, setLoading] = useState(true)
   const [busyPoll, setBusyPoll] = useState(null)
   const [error, setError] = useState('')
@@ -39,14 +38,13 @@ export default function Sondages() {
     if (!list.length) {
       setOptions({})
       setVotes({})
-      setResults({})
       setLoading(false)
       return
     }
 
     const pollIds = list.map((p) => p.id)
     const [{ data: optionData, error: optionError }, { data: voteData, error: voteError }] = await Promise.all([
-      supabase.from('poll_options').select('*').in('poll_id', pollIds).order('sort_order'),
+      supabase.from('poll_options').select('id,poll_id,label,sort_order,vote_count').in('poll_id', pollIds).order('sort_order'),
       supabase.from('poll_votes').select('poll_id,option_id,user_id').eq('user_id', user.id),
     ])
     if (optionError) setError(optionError.message)
@@ -62,12 +60,6 @@ export default function Sondages() {
     const ownVotes = {}
     for (const vote of voteData || []) ownVotes[vote.poll_id] = vote.option_id
     setVotes(ownVotes)
-
-    const resultPairs = await Promise.all(list.map(async (poll) => {
-      const { data } = await supabase.rpc('get_poll_results', { p_poll_id: poll.id })
-      return [poll.id, data || []]
-    }))
-    setResults(Object.fromEntries(resultPairs))
     setLoading(false)
   }
 
@@ -173,25 +165,24 @@ export default function Sondages() {
     {error && <div className="alert error" style={{marginBottom:'1rem'}}>{error}</div>}
 
     {loading ? <div className="skeleton-card tall" /> : <>
-      <PollSection title="Sondages ouverts" empty="Aucun sondage ouvert pour le moment." polls={activePolls} options={options} votes={votes} results={results} busyPoll={busyPoll} isAdmin={isAdmin} onVote={vote} onClose={closePoll} onRemove={removePoll} />
-      {closedPolls.length > 0 && <PollSection title="Sondages clôturés" polls={closedPolls} options={options} votes={votes} results={results} busyPoll={busyPoll} isAdmin={isAdmin} onVote={vote} onClose={closePoll} onRemove={removePoll} />}
+      <PollSection title="Sondages ouverts" empty="Aucun sondage ouvert pour le moment." polls={activePolls} options={options} votes={votes} busyPoll={busyPoll} isAdmin={isAdmin} onVote={vote} onClose={closePoll} onRemove={removePoll} />
+      {closedPolls.length > 0 && <PollSection title="Sondages clôturés" polls={closedPolls} options={options} votes={votes} busyPoll={busyPoll} isAdmin={isAdmin} onVote={vote} onClose={closePoll} onRemove={removePoll} />}
     </>}
   </>
 }
 
-function PollSection({ title, empty, polls, options, votes, results, busyPoll, isAdmin, onVote, onClose, onRemove }) {
+function PollSection({ title, empty, polls, options, votes, busyPoll, isAdmin, onVote, onClose, onRemove }) {
   return <section className="poll-section">
     <div className="section-heading"><div><span className="eyebrow">Activités à venir</span><h2>{title}</h2></div></div>
     <div className="poll-list">
-      {polls.length ? polls.map((poll) => <PollCard key={poll.id} poll={poll} options={options[poll.id] || []} vote={votes[poll.id]} results={results[poll.id] || []} busy={busyPoll === poll.id} isAdmin={isAdmin} onVote={onVote} onClose={onClose} onRemove={onRemove} />) : <div className="empty-state">{empty}</div>}
+      {polls.length ? polls.map((poll) => <PollCard key={poll.id} poll={poll} options={options[poll.id] || []} vote={votes[poll.id]} busy={busyPoll === poll.id} isAdmin={isAdmin} onVote={onVote} onClose={onClose} onRemove={onRemove} />) : <div className="empty-state">{empty}</div>}
     </div>
   </section>
 }
 
-function PollCard({ poll, options, vote, results, busy, isAdmin, onVote, onClose, onRemove }) {
+function PollCard({ poll, options, vote, busy, isAdmin, onVote, onClose, onRemove }) {
   const open = isOpen(poll)
-  const counts = Object.fromEntries(results.map((row) => [row.option_id, Number(row.vote_count || 0)]))
-  const total = Object.values(counts).reduce((sum, value) => sum + value, 0)
+  const total = options.reduce((sum, option) => sum + Number(option.vote_count || 0), 0)
 
   return <article className="poll-card">
     <div className="poll-card-head">
@@ -209,7 +200,7 @@ function PollCard({ poll, options, vote, results, busy, isAdmin, onVote, onClose
 
     <div className="poll-options">
       {options.map((option) => {
-        const count = counts[option.id] || 0
+        const count = Number(option.vote_count || 0)
         const percent = total ? Math.round((count / total) * 100) : 0
         const selected = vote === option.id
         return <button
