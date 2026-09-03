@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { PageTitle } from './Actualites.jsx'
+import '../extra.css'
 
 const escapeIcs = (value = '') => String(value)
   .replace(/\\/g, '\\\\')
@@ -160,9 +161,9 @@ export default function Agenda(){
           {isAdmin && <small style={{display:'block',marginTop:'.65rem',color:'var(--muted)'}}>La modification d’un événement déjà publié ne renvoie pas automatiquement une nouvelle notification.</small>}
         </div>}
 
-        {isEditing && edit && <form onSubmit={saveEdit} onClick={(e)=>e.stopPropagation()}>
+        {isEditing && edit && <form className="inline-event-edit" onSubmit={saveEdit} onClick={(e)=>e.stopPropagation()}>
           <span className="eyebrow">Modification administrateur</span>
-          <h2 style={{marginTop:'.35rem'}}>Modifier l’événement</h2>
+          <h2 style={{marginTop:'.1rem',marginBottom:'.4rem'}}>Modifier l’événement</h2>
           <label>Titre
             <input type="text" required value={edit.title} onChange={(e)=>setEdit({...edit,title:e.target.value})} />
           </label>
@@ -186,7 +187,7 @@ export default function Agenda(){
               <option value="admin">Bureau / Admin uniquement</option>
             </select>
           </label>
-          <div style={{display:'flex',gap:'.65rem',flexWrap:'wrap',marginTop:'1rem'}}>
+          <div style={{display:'flex',gap:'.65rem',flexWrap:'wrap',marginTop:'.35rem'}}>
             <button className="primary-button" style={{width:'auto',marginTop:0}} disabled={saving}>{saving?'Enregistrement…':'Enregistrer les modifications'}</button>
             <button type="button" className="secondary-button" disabled={saving} onClick={cancelEdit}>Annuler</button>
           </div>
