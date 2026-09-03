@@ -1,0 +1,26 @@
+.profile-chip-link{text-decoration:none;color:inherit}.profile-chip-link small{display:grid;gap:1px;min-width:0}.profile-chip-link small strong{font:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.profile-chip-link small em{font-style:normal;font-size:10px;color:var(--muted)}.profile-chip-link:hover{background:rgba(255,255,255,.07)}
+
+/* Dans les pages de consultation, aucun contrôle d’administration n’est exposé. */
+.public-surface .home-admin-banner,
+.public-surface .good-deals-admin-bar,
+.public-surface .good-deal-submissions-review,
+.public-surface .good-deals-admin-panel,
+.public-surface .good-deal-admin-actions,
+.public-surface .poll-admin-bar,
+.public-surface .poll-create-panel,
+.public-surface .poll-admin-actions,
+.public-surface .gallery-upload-panel,
+.public-surface .gallery-media-item figcaption>.ghost-button,
+.public-surface .admin-edit-hint,
+.public-surface .bureau-card-editable small{display:none!important}
+
+.public-surface .bureau-card-editable{pointer-events:none!important;cursor:default!important}
+.public-surface .admin-editable-event{pointer-events:none!important;cursor:default!important;transform:none!important}
+.public-surface .admin-editable-event .calendar-quick-add,
+.public-surface .admin-editable-event .calendar-quick-add *{pointer-events:auto!important}
+.public-surface .admin-editable-event .secondary-button{display:none!important}
+
+.admin-hub{display:grid;gap:22px}.admin-hub-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.admin-hub-card{display:flex;flex-direction:column;gap:8px;min-height:150px;padding:20px;border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:0 6px 22px rgba(25,61,68,.05);transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}.admin-hub-card:hover{transform:translateY(-2px);box-shadow:0 11px 28px rgba(25,61,68,.09);border-color:#b9cfca}.admin-hub-card .admin-hub-icon{font-size:26px}.admin-hub-card strong{font-family:'Playfair Display',serif;font-size:19px;color:var(--ink)}.admin-hub-card span{font-size:12px;line-height:1.5;color:var(--muted)}.admin-hub-card .role-badge{align-self:flex-start;margin-top:auto}.admin-section-heading{display:flex;align-items:end;justify-content:space-between;gap:15px;margin:4px 0 14px}.admin-section-heading h2{margin:3px 0 0}.admin-back-link{display:inline-flex;align-items:center;gap:6px;margin-bottom:14px;font-size:12px;font-weight:800;color:var(--sea2)}
+
+@media(max-width:900px){.admin-hub-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.admin-hub-grid{grid-template-columns:1fr}.admin-hub-card{min-height:120px}.admin-section-heading{align-items:flex-start;flex-direction:column}}
