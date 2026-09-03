@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase.js'
 const accessLabels = {
   admin: 'Admin',
   amicaliste: 'Amicaliste',
-  personnel_danz: 'Personnel de la DANZ',
+  personnel_danz: 'Militaire DANZ',
 }
 
 export default function Login() {
@@ -111,7 +111,7 @@ export default function Login() {
           <div style={{display:'grid',gridTemplateColumns:'1fr',gap:'.65rem',margin:'1rem 0 1.25rem'}}>
             <button type="button" className={mode === 'admin' ? 'primary-button' : 'ghost-button'} onClick={() => changeMode('admin')}>Admin</button>
             <button type="button" className={mode === 'amicaliste' ? 'primary-button' : 'ghost-button'} onClick={() => changeMode('amicaliste')}>Amicaliste</button>
-            <button type="button" className={mode === 'personnel_danz' ? 'primary-button' : 'ghost-button'} onClick={() => changeMode('personnel_danz')}>Personnel de la DANZ</button>
+            <button type="button" className={mode === 'personnel_danz' ? 'primary-button' : 'ghost-button'} onClick={() => changeMode('personnel_danz')}>Militaire DANZ</button>
           </div>
 
           {!configured && <div className="alert warning"><strong>Configuration nécessaire.</strong><br />Les variables Supabase doivent être ajoutées avant la première connexion.</div>}
