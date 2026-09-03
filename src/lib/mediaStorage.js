@@ -17,13 +17,7 @@ export async function getR2Status() {
 
 export async function uploadPrivateMedia(file, { scope, parentId, fallbackBucket }) {
   const { data, error } = await supabase.functions.invoke('r2-media', {
-    body: {
-      action: 'upload',
-      scope,
-      parentId,
-      fileName: file.name,
-      fileSize: file.size,
-    },
+    body: { action: 'upload', scope, parentId, fileName: file.name, fileSize: file.size },
   })
 
   if (!error && data?.url && data?.key) {
@@ -41,16 +35,12 @@ export async function uploadPrivateMedia(file, { scope, parentId, fallbackBucket
     throw new Error(data?.error || error?.message || 'Impossible de préparer le stockage du fichier.')
   }
 
-  if (file.size > FALLBACK_LIMIT) {
-    throw new Error('Cloudflare R2 n’est pas encore raccordé. Tant qu’il ne l’est pas, les fichiers de secours Supabase sont limités à 45 Mo.')
-  }
+  if (file.size > FALLBACK_LIMIT) throw new Error('Cloudflare R2 n’est pas encore raccordé. Tant qu’il ne l’est pas, les fichiers de secours Supabase sont limités à 45 Mo.')
 
   const random = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`
   const path = `${scope}/${parentId || 'general'}/${Date.now()}-${random}-${safeName(file.name)}`
   const { error: uploadError } = await supabase.storage.from(fallbackBucket).upload(path, file, {
-    cacheControl: '3600',
-    upsert: false,
-    contentType: file.type || undefined,
+    cacheControl: '3600', upsert: false, contentType: file.type || undefined,
   })
   if (uploadError) throw uploadError
   return { storage_provider: 'supabase', storage_path: path }
@@ -59,9 +49,7 @@ export async function uploadPrivateMedia(file, { scope, parentId, fallbackBucket
 export async function resolvePrivateMedia(item, { entity, fallbackBucket }) {
   if (!item?.storage_path) return item?.image_url || null
   if (item.storage_provider === 'r2') {
-    const { data, error } = await supabase.functions.invoke('r2-media', {
-      body: { action: 'view', entity, id: item.id },
-    })
+    const { data, error } = await supabase.functions.invoke('r2-media', { body: { action: 'view', entity, id: item.id } })
     if (error || !data?.url) return null
     return data.url
   }
@@ -69,11 +57,12 @@ export async function resolvePrivateMedia(item, { entity, fallbackBucket }) {
   return data?.signedUrl || null
 }
 
-export async function removePrivateMedia(item, { fallbackBucket }) {
+export async function removePrivateMedia(item, { entity, fallbackBucket } = {}) {
   if (!item?.storage_path) return
-  if (item.storage_provider === 'supabase') {
-    await supabase.storage.from(fallbackBucket).remove([item.storage_path])
+  if (item.storage_provider === 'r2') {
+    if (!entity || !item.id) return
+    await supabase.functions.invoke('r2-media', { body: { action: 'delete', entity, id: item.id } })
+    return
   }
-  // La suppression physique R2 sera ajoutée dès que le bucket Cloudflare est raccordé.
-  // La suppression de la ligne de base suffit à rendre le média inaccessible depuis l’application.
+  await supabase.storage.from(fallbackBucket).remove([item.storage_path])
 }
