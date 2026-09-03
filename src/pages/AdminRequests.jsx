@@ -4,12 +4,6 @@ import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { PageTitle } from './Actualites.jsx'
 
-const accessLabels = {
-  admin: 'Admin',
-  amicaliste: 'Amicaliste',
-  personnel_danz: 'Militaire DANZ',
-}
-
 export default function AdminRequests() {
   const { isAdmin, loading: authLoading } = useAuth()
   const [requests, setRequests] = useState([])
@@ -22,7 +16,7 @@ export default function AdminRequests() {
     setError('')
     const { data, error: loadError } = await supabase
       .from('membership_requests')
-      .select('id, full_name, first_name, last_name, email, applicant_type, is_amicaliste, requested_access, status, created_at')
+      .select('id, full_name, first_name, last_name, email, applicant_type, is_amicaliste, status, created_at')
       .order('created_at', { ascending: false })
     if (loadError) setError(loadError.message)
     setRequests(data || [])
@@ -60,7 +54,7 @@ export default function AdminRequests() {
   }
 
   return <>
-    <PageTitle eyebrow="Administration" title="Demandes d’accès" text="Toute inscription doit être validée ici avant qu’un compte puisse accéder à l’espace privé." />
+    <PageTitle eyebrow="Administration" title="Demandes d’accès" text="Vérifiez simplement l’identité et le profil du demandeur. Le site enregistrera automatiquement ses catégories lors de l’approbation." />
     {error && <div className="alert error">{error}</div>}
     {loading ? <div className="skeleton-card" /> : requests.length === 0 ? (
       <div className="empty-state">Aucune demande pour le moment.</div>
@@ -68,14 +62,12 @@ export default function AdminRequests() {
       <div className="card-grid">
         {requests.map((request) => {
           const displayName = [request.first_name, request.last_name].filter(Boolean).join(' ') || request.full_name
-          const situation = request.applicant_type === 'spouse' ? 'Conjoint(e)' : 'Militaire'
-          const access = accessLabels[request.requested_access] || 'Amicaliste'
+          const situation = request.applicant_type === 'spouse' ? 'Conjoint(e)' : 'Militaire DANZ'
           const amicaliste = request.is_amicaliste === true ? 'Oui' : request.is_amicaliste === false ? 'Non' : 'Non renseigné'
 
           return <article className="content-card" key={request.id}>
             <time>{new Date(request.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</time>
             <h3>{displayName}</h3>
-            <p><span className="role-badge">Demande : {access}</span></p>
             <p><strong>E-mail :</strong> {request.email}</p>
             <p><strong>Situation :</strong> {situation}</p>
             <p><strong>Amicaliste :</strong> {amicaliste}</p>
@@ -83,7 +75,7 @@ export default function AdminRequests() {
 
             {request.status === 'pending' && <div style={{display:'flex',gap:'.75rem',flexWrap:'wrap'}}>
               <button className="primary-button" disabled={busyId === request.id} onClick={() => approve(request.id)}>
-                {busyId === request.id ? 'Traitement…' : `Approuver — ${access}`}
+                {busyId === request.id ? 'Traitement…' : 'Approuver l’accès'}
               </button>
               <button className="ghost-button" disabled={busyId === request.id} onClick={() => reject(request.id)}>Refuser</button>
             </div>}
