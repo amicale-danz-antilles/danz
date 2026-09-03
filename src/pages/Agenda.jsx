@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { PageTitle } from './Actualites.jsx'
@@ -30,7 +31,9 @@ function GoogleLogo() {
 
 export default function Agenda(){
  const { isAdmin } = useAuth()
+ const navigate = useNavigate()
  const [items,setItems]=useState([])
+ const [mediaCounts,setMediaCounts]=useState({})
  const [loading,setLoading]=useState(true)
  const [editingId,setEditingId]=useState(null)
  const [edit,setEdit]=useState(null)
@@ -38,9 +41,16 @@ export default function Agenda(){
  const [error,setError]=useState('')
 
  const load = async () => {
-  const { data, error: loadError } = await supabase.from('events').select('*').order('starts_at',{ascending:true})
-  if (loadError) setError(loadError.message)
-  setItems(data||[])
+  const [eventsResult, mediaResult] = await Promise.all([
+    supabase.from('events').select('*').order('starts_at',{ascending:true}),
+    supabase.from('gallery').select('event_id').not('event_id','is',null),
+  ])
+  if (eventsResult.error) setError(eventsResult.error.message)
+  if (mediaResult.error) setError(mediaResult.error.message)
+  setItems(eventsResult.data||[])
+  const counts = {}
+  ;(mediaResult.data || []).forEach((row)=>{ if(row.event_id) counts[row.event_id] = (counts[row.event_id] || 0) + 1 })
+  setMediaCounts(counts)
   setLoading(false)
  }
 
@@ -90,6 +100,11 @@ export default function Agenda(){
     location: event.location || '',
   })
   window.open(`https://calendar.google.com/calendar/render?${params.toString()}`, '_blank', 'noopener,noreferrer')
+ }
+
+ const openGallery = (event, clickEvent) => {
+  clickEvent?.stopPropagation()
+  navigate(`/galerie?event=${event.id}`)
  }
 
  const beginEdit = (event) => {
@@ -152,13 +167,14 @@ export default function Agenda(){
  }
 
  return <>
-  <PageTitle eyebrow="Vie de l'amicale" title="Agenda" text={isAdmin ? "Toutes les informations sont visibles directement. Touchez une tuile pour modifier l’événement." : "Toutes les informations sont visibles directement. Ajoutez un rendez-vous à votre calendrier en touchant simplement le logo Apple ou Google."} />
+  <PageTitle eyebrow="Vie de l'amicale" title="Agenda" text={isAdmin ? "Toutes les informations sont visibles directement. Touchez une tuile pour modifier l’événement, ou ouvrez son dossier photos & vidéos." : "Toutes les informations sont visibles directement. Les souvenirs d’un événement sont accessibles depuis sa tuile lorsqu’ils sont disponibles."} />
   {error && <div className="alert error" style={{marginBottom:'1rem'}}>{error}</div>}
   {loading?<div className="skeleton-card tall"/>:<div className="timeline">
    {items.length?items.map(x=>{
     const d=new Date(x.starts_at)
     const isEditing=editingId===x.id
     const endLabel=formatEnd(x)
+    const mediaCount = mediaCounts[x.id] || 0
     return <article className="timeline-item" key={x.id}>
       <div className="timeline-date"><strong>{d.getDate()}</strong><span>{d.toLocaleDateString('fr-FR',{month:'short',year:'numeric'})}</span></div>
       <div
@@ -190,6 +206,11 @@ export default function Agenda(){
               <GoogleLogo />
             </button>
           </div>
+          {(mediaCount > 0 || isAdmin) && <div style={{marginTop:'.75rem'}} onClick={(e)=>e.stopPropagation()}>
+            <button type="button" className="secondary-button" onClick={(e)=>openGallery(x,e)}>
+              {mediaCount > 0 ? `📷 Voir les photos & vidéos (${mediaCount})` : '📷 Ajouter des photos & vidéos'}
+            </button>
+          </div>}
         </>}
 
         {isEditing && edit && <form className="inline-event-edit" onSubmit={saveEdit} onClick={(e)=>e.stopPropagation()}>
