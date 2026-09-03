@@ -23,7 +23,7 @@ export default function Agenda(){
   })
  },[])
 
- const addIcs = (event) => {
+ const addApple = (event) => {
   const start = new Date(event.starts_at)
   const end = event.ends_at ? new Date(event.ends_at) : new Date(start.getTime() + 60 * 60 * 1000)
   const uid = `${event.id}@amicale-danz-antilles`
@@ -56,7 +56,7 @@ export default function Agenda(){
   setTimeout(() => URL.revokeObjectURL(url), 1500)
  }
 
- const openGoogle = (event) => {
+ const addGoogle = (event) => {
   const start = new Date(event.starts_at)
   const end = event.ends_at ? new Date(event.ends_at) : new Date(start.getTime() + 60 * 60 * 1000)
   const params = new URLSearchParams({
@@ -85,10 +85,9 @@ export default function Agenda(){
         {expanded&&<div style={{marginTop:'1rem',paddingTop:'1rem',borderTop:'1px solid rgba(0,0,0,.1)'}} onClick={(e)=>e.stopPropagation()}>
           {x.ends_at&&<p><strong>Fin :</strong> {new Date(x.ends_at).toLocaleString('fr-FR')}</p>}
           <div style={{display:'flex',gap:'.65rem',flexWrap:'wrap'}}>
-            <button type="button" className="primary-button" onClick={()=>addIcs(x)}>📅 Ajouter au calendrier</button>
-            <button type="button" className="ghost-button" onClick={()=>openGoogle(x)}>Google Agenda</button>
+            <button type="button" className="primary-button" onClick={()=>addApple(x)}>📅 Ajouter calendrier Apple</button>
+            <button type="button" className="primary-button" onClick={()=>addGoogle(x)}>📅 Ajouter calendrier Google</button>
           </div>
-          <small style={{display:'block',marginTop:'.65rem'}}>Le fichier calendrier est compatible avec Apple Calendrier, Outlook et la plupart des applications de calendrier.</small>
         </div>}
       </div>
     </article>
