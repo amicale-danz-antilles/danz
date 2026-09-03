@@ -25,13 +25,13 @@ export default function Layout() {
   const spaceTitle = isAdmin
     ? 'Espace administrateur'
     : profile?.access_type === 'personnel_danz'
-      ? 'Espace personnel DANZ'
+      ? 'Espace Militaire DANZ'
       : 'Espace amicaliste'
 
   const spaceSubtitle = isAdmin
     ? 'Administration et vie de l’amicale'
     : profile?.access_type === 'personnel_danz'
-      ? 'Accès réservé au personnel validé de la DANZ'
+      ? 'Accès réservé aux militaires validés de la DANZ'
       : 'Accès réservé aux amicalistes validés'
 
   return (
