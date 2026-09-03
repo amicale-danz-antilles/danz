@@ -47,7 +47,10 @@ export default function Layout() {
               <span className="nav-icon">{icon}</span>{label}
             </NavLink>
           ))}
-          {isAdmin && <NavLink to="/administration/demandes" onClick={() => setOpen(false)}><span className="nav-icon">⚙</span>Administration</NavLink>}
+          {isAdmin && <>
+            <NavLink to="/administration/contenus" onClick={() => setOpen(false)}><span className="nav-icon">＋</span>Publier</NavLink>
+            <NavLink to="/administration/demandes" onClick={() => setOpen(false)}><span className="nav-icon">⚙</span>Demandes d’accès</NavLink>
+          </>}
         </nav>
         <div className="sidebar-footer">
           <div className="member-chip"><span>{(profile?.full_name || user?.email || 'A')[0].toUpperCase()}</span><small>{profile?.full_name || user?.email}</small></div>
