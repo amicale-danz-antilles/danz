@@ -29,6 +29,8 @@ export default function AdminContent() {
   const { user, isAdmin, loading: authLoading } = useAuth()
   const [type, setType] = useState('news')
   const [audience, setAudience] = useState('everyone')
+  const [publishMode, setPublishMode] = useState('now')
+  const [publishAt, setPublishAt] = useState('')
   const [title, setTitle] = useState('')
   const [summary, setSummary] = useState('')
   const [content, setContent] = useState('')
@@ -49,7 +51,7 @@ export default function AdminContent() {
     const { data, error: loadError } = await supabase
       .from(type)
       .select('*')
-      .order(type === 'news' ? 'published_at' : 'created_at', { ascending: false })
+      .order('publish_at', { ascending: false })
       .limit(8)
     if (loadError) setError(loadError.message)
     setRecent(data || [])
@@ -68,6 +70,8 @@ export default function AdminContent() {
     setStartsAt('')
     setEndsAt('')
     setTakenAt('')
+    setPublishMode('now')
+    setPublishAt('')
     setFile(null)
     const input = document.getElementById('admin-content-file')
     if (input) input.value = ''
@@ -95,6 +99,15 @@ export default function AdminContent() {
     try {
       if (!title.trim()) throw new Error('Ajoutez un titre.')
 
+      let publicationDate = new Date()
+      if (publishMode === 'later') {
+        if (!publishAt) throw new Error('Choisissez la date et l’heure de publication.')
+        publicationDate = new Date(publishAt)
+        if (Number.isNaN(publicationDate.getTime())) throw new Error('Date de publication invalide.')
+        if (publicationDate.getTime() <= Date.now() + 30000) throw new Error('Choisissez une heure de publication dans le futur.')
+      }
+      const publicationIso = publicationDate.toISOString()
+
       if (type === 'news') {
         const { error: insertError } = await supabase.from('news').insert({
           title: title.trim(),
@@ -102,6 +115,8 @@ export default function AdminContent() {
           content: content.trim() || null,
           audience,
           published: true,
+          publish_at: publicationIso,
+          published_at: publicationIso,
           created_by: user.id,
         })
         if (insertError) throw insertError
@@ -116,6 +131,7 @@ export default function AdminContent() {
           starts_at: new Date(startsAt).toISOString(),
           ends_at: endsAt ? new Date(endsAt).toISOString() : null,
           audience,
+          publish_at: publicationIso,
           created_by: user.id,
         })
         if (insertError) throw insertError
@@ -129,6 +145,7 @@ export default function AdminContent() {
           description: content.trim() || null,
           storage_path: uploaded,
           audience,
+          publish_at: publicationIso,
           created_by: user.id,
         })
         if (insertError) throw insertError
@@ -144,12 +161,16 @@ export default function AdminContent() {
           image_url: null,
           taken_at: takenAt || null,
           audience,
+          publish_at: publicationIso,
           created_by: user.id,
         })
         if (insertError) throw insertError
       }
 
-      setSuccess(`${typeLabels[type]} publié(e) pour : ${audienceLabels[audience]}. La notification suit la même audience.`)
+      const timingText = publishMode === 'later'
+        ? `programmé(e) pour le ${publicationDate.toLocaleString('fr-FR')}`
+        : 'publié(e) maintenant'
+      setSuccess(`${typeLabels[type]} ${timingText} pour : ${audienceLabels[audience]}. La notification sera envoyée au moment de la publication.`)
       reset()
       await loadRecent()
     } catch (err) {
@@ -174,7 +195,7 @@ export default function AdminContent() {
     <PageTitle
       eyebrow="Administration"
       title="Publier du contenu"
-      text="Publiez une information et choisissez précisément qui peut la voir. Les notifications sont facultatives pour chaque utilisateur."
+      text="Publiez immédiatement ou programmez une information à une date précise, puis choisissez qui peut la voir."
     />
 
     <div className="text-panel">
@@ -197,7 +218,18 @@ export default function AdminContent() {
           </select>
         </label>
 
-        <div className="privacy-note">🔒 L’audience détermine qui peut voir le contenu. Les notifications ne sont qu’une alerte : un utilisateur autorisé verra toujours la publication même s’il a désactivé ses notifications.</div>
+        <label>Publication
+          <select value={publishMode} onChange={(e) => setPublishMode(e.target.value)}>
+            <option value="now">Publier maintenant</option>
+            <option value="later">Programmer pour plus tard</option>
+          </select>
+        </label>
+
+        {publishMode === 'later' && <label>Date et heure de publication
+          <input type="datetime-local" required value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
+        </label>}
+
+        <div className="privacy-note">⏱ Une publication programmée reste invisible jusqu’à l’heure choisie. À ce moment-là, elle devient visible pour son audience et la notification correspondante est envoyée aux utilisateurs qui l’ont activée.</div>
 
         <label>Titre
           <input type="text" required maxLength="160" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -215,10 +247,10 @@ export default function AdminContent() {
           <label>Lieu
             <input type="text" maxLength="180" value={location} onChange={(e) => setLocation(e.target.value)} />
           </label>
-          <label>Début
+          <label>Début de l’événement
             <input type="datetime-local" required value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
           </label>
-          <label>Fin (facultatif)
+          <label>Fin de l’événement (facultatif)
             <input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
           </label>
         </>}
@@ -234,7 +266,7 @@ export default function AdminContent() {
         {error && <div className="alert error">{error}</div>}
         {success && <div className="alert">{success}</div>}
 
-        <button className="primary-button" disabled={busy}>{busy ? 'Publication…' : `Publier ${typeLabels[type].toLowerCase()}`}</button>
+        <button className="primary-button" disabled={busy}>{busy ? 'Enregistrement…' : publishMode === 'later' ? `Programmer ${typeLabels[type].toLowerCase()}` : `Publier ${typeLabels[type].toLowerCase()}`}</button>
       </form>
     </div>
 
@@ -242,15 +274,21 @@ export default function AdminContent() {
       <h2>Publications récentes — {typeLabels[type]}</h2>
       {loadingRecent ? <div className="skeleton-card" /> : recent.length === 0 ? <div className="empty-state">Aucune publication dans cette catégorie.</div> : (
         <div className="document-list">
-          {recent.map((item) => <article className="document-row" key={item.id}>
-            <div>
-              <h3>{item.title || 'Sans titre'}</h3>
-              <p><span className="role-badge">{audienceLabels[item.audience] || 'Tout le monde'}</span></p>
-              {type === 'events' && item.starts_at && <small>{new Date(item.starts_at).toLocaleString('fr-FR')}</small>}
-              {type !== 'events' && <small>{new Date(item.published_at || item.created_at).toLocaleDateString('fr-FR')}</small>}
-            </div>
-            <button type="button" className="ghost-button" onClick={() => removeItem(item)}>Supprimer</button>
-          </article>)}
+          {recent.map((item) => {
+            const planned = item.publish_at && new Date(item.publish_at).getTime() > Date.now()
+            return <article className="document-row" key={item.id}>
+              <div>
+                <h3>{item.title || 'Sans titre'}</h3>
+                <p style={{display:'flex',gap:'.5rem',flexWrap:'wrap'}}>
+                  <span className="role-badge">{audienceLabels[item.audience] || 'Tout le monde'}</span>
+                  {planned && <span className="role-badge">Programmé</span>}
+                </p>
+                <small>{planned ? `Publication : ${new Date(item.publish_at).toLocaleString('fr-FR')}` : `Publié : ${new Date(item.publish_at || item.published_at || item.created_at).toLocaleString('fr-FR')}`}</small>
+                {type === 'events' && item.starts_at && <small style={{display:'block'}}>Événement : {new Date(item.starts_at).toLocaleString('fr-FR')}</small>}
+              </div>
+              <button type="button" className="ghost-button" onClick={() => removeItem(item)}>Supprimer</button>
+            </article>
+          })}
         </div>
       )}
     </div>
