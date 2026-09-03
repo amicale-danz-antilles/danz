@@ -10,6 +10,7 @@ import Galerie from './pages/Galerie.jsx'
 import Amicale from './pages/Amicale.jsx'
 import Profile from './pages/Profile.jsx'
 import AdminRequests from './pages/AdminRequests.jsx'
+import AdminContent from './pages/AdminContent.jsx'
 
 export default function App(){
  return <Routes>
@@ -23,6 +24,7 @@ export default function App(){
     <Route path="amicale" element={<Amicale/>}/>
     <Route path="profil" element={<Profile/>}/>
     <Route path="administration/demandes" element={<AdminRequests/>}/>
+    <Route path="administration/contenus" element={<AdminContent/>}/>
   </Route>
   <Route path="*" element={<Navigate to="/" replace/>}/>
  </Routes>
