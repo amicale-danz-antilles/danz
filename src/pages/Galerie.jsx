@@ -2,22 +2,16 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { getR2Status, removePrivateMedia, resolvePrivateMedia, uploadPrivateMedia } from '../lib/mediaStorage.js'
 import { PageTitle } from './Actualites.jsx'
 import '../gallery-events.css'
 
-const IMAGE_LIMIT = 12 * 1024 * 1024
-const VIDEO_LIMIT = 45 * 1024 * 1024
+const IMAGE_LIMIT = 20 * 1024 * 1024
+const VIDEO_LIMIT = 200 * 1024 * 1024
 const ACCEPTED_TYPES = new Set([
   'image/jpeg', 'image/png', 'image/webp', 'image/gif',
   'video/mp4', 'video/quicktime', 'video/webm',
 ])
-
-const safeName = (name = 'media') => name
-  .normalize('NFD')
-  .replace(/[\u0300-\u036f]/g, '')
-  .replace(/[^a-zA-Z0-9._-]+/g, '-')
-  .replace(/-+/g, '-')
-  .toLowerCase()
 
 const formatDate = (value) => value
   ? new Date(value).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -36,6 +30,7 @@ export default function Galerie(){
   const [uploading,setUploading]=useState(false)
   const [error,setError]=useState('')
   const [success,setSuccess]=useState('')
+  const [r2Ready,setR2Ready]=useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -50,11 +45,10 @@ export default function Galerie(){
     if (eventsResult.error) setError(eventsResult.error.message)
 
     const rows = galleryResult.data || []
-    const resolved = await Promise.all(rows.map(async(item)=>{
-      if(!item.storage_path) return {...item,display_url:item.image_url}
-      const {data:signed}=await supabase.storage.from('gallery').createSignedUrl(item.storage_path,3600)
-      return {...item,display_url:signed?.signedUrl||null}
-    }))
+    const resolved=await Promise.all(rows.map(async(item)=>({
+      ...item,
+      display_url: await resolvePrivateMedia(item,{entity:'gallery',fallbackBucket:'gallery'}),
+    })))
     setItems(resolved)
     setEvents(eventsResult.data || [])
     setLoading(false)
@@ -62,6 +56,7 @@ export default function Galerie(){
 
   useEffect(()=>{ load() },[isAdmin])
   useEffect(()=>{ if(selectedEventId) setUploadEventId(selectedEventId) },[selectedEventId])
+  useEffect(()=>{ if(isAdmin) getR2Status().then(setR2Ready) },[isAdmin])
 
   const folders = useMemo(() => {
     const map = new Map()
@@ -90,9 +85,7 @@ export default function Galerie(){
     if (!ACCEPTED_TYPES.has(file.type)) throw new Error(`Format non pris en charge : ${file.name}. Utilisez JPG, PNG, WEBP, GIF, MP4, MOV ou WEBM.`)
     const isVideo = file.type.startsWith('video/')
     const limit = isVideo ? VIDEO_LIMIT : IMAGE_LIMIT
-    if (file.size > limit) {
-      throw new Error(`${file.name} est trop volumineux. Maximum : ${isVideo ? '45 Mo pour une vidéo' : '12 Mo pour une photo'}.`)
-    }
+    if (file.size > limit) throw new Error(`${file.name} est trop volumineux. Maximum : ${isVideo ? '200 Mo pour une vidéo' : '20 Mo pour une photo'}.`)
   }
 
   const uploadMedia = async (event) => {
@@ -105,7 +98,7 @@ export default function Galerie(){
     setUploading(true)
     setError('')
     setSuccess('')
-    const uploadedPaths = []
+    const inserted=[]
     try {
       files.forEach(validateFile)
       const now = new Date().toISOString()
@@ -113,34 +106,27 @@ export default function Galerie(){
       for (let index = 0; index < files.length; index += 1) {
         const file = files[index]
         const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
-        const randomPart = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${index}`
-        const path = `events/${uploadEventId}/${Date.now()}-${randomPart}-${safeName(file.name)}`
-        const { error: uploadError } = await supabase.storage.from('gallery').upload(path, file, {
-          cacheControl: '3600',
-          upsert: false,
-          contentType: file.type,
-        })
-        if (uploadError) throw uploadError
-        uploadedPaths.push(path)
-
-        const { error: insertError } = await supabase.from('gallery').insert({
+        const stored=await uploadPrivateMedia(file,{scope:'gallery',parentId:uploadEventId,fallbackBucket:'gallery'})
+        const { data: row, error: insertError } = await supabase.from('gallery').insert({
           title: files.length === 1 && caption.trim() ? caption.trim() : null,
           event_id: uploadEventId,
           media_type: mediaType,
           mime_type: file.type,
           file_size: file.size,
-          storage_path: path,
+          storage_provider: stored.storage_provider,
+          storage_path: stored.storage_path,
           image_url: null,
           taken_at: linkedEvent.starts_at ? linkedEvent.starts_at.slice(0,10) : null,
           audience: linkedEvent.audience || 'everyone',
           publish_at: now,
           notified_at: index === 0 ? null : now,
           created_by: user.id,
-        })
+        }).select('id,storage_provider,storage_path').single()
         if (insertError) throw insertError
+        inserted.push(row)
       }
 
-      setSuccess(`${files.length} média${files.length > 1 ? 's' : ''} ajouté${files.length > 1 ? 's' : ''} au dossier « ${linkedEvent.title} ».`)
+      setSuccess(`${files.length} média${files.length > 1 ? 's' : ''} ajouté${files.length > 1 ? 's' : ''} au dossier « ${linkedEvent.title} »${r2Ready ? ' sur le stockage R2.' : '.'}`)
       setFiles([])
       setCaption('')
       const input = document.getElementById('gallery-media-files')
@@ -148,7 +134,10 @@ export default function Galerie(){
       setSearchParams({ event: uploadEventId })
       await load()
     } catch (err) {
-      if (uploadedPaths.length) await supabase.storage.from('gallery').remove(uploadedPaths)
+      for (const item of inserted) {
+        await removePrivateMedia(item,{fallbackBucket:'gallery'})
+        await supabase.from('gallery').delete().eq('id',item.id)
+      }
       setError(err.message || 'Impossible d’ajouter ces médias.')
     } finally {
       setUploading(false)
@@ -158,26 +147,23 @@ export default function Galerie(){
   const deleteMedia = async (item) => {
     if (!window.confirm('Supprimer définitivement ce média ?')) return
     setError('')
+    await removePrivateMedia(item,{fallbackBucket:'gallery'})
     const { error: deleteError } = await supabase.from('gallery').delete().eq('id', item.id)
     if (deleteError) return setError(deleteError.message)
-    if (item.storage_path) await supabase.storage.from('gallery').remove([item.storage_path])
     await load()
   }
 
   const openFolder = (id) => setSearchParams(id === 'other' ? {} : { event: id })
 
   return <>
-    <PageTitle
-      eyebrow="Souvenirs"
-      title="Galerie"
-      text="Photos et vidéos classées par événement. Chaque dossier rassemble les souvenirs liés au rendez-vous correspondant."
-    />
+    <PageTitle eyebrow="Souvenirs" title="Galerie" text="Photos et vidéos classées par événement. Chaque dossier rassemble les souvenirs liés au rendez-vous correspondant." />
 
     {isAdmin && <section className="gallery-upload-panel">
       <div>
         <span className="eyebrow">Administration</span>
         <h2>Ajouter des photos ou vidéos</h2>
         <p>Choisissez l’événement : les fichiers seront rangés automatiquement dans son dossier privé.</p>
+        <div className={`privacy-note ${r2Ready ? '' : 'warning'}`}>{r2Ready ? '☁️ Cloudflare R2 connecté : les nouveaux médias utilisent le stockage R2.' : '☁️ R2 pas encore raccordé : stockage Supabase de secours utilisé en attendant les clés Cloudflare.'}</div>
       </div>
       <form onSubmit={uploadMedia}>
         <label>Événement
@@ -189,10 +175,8 @@ export default function Galerie(){
         <label>Photos / vidéos
           <input id="gallery-media-files" type="file" multiple required accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm" onChange={(e)=>setFiles([...e.target.files])} />
         </label>
-        {files.length === 1 && <label>Légende (facultatif)
-          <input type="text" maxLength="160" value={caption} onChange={(e)=>setCaption(e.target.value)} />
-        </label>}
-        <div className="gallery-upload-limits">Photos : 12 Mo max • Vidéos : 45 Mo max • MP4/MOV/WEBM recommandés</div>
+        {files.length === 1 && <label>Légende (facultatif)<input type="text" maxLength="160" value={caption} onChange={(e)=>setCaption(e.target.value)} /></label>}
+        <div className="gallery-upload-limits">Photos : 20 Mo max • Vidéos : 200 Mo max avec R2 • Si R2 n’est pas encore connecté, le secours Supabase reste limité à 45 Mo.</div>
         <button className="primary-button" disabled={uploading}>{uploading ? 'Envoi en cours…' : `Ajouter ${files.length || ''} média${files.length > 1 ? 's' : ''}`}</button>
       </form>
     </section>}
@@ -211,10 +195,7 @@ export default function Galerie(){
             ? <video src={item.display_url} controls playsInline preload="metadata" />
             : <img src={item.display_url} alt={item.title||`Photo de ${selectedFolder.title}`} loading="lazy" />
             : <div className="empty-state">Média indisponible</div>}
-          <figcaption>
-            <div>{item.title && <strong>{item.title}</strong>}{item.taken_at && <span>{formatDate(item.taken_at)}</span>}</div>
-            {isAdmin && <button type="button" className="ghost-button" onClick={()=>deleteMedia(item)}>Supprimer</button>}
-          </figcaption>
+          <figcaption><div>{item.title && <strong>{item.title}</strong>}{item.taken_at && <span>{formatDate(item.taken_at)}</span>}</div>{isAdmin && <button type="button" className="ghost-button" onClick={()=>deleteMedia(item)}>Supprimer</button>}</figcaption>
         </figure>)}
       </div>
     </> : <>
@@ -222,10 +203,7 @@ export default function Galerie(){
         {folders.map((folder)=>{
           const cover = folder.media.find((item)=>item.media_type !== 'video' && item.display_url) || folder.media[0]
           return <button type="button" className="gallery-folder-card" key={folder.id} onClick={()=>openFolder(folder.id)}>
-            <div className="gallery-folder-cover">
-              {cover?.display_url && cover.media_type !== 'video' ? <img src={cover.display_url} alt="" loading="lazy" /> : <span>🎬</span>}
-              <div className="gallery-folder-count">{folder.media.length} média{folder.media.length > 1 ? 's' : ''}</div>
-            </div>
+            <div className="gallery-folder-cover">{cover?.display_url && cover.media_type !== 'video' ? <img src={cover.display_url} alt="" loading="lazy" /> : <span>🎬</span>}<div className="gallery-folder-count">{folder.media.length} média{folder.media.length > 1 ? 's' : ''}</div></div>
             <div className="gallery-folder-info"><strong>{folder.title}</strong>{folder.date && <span>{formatDate(folder.date)}</span>}</div>
           </button>
         })}
