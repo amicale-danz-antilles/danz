@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { PageTitle } from './Actualites.jsx'
 import '../extra.css'
+import '../polls-bureau.css'
 
 export default function Sondages() {
   const { user, isAdmin } = useAuth()
