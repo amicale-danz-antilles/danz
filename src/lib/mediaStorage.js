@@ -60,8 +60,11 @@ export async function resolvePrivateMedia(item, { entity, fallbackBucket }) {
 export async function removePrivateMedia(item, { entity, fallbackBucket } = {}) {
   if (!item?.storage_path) return
   if (item.storage_provider === 'r2') {
-    if (!entity || !item.id) return
-    await supabase.functions.invoke('r2-media', { body: { action: 'delete', entity, id: item.id } })
+    if (entity && item.id) {
+      await supabase.functions.invoke('r2-media', { body: { action: 'delete', entity, id: item.id } })
+    } else {
+      await supabase.functions.invoke('r2-media', { body: { action: 'delete-key', key: item.storage_path } })
+    }
     return
   }
   await supabase.storage.from(fallbackBucket).remove([item.storage_path])
