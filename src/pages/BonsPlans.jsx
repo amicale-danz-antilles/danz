@@ -25,7 +25,7 @@ const EMPTY_FORM = {
 }
 const EMPTY_PROPOSAL = {
   title: '', category: 'restaurant', description: '', offer_text: '', address: '', municipality: '',
-  phone: '', email: '', website_url: '',
+  phone: '', email: '', website_url: '', change_note: '',
 }
 
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]))
@@ -38,6 +38,12 @@ const isMartiniqueCoords = (lat, lng) => Number.isFinite(Number(lat)) && Number.
   && Number(lng) >= MARTINIQUE.minLng && Number(lng) <= MARTINIQUE.maxLng
 const isMapEligible = (deal) => deal.map_verified === true && isMartiniqueCoords(deal.latitude, deal.longitude)
 const googleSearchUrl = (deal) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(placeSearchText(deal))}`
+
+const submissionTypeLabel = (type) => type === 'update'
+  ? 'Modification proposée'
+  : type === 'remove'
+    ? 'Suppression / fermeture signalée'
+    : 'Nouveau bon plan'
 
 function navigationUrls(deal) {
   const query = encodeURIComponent(fullAddress(deal) || placeSearchText(deal))
@@ -225,6 +231,8 @@ export default function BonsPlans() {
   const [geocoding, setGeocoding] = useState(false)
   const [showProposal, setShowProposal] = useState(false)
   const [proposal, setProposal] = useState(EMPTY_PROPOSAL)
+  const [proposalType, setProposalType] = useState('new')
+  const [proposalTarget, setProposalTarget] = useState(null)
   const [proposalBusy, setProposalBusy] = useState(false)
   const [proposalLocation, setProposalLocation] = useState(null)
   const [reviewBusy, setReviewBusy] = useState(null)
@@ -283,13 +291,54 @@ export default function BonsPlans() {
     }
   }
 
+  const resetProposal = () => {
+    setProposal(EMPTY_PROPOSAL)
+    setProposalType('new')
+    setProposalTarget(null)
+    setProposalLocation(null)
+    setShowProposal(false)
+  }
+
+  const startNewProposal = () => {
+    setProposal(EMPTY_PROPOSAL)
+    setProposalType('new')
+    setProposalTarget(null)
+    setProposalLocation(null)
+    setError('')
+    setSuccess('')
+    setShowProposal(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const startChangeProposal = (deal) => {
+    setProposal({
+      title: deal.title || '',
+      category: deal.category || 'autre',
+      description: deal.description || '',
+      offer_text: deal.offer_text || '',
+      address: deal.address || '',
+      municipality: deal.municipality || '',
+      phone: deal.phone || '',
+      email: deal.email || '',
+      website_url: deal.website_url || '',
+      change_note: '',
+    })
+    setProposalType('update')
+    setProposalTarget(deal)
+    setProposalLocation(null)
+    setError('')
+    setSuccess('')
+    setShowProposal(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   const previewProposal = async () => {
     setProposalBusy(true)
     setError('')
     try {
       const match = await lookupMartiniqueLocation(proposal)
       setProposalLocation(match)
-      if (!match) setError('Cette adresse n’est pas encore reconnue avec précision. Vous pouvez quand même proposer le bon plan : un admin pourra la corriger avant validation.')
+      if (!match) setError('Cette adresse n’est pas encore reconnue avec précision. Vous pouvez quand même envoyer la proposition : un admin pourra la contrôler avant validation.')
     } catch (_) {
       setProposalLocation(null)
       setError('La vérification automatique de l’adresse n’est pas disponible pour le moment.')
@@ -303,7 +352,11 @@ export default function BonsPlans() {
     setProposalBusy(true)
     setError('')
     setSuccess('')
-    const { error: submitError } = await supabase.from('good_deal_submissions').insert({
+
+    const payload = {
+      submission_type: proposalType,
+      target_deal_id: proposalTarget?.id || null,
+      change_note: proposal.change_note.trim() || null,
       title: proposal.title.trim(),
       category: proposal.category,
       description: proposal.description.trim() || null,
@@ -314,13 +367,18 @@ export default function BonsPlans() {
       email: proposal.email.trim().toLowerCase() || null,
       website_url: normalizeUrl(proposal.website_url.trim()),
       submitted_by: user.id,
-    })
+    }
+
+    const { error: submitError } = await supabase.from('good_deal_submissions').insert(payload)
     if (submitError) setError(submitError.message)
     else {
-      setSuccess('Merci ! Votre bon plan a été envoyé au bureau. Il apparaîtra dans l’application après validation par un administrateur.')
-      setProposal(EMPTY_PROPOSAL)
-      setProposalLocation(null)
-      setShowProposal(false)
+      const message = proposalType === 'remove'
+        ? 'Merci. Le signalement de fermeture/suppression a été envoyé au bureau. Le bon plan reste visible tant qu’un admin ne l’a pas validé.'
+        : proposalType === 'update'
+          ? 'Merci. Votre proposition de modification a été envoyée au bureau. La fiche actuelle reste inchangée jusqu’à validation.'
+          : 'Merci ! Votre bon plan a été envoyé au bureau. Il apparaîtra dans l’application après validation par un administrateur.'
+      setSuccess(message)
+      resetProposal()
       await load()
     }
     setProposalBusy(false)
@@ -329,37 +387,72 @@ export default function BonsPlans() {
   const approveSubmission = async (submission) => {
     setReviewBusy(submission.id)
     setError('')
-    const { error: insertError } = await supabase.from('good_deals').insert({
-      title: submission.title,
-      category: submission.category,
-      description: submission.description,
-      offer_text: submission.offer_text,
-      address: submission.address,
-      municipality: submission.municipality,
-      phone: submission.phone,
-      email: submission.email,
-      website_url: submission.website_url,
-      audience: 'everyone',
-      created_by: user.id,
-    })
-    if (insertError) {
-      setError(insertError.message)
+    setSuccess('')
+
+    let operationError = null
+    if (submission.submission_type === 'remove') {
+      if (!submission.target_deal_id) operationError = new Error('Le bon plan concerné n’existe plus.')
+      else {
+        const result = await supabase.from('good_deals').delete().eq('id', submission.target_deal_id)
+        operationError = result.error
+      }
+    } else if (submission.submission_type === 'update') {
+      if (!submission.target_deal_id) operationError = new Error('Le bon plan concerné est introuvable.')
+      else {
+        const result = await supabase.from('good_deals').update({
+          title: submission.title,
+          category: submission.category,
+          description: submission.description,
+          offer_text: submission.offer_text,
+          address: submission.address,
+          municipality: submission.municipality,
+          phone: submission.phone,
+          email: submission.email,
+          website_url: submission.website_url,
+        }).eq('id', submission.target_deal_id)
+        operationError = result.error
+      }
+    } else {
+      const result = await supabase.from('good_deals').insert({
+        title: submission.title,
+        category: submission.category,
+        description: submission.description,
+        offer_text: submission.offer_text,
+        address: submission.address,
+        municipality: submission.municipality,
+        phone: submission.phone,
+        email: submission.email,
+        website_url: submission.website_url,
+        audience: 'everyone',
+        created_by: user.id,
+      })
+      operationError = result.error
+    }
+
+    if (operationError) {
+      setError(operationError.message)
       setReviewBusy(null)
       return
     }
+
     const { error: updateError } = await supabase.from('good_deal_submissions').update({
       status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: user.id,
     }).eq('id', submission.id)
+
     if (updateError) setError(updateError.message)
     else {
-      setSuccess(`« ${submission.title} » a été validé. Sa position est maintenant recalculée côté serveur avant d’apparaître sur la carte.`)
+      setSuccess(submission.submission_type === 'remove'
+        ? `« ${submission.title} » a été retiré des bons plans.`
+        : submission.submission_type === 'update'
+          ? `Les modifications proposées pour « ${submission.title} » ont été appliquées. L’adresse sera revérifiée automatiquement si elle a changé.`
+          : `« ${submission.title} » a été validé. Sa position est recalculée côté serveur avant d’apparaître sur la carte.`)
       await load()
     }
     setReviewBusy(null)
   }
 
   const rejectSubmission = async (submission) => {
-    if (!window.confirm(`Refuser la proposition « ${submission.title} » ?`)) return
+    if (!window.confirm(`Refuser cette proposition concernant « ${submission.title} » ?`)) return
     setReviewBusy(submission.id)
     const { error: updateError } = await supabase.from('good_deal_submissions').update({
       status: 'rejected', reviewed_at: new Date().toISOString(), reviewed_by: user.id,
@@ -398,9 +491,7 @@ export default function BonsPlans() {
       let mapVerified = form.map_verified === true
 
       if (Number.isFinite(latitude) || Number.isFinite(longitude)) {
-        if (!isMartiniqueCoords(latitude, longitude)) {
-          throw new Error('Ces coordonnées sont hors de la Martinique. Corrigez-les ou laissez-les vides.')
-        }
+        if (!isMartiniqueCoords(latitude, longitude)) throw new Error('Ces coordonnées sont hors de la Martinique. Corrigez-les ou laissez-les vides.')
         mapVerified = true
       }
 
@@ -458,32 +549,57 @@ export default function BonsPlans() {
   }
 
   return <>
-    <PageTitle eyebrow="Martinique" title="Bons plans" text="Les bonnes adresses et idées utiles partagées par l’Amicale. La carte croise l’adresse, la commune et le nom du lieu pour afficher un maximum de positions fiables en Martinique." />
+    <PageTitle eyebrow="Martinique" title="Bons plans" text="Les bonnes adresses et idées utiles partagées par l’Amicale. Les membres peuvent aussi signaler une information qui a changé ou un établissement qui n’existe plus." />
 
     <section className="good-deals-contribute-bar">
-      <div><strong>Vous connaissez un bon plan ?</strong><span>Tout membre peut le proposer. Le bureau le vérifie avant sa publication dans l’application.</span></div>
-      <button type="button" className="secondary-button" onClick={() => { setShowProposal(!showProposal); setProposalLocation(null); setError('') }}>{showProposal ? 'Fermer' : '＋ Proposer un bon plan'}</button>
+      <div><strong>Contribuer aux bons plans</strong><span>Proposez une nouvelle adresse ou signalez une fiche à mettre à jour. Toute modification est vérifiée par le bureau avant publication.</span></div>
+      <button type="button" className="secondary-button" onClick={showProposal ? resetProposal : startNewProposal}>{showProposal ? 'Fermer' : '＋ Proposer un bon plan'}</button>
     </section>
 
     {showProposal && <section className="good-deals-admin-panel good-deals-proposal-panel">
-      <h2>Proposer un bon plan</h2>
-      <p className="muted">Indiquez le nom exact du lieu et son adresse. La position est recherchée automatiquement en Martinique, puis recalculée côté serveur après validation par un admin.</p>
+      <h2>{proposalTarget ? `Proposer une modification — ${proposalTarget.title}` : 'Proposer un bon plan'}</h2>
+      {proposalTarget ? <>
+        <p className="muted">La fiche publiée ne changera pas tant qu’un administrateur n’aura pas validé votre proposition.</p>
+        <label className="proposal-change-type">Que souhaitez-vous signaler ?
+          <select value={proposalType} onChange={(e) => { setProposalType(e.target.value); setProposalLocation(null) }}>
+            <option value="update">Des informations ont changé</option>
+            <option value="remove">Ce bon plan n’existe plus / doit être retiré</option>
+          </select>
+        </label>
+      </> : <p className="muted">Indiquez le nom exact du lieu et son adresse. La position est recherchée automatiquement en Martinique, puis recalculée côté serveur après validation par un admin.</p>}
+
       <form onSubmit={submitProposal} className="good-deals-form">
-        <label>Nom du lieu<input required maxLength="160" value={proposal.title} onChange={(e) => { setProposal({ ...proposal, title: e.target.value }); setProposalLocation(null) }} /></label>
-        <label>Rubrique<select value={proposal.category} onChange={(e) => setProposal({ ...proposal, category: e.target.value })}>{CATEGORIES.map(([value, label, icon]) => <option key={value} value={value}>{icon} {label}</option>)}</select></label>
-        <label className="full">Le bon plan / avantage<input maxLength="250" placeholder="Réduction, tarif, avantage…" value={proposal.offer_text} onChange={(e) => setProposal({ ...proposal, offer_text: e.target.value })} /></label>
-        <label className="full">Description<textarea rows="3" value={proposal.description} onChange={(e) => setProposal({ ...proposal, description: e.target.value })} /></label>
-        <label>Adresse<input required value={proposal.address} onChange={(e) => { setProposal({ ...proposal, address: e.target.value }); setProposalLocation(null) }} placeholder="Numéro, rue, quartier…" /></label>
-        <label>Commune<input required value={proposal.municipality} onChange={(e) => { setProposal({ ...proposal, municipality: e.target.value }); setProposalLocation(null) }} placeholder="Fort-de-France, Le Marin…" /></label>
-        <div className="full proposal-location-check">
-          <button type="button" className="secondary-button" disabled={proposalBusy || (!proposal.address.trim() && !proposal.title.trim())} onClick={previewProposal}>{proposalBusy ? 'Vérification…' : '📍 Vérifier la position'}</button>
-          <a className="secondary-button" href={googleSearchUrl(proposal)} target="_blank" rel="noopener noreferrer">Comparer dans Google Maps ↗</a>
-          {proposalLocation && <small>✓ Lieu repéré en Martinique : {proposalLocation.displayName}</small>}
+        {proposalTarget && <label className="full">Expliquez ce qui a changé
+          <textarea rows="3" required={proposalType === 'remove'} placeholder={proposalType === 'remove' ? 'Ex. établissement fermé définitivement…' : 'Ex. nouvelle remise, changement de téléphone, nouvelle adresse…'} value={proposal.change_note} onChange={(e) => setProposal({ ...proposal, change_note: e.target.value })} />
+        </label>}
+
+        {proposalType !== 'remove' && <>
+          <label>Nom du lieu<input required maxLength="160" value={proposal.title} onChange={(e) => { setProposal({ ...proposal, title: e.target.value }); setProposalLocation(null) }} /></label>
+          <label>Rubrique<select value={proposal.category} onChange={(e) => setProposal({ ...proposal, category: e.target.value })}>{CATEGORIES.map(([value, label, icon]) => <option key={value} value={value}>{icon} {label}</option>)}</select></label>
+          <label className="full">Le bon plan / avantage<input maxLength="250" placeholder="Réduction, tarif, avantage…" value={proposal.offer_text} onChange={(e) => setProposal({ ...proposal, offer_text: e.target.value })} /></label>
+          <label className="full">Description<textarea rows="3" value={proposal.description} onChange={(e) => setProposal({ ...proposal, description: e.target.value })} /></label>
+          <label>Adresse<input required value={proposal.address} onChange={(e) => { setProposal({ ...proposal, address: e.target.value }); setProposalLocation(null) }} placeholder="Numéro, rue, quartier…" /></label>
+          <label>Commune<input required value={proposal.municipality} onChange={(e) => { setProposal({ ...proposal, municipality: e.target.value }); setProposalLocation(null) }} placeholder="Fort-de-France, Le Marin…" /></label>
+          <div className="full proposal-location-check">
+            <button type="button" className="secondary-button" disabled={proposalBusy || (!proposal.address.trim() && !proposal.title.trim())} onClick={previewProposal}>{proposalBusy ? 'Vérification…' : '📍 Vérifier la position'}</button>
+            <a className="secondary-button" href={googleSearchUrl(proposal)} target="_blank" rel="noopener noreferrer">Comparer dans Google Maps ↗</a>
+            {proposalLocation && <small>✓ Lieu repéré en Martinique : {proposalLocation.displayName}</small>}
+          </div>
+          <label>Téléphone<input type="tel" value={proposal.phone} onChange={(e) => setProposal({ ...proposal, phone: e.target.value })} /></label>
+          <label>E-mail<input type="email" value={proposal.email} onChange={(e) => setProposal({ ...proposal, email: e.target.value })} /></label>
+          <label className="full">Site internet<input type="text" inputMode="url" placeholder="www.exemple.fr" value={proposal.website_url} onChange={(e) => setProposal({ ...proposal, website_url: e.target.value })} /></label>
+        </>}
+
+        {proposalType === 'remove' && proposalTarget && <div className="full proposal-removal-summary">
+          <strong>Fiche concernée : {proposalTarget.title}</strong>
+          {(proposalTarget.address || proposalTarget.municipality) && <span>📍 {[proposalTarget.address, proposalTarget.municipality].filter(Boolean).join(', ')}</span>}
+          <small>Elle restera visible jusqu’à validation du signalement par un administrateur.</small>
+        </div>}
+
+        <div className="full good-deals-form-actions">
+          <button className="primary-button" disabled={proposalBusy}>{proposalBusy ? 'Envoi…' : 'Envoyer au bureau pour validation'}</button>
+          {proposalTarget && <button type="button" className="secondary-button" onClick={resetProposal}>Annuler</button>}
         </div>
-        <label>Téléphone<input type="tel" value={proposal.phone} onChange={(e) => setProposal({ ...proposal, phone: e.target.value })} /></label>
-        <label>E-mail<input type="email" value={proposal.email} onChange={(e) => setProposal({ ...proposal, email: e.target.value })} /></label>
-        <label className="full">Site internet<input type="text" inputMode="url" placeholder="www.exemple.fr" value={proposal.website_url} onChange={(e) => setProposal({ ...proposal, website_url: e.target.value })} /></label>
-        <div className="full good-deals-form-actions"><button className="primary-button" disabled={proposalBusy}>{proposalBusy ? 'Envoi…' : 'Envoyer au bureau pour validation'}</button></div>
       </form>
     </section>}
 
@@ -500,19 +616,28 @@ export default function BonsPlans() {
       <div className="submission-review-grid">
         {pendingSubmissions.map((submission) => {
           const cat = CATEGORY_MAP[submission.category] || CATEGORY_MAP.autre
-          return <article className="submission-review-card" key={submission.id}>
+          const target = submission.target_deal_id ? items.find((item) => item.id === submission.target_deal_id) : null
+          return <article className={`submission-review-card submission-${submission.submission_type || 'new'}`} key={submission.id}>
+            <span className="submission-type-badge">{submissionTypeLabel(submission.submission_type)}</span>
             <span className="good-deal-category">{cat.icon} {cat.label}</span>
             <h3>{submission.title}</h3>
-            {submission.offer_text && <div className="good-deal-offer">★ {submission.offer_text}</div>}
-            {submission.description && <p>{submission.description}</p>}
-            {(submission.address || submission.municipality) && <p>📍 {[submission.address, submission.municipality].filter(Boolean).join(', ')}</p>}
-            <div className="submission-contact-line">
-              {submission.phone && <a href={`tel:${submission.phone.replace(/\s/g,'')}`}>☎ {submission.phone}</a>}
-              {submission.email && <a href={`mailto:${submission.email}`}>✉ {submission.email}</a>}
-              <a href={googleSearchUrl(submission)} target="_blank" rel="noopener noreferrer">Vérifier Google Maps ↗</a>
-            </div>
+            {target && <p className="submission-target"><strong>Fiche actuelle :</strong> {target.title}</p>}
+            {submission.change_note && <div className="submission-change-note"><strong>Motif / changement signalé</strong><p>{submission.change_note}</p></div>}
+            {submission.submission_type !== 'remove' && <>
+              {submission.offer_text && <div className="good-deal-offer">★ {submission.offer_text}</div>}
+              {submission.description && <p>{submission.description}</p>}
+              {(submission.address || submission.municipality) && <p>📍 {[submission.address, submission.municipality].filter(Boolean).join(', ')}</p>}
+              <div className="submission-contact-line">
+                {submission.phone && <a href={`tel:${submission.phone.replace(/\s/g,'')}`}>☎ {submission.phone}</a>}
+                {submission.email && <a href={`mailto:${submission.email}`}>✉ {submission.email}</a>}
+                <a href={googleSearchUrl(submission)} target="_blank" rel="noopener noreferrer">Vérifier Google Maps ↗</a>
+              </div>
+            </>}
+            {submission.submission_type === 'remove' && target && <p className="submission-removal-warning">⚠️ La validation retirera immédiatement cette fiche de l’application.</p>}
             <div className="good-deals-form-actions">
-              <button className="primary-button" disabled={reviewBusy === submission.id} onClick={() => approveSubmission(submission)}>{reviewBusy === submission.id ? 'Traitement…' : '✓ Valider et publier'}</button>
+              <button className="primary-button" disabled={reviewBusy === submission.id} onClick={() => approveSubmission(submission)}>
+                {reviewBusy === submission.id ? 'Traitement…' : submission.submission_type === 'remove' ? '✓ Confirmer le retrait' : submission.submission_type === 'update' ? '✓ Appliquer les modifications' : '✓ Valider et publier'}
+              </button>
               <button className="secondary-button" disabled={reviewBusy === submission.id} onClick={() => rejectSubmission(submission)}>Refuser</button>
             </div>
           </article>
@@ -545,7 +670,7 @@ export default function BonsPlans() {
     </section>}
 
     {!isAdmin && submissions.length > 0 && <section className="my-good-deal-submissions">
-      <details><summary>Mes propositions ({submissions.length})</summary><div>{submissions.map((submission) => <p key={submission.id}><strong>{submission.title}</strong> — {submission.status === 'pending' ? 'En attente de validation' : submission.status === 'approved' ? 'Validée' : 'Non retenue'}</p>)}</div></details>
+      <details><summary>Mes propositions ({submissions.length})</summary><div>{submissions.map((submission) => <p key={submission.id}><strong>{submission.title}</strong> — {submissionTypeLabel(submission.submission_type)} — {submission.status === 'pending' ? 'En attente de validation' : submission.status === 'approved' ? 'Validée' : 'Non retenue'}</p>)}</div></details>
     </section>}
 
     <section className="good-deals-tools">
@@ -577,7 +702,7 @@ export default function BonsPlans() {
             {deal.email && <a className="secondary-button" href={`mailto:${deal.email}`}>✉ Envoyer un e-mail</a>}
             {deal.website_url && <a className="secondary-button" href={deal.website_url} target="_blank" rel="noopener noreferrer">Site web ↗</a>}
           </div>
-          {isAdmin && <div className="good-deal-admin-actions"><button type="button" onClick={() => beginEdit(deal)}>Modifier</button><button type="button" onClick={() => removeItem(deal)}>Supprimer</button></div>}
+          {isAdmin ? <div className="good-deal-admin-actions"><button type="button" onClick={() => beginEdit(deal)}>Modifier</button><button type="button" onClick={() => removeItem(deal)}>Supprimer</button></div> : <div className="good-deal-member-actions"><button type="button" className="deal-suggest-change" onClick={() => startChangeProposal(deal)}>✏ Proposer une modification</button></div>}
         </article>
       })}
     </div>}
