@@ -7,7 +7,7 @@ import { PageTitle } from './Actualites.jsx'
 const accessLabels = {
   admin: 'Admin',
   amicaliste: 'Amicaliste',
-  personnel_danz: 'Personnel de la DANZ',
+  personnel_danz: 'Militaire DANZ',
 }
 
 export default function AdminRequests() {
