@@ -6,6 +6,7 @@ const links = [
   ['/', 'Accueil', '⌂'],
   ['/actualites', 'Actualités', '◫'],
   ['/agenda', 'Agenda', '◷'],
+  ['/sondages', 'Sondages', '✓'],
   ['/bons-plans', 'Bons plans', '★'],
   ['/documents', 'Documents', '▤'],
   ['/galerie', 'Galerie', '▦'],
