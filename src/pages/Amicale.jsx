@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { PageTitle } from './Actualites.jsx'
 import '../extra.css'
+import '../polls-bureau.css'
 
 export default function Amicale(){
   const { isAdmin, user } = useAuth()
@@ -73,7 +74,7 @@ export default function Amicale(){
         >
           {editing === member.role_key ? <div className="bureau-edit" onClick={(e) => e.stopPropagation()}>
             <span>{member.role_label}</span>
-            <input autoFocus type="text" placeholder="Nom Prénom" value={name} onChange={(e) => setName(e.target.value)} />
+            <input autoFocus type="text" placeholder="Prénom Nom" value={name} onChange={(e) => setName(e.target.value)} />
             <div>
               <button type="button" className="secondary-button" disabled={saving} onClick={() => saveMember(member)}>{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
               <button type="button" className="ghost-button" disabled={saving} onClick={() => { setEditing(null); setName('') }}>Annuler</button>
