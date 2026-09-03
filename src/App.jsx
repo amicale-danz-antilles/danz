@@ -8,6 +8,7 @@ import Galerie from './pages/Galerie.jsx'
 import BonsPlans from './pages/BonsPlans.jsx'
 import Sondages from './pages/Sondages.jsx'
 import Profile from './pages/Profile.jsx'
+import Amicale from './pages/Amicale.jsx'
 import AdminRequests from './pages/AdminRequests.jsx'
 import AdminContent from './pages/AdminContent.jsx'
 
@@ -24,8 +25,14 @@ export default function App(){
     <Route path="actualites" element={<Navigate to="/" replace/>}/>
     <Route path="documents" element={<Navigate to="/" replace/>}/>
     <Route path="amicale" element={<Navigate to="/" replace/>}/>
-    <Route path="administration/demandes" element={<AdminRequests/>}/>
+
+    <Route path="administration" element={<AdminRequests/>}/>
     <Route path="administration/contenus" element={<AdminContent/>}/>
+    <Route path="administration/galerie" element={<Galerie/>}/>
+    <Route path="administration/bons-plans" element={<BonsPlans/>}/>
+    <Route path="administration/sondages" element={<Sondages/>}/>
+    <Route path="administration/bureau" element={<Amicale/>}/>
+    <Route path="administration/demandes" element={<Navigate to="/administration" replace/>}/>
   </Route>
   <Route path="*" element={<Navigate to="/" replace/>}/>
  </Routes>
