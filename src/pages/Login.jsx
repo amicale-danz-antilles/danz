@@ -87,7 +87,7 @@ export default function Login() {
             <div><strong>Amicale DANZ</strong><span>Antilles</span></div>
           </div>
           <div className="welcome-copy">
-            <span className="eyebrow">Bienvenue</span>
+            <span className="eyebrow">Amicale DANZ Antilles</span>
             <h1>Espace privé<br />DANZ Antilles</h1>
             <p>Membres : connectez-vous simplement avec votre adresse e-mail. Le site reconnaît automatiquement votre profil et vos accès.</p>
           </div>
@@ -99,7 +99,7 @@ export default function Login() {
           <div className="mobile-logo">
             <img src="/danz/Insigne%20CND%20-%20ANTILLES.png" alt="Insigne DANZ Antilles" style={{width:72,height:72,objectFit:'contain'}} />
           </div>
-          <span className="eyebrow">Espace privé</span>
+          <span className="eyebrow">Amicale DANZ Antilles</span>
           <h2>{registering ? 'Demander un accès' : 'Connexion'}</h2>
 
           {!registering && <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'.65rem',margin:'1rem 0 1.25rem'}}>
