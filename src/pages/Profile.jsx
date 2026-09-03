@@ -175,11 +175,12 @@ export default function Profile() {
     setBusy(false)
   }
 
-  const roleLabel = isAdmin
-    ? 'Administrateur'
-    : profile?.access_type === 'personnel_danz'
-      ? 'Personnel de la DANZ'
-      : 'Amicaliste'
+  const roleLabel = isAdmin ? 'Administrateur' : 'Membre'
+  const memberTags = []
+  if (!isAdmin) {
+    memberTags.push(profile?.applicant_type === 'spouse' ? 'Conjoint(e)' : 'Militaire DANZ')
+    if (profile?.is_amicaliste === true) memberTags.push('Amicaliste')
+  }
 
   return <>
     <PageTitle eyebrow="Compte" title="Mon profil" text="Gérez votre accès et vos préférences de notifications." />
@@ -189,7 +190,10 @@ export default function Profile() {
       <div>
         <h2>{profile?.full_name || roleLabel}</h2>
         <p>{user.email}</p>
-        <span className="role-badge">{roleLabel}</span>
+        <div style={{display:'flex',gap:'.4rem',flexWrap:'wrap'}}>
+          <span className="role-badge">{roleLabel}</span>
+          {memberTags.map((tag) => <span className="role-badge" key={tag}>{tag}</span>)}
+        </div>
       </div>
     </div>
 
@@ -252,7 +256,7 @@ export default function Profile() {
     ) : (
       <div className="text-panel">
         <h2>Connexion</h2>
-        <p>Votre compte se connecte par adresse e-mail et lien sécurisé. Aucun mot de passe n’est nécessaire.</p>
+        <p>Votre compte se connecte par adresse e-mail et lien sécurisé. Le site reconnaît automatiquement votre profil ; aucun choix de catégorie ni mot de passe n’est nécessaire.</p>
       </div>
     )}
   </>
