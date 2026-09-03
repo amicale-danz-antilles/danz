@@ -49,6 +49,10 @@ export async function uploadPrivateMedia(file, { scope, parentId, fallbackBucket
 export async function resolvePrivateMedia(item, { entity, fallbackBucket }) {
   if (!item?.storage_path) return item?.image_url || null
   if (item.storage_provider === 'r2') {
+    if (String(item.mime_type || '').startsWith('image/')) {
+      const { data, error } = await supabase.functions.invoke('r2-media', { body: { action: 'view-image', entity, id: item.id } })
+      if (!error && data instanceof Blob) return URL.createObjectURL(data)
+    }
     const { data, error } = await supabase.functions.invoke('r2-media', { body: { action: 'view', entity, id: item.id } })
     if (error || !data?.url) return null
     return data.url
