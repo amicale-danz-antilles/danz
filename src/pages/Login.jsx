@@ -3,15 +3,9 @@ import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { supabase } from '../lib/supabase.js'
 
-const accessLabels = {
-  admin: 'Admin',
-  amicaliste: 'Amicaliste',
-  personnel_danz: 'Militaire DANZ',
-}
-
 export default function Login() {
   const { user, hasAccess, requestMemberLogin, signInAdmin, configured } = useAuth()
-  const [mode, setMode] = useState(null)
+  const [mode, setMode] = useState('standard')
   const [registering, setRegistering] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -59,7 +53,7 @@ export default function Login() {
           last_name: normalizedLastName,
           applicant_type: applicantType,
           is_amicaliste: isAmicaliste === 'yes',
-          requested_access: mode,
+          requested_access: 'amicaliste',
           email: email.trim().toLowerCase(),
         })
 
@@ -68,14 +62,14 @@ export default function Login() {
           throw requestError
         }
 
-        setSuccess(`Votre demande « ${accessLabels[mode]} » a bien été transmise. Un administrateur doit la valider avant toute connexion.`)
+        setSuccess('Votre demande d’accès a bien été transmise. Après validation par un administrateur, vous pourrez vous connecter simplement avec votre adresse e-mail.')
         resetRegistration()
         setRegistering(false)
       } else if (mode === 'admin') {
         await signInAdmin(email, password)
       } else {
-        await requestMemberLogin(email, mode)
-        setSuccess('Si cette adresse correspond à un compte validé dans cette catégorie, un lien de connexion vient de vous être envoyé par e-mail.')
+        await requestMemberLogin(email)
+        setSuccess('Si cette adresse correspond à un compte validé, un lien de connexion sécurisé vient de vous être envoyé par e-mail.')
       }
     } catch (err) {
       setError(err.message === 'Invalid login credentials' ? 'Identifiants administrateur incorrects.' : err.message)
@@ -95,7 +89,7 @@ export default function Login() {
           <div className="welcome-copy">
             <span className="eyebrow">Bienvenue</span>
             <h1>Espace privé<br />DANZ Antilles</h1>
-            <p>Choisissez votre type d’accès. Toute nouvelle inscription doit être approuvée par un administrateur.</p>
+            <p>Membres : connectez-vous simplement avec votre adresse e-mail. Le site reconnaît automatiquement votre profil et vos accès.</p>
           </div>
         </div>
       </section>
@@ -106,24 +100,20 @@ export default function Login() {
             <img src="/danz/Insigne%20CND%20-%20ANTILLES.png" alt="Insigne DANZ Antilles" style={{width:72,height:72,objectFit:'contain'}} />
           </div>
           <span className="eyebrow">Espace privé</span>
-          <h2>Choisissez votre accès</h2>
+          <h2>{registering ? 'Demander un accès' : 'Connexion'}</h2>
 
-          <div style={{display:'grid',gridTemplateColumns:'1fr',gap:'.65rem',margin:'1rem 0 1.25rem'}}>
-            <button type="button" className={mode === 'admin' ? 'primary-button' : 'ghost-button'} onClick={() => changeMode('admin')}>Admin</button>
-            <button type="button" className={mode === 'amicaliste' ? 'primary-button' : 'ghost-button'} onClick={() => changeMode('amicaliste')}>Amicaliste</button>
-            <button type="button" className={mode === 'personnel_danz' ? 'primary-button' : 'ghost-button'} onClick={() => changeMode('personnel_danz')}>Militaire DANZ</button>
-          </div>
+          {!registering && <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'.65rem',margin:'1rem 0 1.25rem'}}>
+            <button type="button" className={mode === 'standard' ? 'primary-button' : 'ghost-button'} style={{marginTop:0}} onClick={() => changeMode('standard')}>Connexion standard</button>
+            <button type="button" className={mode === 'admin' ? 'primary-button' : 'ghost-button'} style={{marginTop:0}} onClick={() => changeMode('admin')}>Connexion admin</button>
+          </div>}
 
           {!configured && <div className="alert warning"><strong>Configuration nécessaire.</strong><br />Les variables Supabase doivent être ajoutées avant la première connexion.</div>}
           {error && <div className="alert error">{error}</div>}
           {success && <div className="alert">{success}</div>}
 
-          {!mode ? (
-            <p className="muted">Sélectionnez votre catégorie pour vous connecter ou demander un accès.</p>
-          ) : registering ? (
+          {registering ? (
             <>
-              <h3>Demande d’accès — {accessLabels[mode]}</h3>
-              <p className="muted">La demande restera en attente jusqu’à validation par un administrateur.</p>
+              <p className="muted">Un seul formulaire suffit. Après validation, le site saura automatiquement si vous êtes militaire, conjoint(e), amicaliste ou non.</p>
 
               <label>Nom
                 <input type="text" required minLength="2" maxLength="80" autoComplete="family-name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
@@ -133,7 +123,7 @@ export default function Login() {
               </label>
               <label>Situation
                 <select required value={applicantType} onChange={(e) => setApplicantType(e.target.value)}>
-                  <option value="military">Militaire</option>
+                  <option value="military">Militaire DANZ</option>
                   <option value="spouse">Conjoint(e)</option>
                 </select>
               </label>
@@ -149,33 +139,41 @@ export default function Login() {
               </label>
 
               <button className="primary-button" disabled={busy || !configured}>{busy ? 'Envoi…' : 'Envoyer ma demande'}</button>
-              <button type="button" className="ghost-button" onClick={() => { setRegistering(false); setError(''); setSuccess('') }}>Retour à la connexion</button>
+              <button type="button" className="ghost-button" onClick={() => { setRegistering(false); setMode('standard'); setError(''); setSuccess('') }}>J’ai déjà un compte</button>
+            </>
+          ) : mode === 'admin' ? (
+            <>
+              <h3>Administrateur</h3>
+              <p className="muted">Accès réservé aux administrateurs déjà enregistrés. Connexion avec adresse e-mail et mot de passe.</p>
+
+              <label>Adresse e-mail
+                <input type="email" required autoComplete="email" placeholder="prenom.nom@exemple.fr" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </label>
+              <label>Mot de passe
+                <input type="password" required autoComplete="current-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
+              </label>
+
+              <button className="primary-button" disabled={busy || !configured}>{busy ? 'Connexion…' : 'Se connecter comme admin'}</button>
+              <p className="login-help">Les droits administrateur ne sont pas demandés depuis cette page : ils sont attribués par un administrateur existant.</p>
             </>
           ) : (
             <>
-              <h3>{accessLabels[mode]}</h3>
-              <p className="muted">
-                {mode === 'admin'
-                  ? 'Connexion par adresse e-mail et mot de passe. Le compte doit avoir été validé comme administrateur.'
-                  : 'Connexion par adresse e-mail uniquement. Après validation, un lien sécurisé vous est envoyé par e-mail.'}
-              </p>
+              <h3>Membre</h3>
+              <p className="muted">Saisissez uniquement votre adresse e-mail. Si votre compte a été validé, vous recevrez un lien sécurisé de connexion.</p>
 
               <label>Adresse e-mail
                 <input type="email" required autoComplete="email" placeholder="prenom.nom@exemple.fr" value={email} onChange={(e) => setEmail(e.target.value)} />
               </label>
 
-              {mode === 'admin' && <label>Mot de passe
-                <input type="password" required autoComplete="current-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
-              </label>}
+              <button className="primary-button" disabled={busy || !configured}>{busy ? 'Envoi…' : 'Recevoir mon lien de connexion'}</button>
 
-              <button className="primary-button" disabled={busy || !configured}>
-                {busy ? 'Traitement…' : mode === 'admin' ? 'Se connecter' : 'Recevoir mon lien de connexion'}
-              </button>
-              <button type="button" className="ghost-button" onClick={() => { setRegistering(true); setError(''); setSuccess('') }}>Demander un accès</button>
+              <div style={{marginTop:'1.4rem',paddingTop:'1.2rem',borderTop:'1px solid #dce5e2'}}>
+                <strong style={{display:'block',marginBottom:'.3rem'}}>Première visite ?</strong>
+                <p className="muted" style={{marginBottom:'.7rem'}}>Demandez votre accès une seule fois. Un administrateur validera ensuite votre compte.</p>
+                <button type="button" className="secondary-button" onClick={() => { setRegistering(true); setError(''); setSuccess(''); setEmail('') }}>Demander un accès</button>
+              </div>
             </>
           )}
-
-          <p className="login-help">Aucun nouveau compte n’accède au site sans validation préalable d’un administrateur.</p>
         </form>
       </section>
     </div>
