@@ -10,6 +10,7 @@ export default function AdminRequests() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState(null)
+  const pendingCount = useMemo(() => requests.filter((request) => request.status === 'pending').length, [requests])
 
   const load = async () => {
     setLoading(true)
@@ -29,8 +30,6 @@ export default function AdminRequests() {
   }, [isAdmin, authLoading])
 
   if (!authLoading && !isAdmin) return <Navigate to="/" replace />
-
-  const pendingCount = useMemo(() => requests.filter((request) => request.status === 'pending').length, [requests])
 
   const approve = async (id) => {
     setBusyId(id)
