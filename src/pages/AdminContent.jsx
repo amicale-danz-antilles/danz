@@ -15,6 +15,7 @@ const audienceLabels = {
   everyone: 'Tout le monde',
   military: 'Militaires uniquement',
   amicaliste: 'Amicalistes uniquement',
+  admin: 'Bureau / Admin uniquement',
 }
 
 const safeName = (name) => name
@@ -173,7 +174,7 @@ export default function AdminContent() {
     <PageTitle
       eyebrow="Administration"
       title="Publier du contenu"
-      text="Publiez une information et choisissez précisément qui peut la voir et recevoir sa notification."
+      text="Publiez une information et choisissez précisément qui peut la voir. Les notifications sont facultatives pour chaque utilisateur."
     />
 
     <div className="text-panel">
@@ -192,10 +193,11 @@ export default function AdminContent() {
             <option value="everyone">Tout le monde</option>
             <option value="military">Militaires uniquement</option>
             <option value="amicaliste">Amicalistes uniquement</option>
+            <option value="admin">Bureau / Admin uniquement</option>
           </select>
         </label>
 
-        <div className="privacy-note">🔒 Le filtrage est appliqué côté serveur. Les utilisateurs hors audience ne voient pas la publication et ne reçoivent pas sa notification.</div>
+        <div className="privacy-note">🔒 L’audience détermine qui peut voir le contenu. Les notifications ne sont qu’une alerte : un utilisateur autorisé verra toujours la publication même s’il a désactivé ses notifications.</div>
 
         <label>Titre
           <input type="text" required maxLength="160" value={title} onChange={(e) => setTitle(e.target.value)} />
