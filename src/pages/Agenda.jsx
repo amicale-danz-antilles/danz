@@ -20,21 +20,12 @@ const toLocalInput = (value) => {
   return local.toISOString().slice(0, 16)
 }
 
-function AppleCalendarIcon() {
-  return <span className="calendar-app-icon apple-calendar-icon" aria-hidden="true">
-    <span className="calendar-icon-bar" />
-    <strong>17</strong>
-  </span>
+function AppleLogo() {
+  return <img className="calendar-brand-logo" src="/danz/apple-logo.svg" alt="" aria-hidden="true" />
 }
 
-function GoogleCalendarIcon() {
-  return <span className="calendar-app-icon google-calendar-icon" aria-hidden="true">
-    <span className="google-calendar-corner google-calendar-blue" />
-    <span className="google-calendar-corner google-calendar-green" />
-    <span className="google-calendar-corner google-calendar-yellow" />
-    <span className="google-calendar-corner google-calendar-red" />
-    <strong>31</strong>
-  </span>
+function GoogleLogo() {
+  return <img className="calendar-brand-logo" src="/danz/google-logo.svg" alt="" aria-hidden="true" />
 }
 
 export default function Agenda(){
@@ -161,7 +152,7 @@ export default function Agenda(){
  }
 
  return <>
-  <PageTitle eyebrow="Vie de l'amicale" title="Agenda" text={isAdmin ? "Toutes les informations sont visibles directement. Touchez une tuile pour modifier l’événement." : "Toutes les informations sont visibles directement. Ajoutez un rendez-vous à votre calendrier en touchant simplement son icône."} />
+  <PageTitle eyebrow="Vie de l'amicale" title="Agenda" text={isAdmin ? "Toutes les informations sont visibles directement. Touchez une tuile pour modifier l’événement." : "Toutes les informations sont visibles directement. Ajoutez un rendez-vous à votre calendrier en touchant simplement le logo Apple ou Google."} />
   {error && <div className="alert error" style={{marginBottom:'1rem'}}>{error}</div>}
   {loading?<div className="skeleton-card tall"/>:<div className="timeline">
    {items.length?items.map(x=>{
@@ -193,10 +184,10 @@ export default function Agenda(){
           <div className="calendar-quick-add" onClick={(e)=>e.stopPropagation()}>
             <span>Ajouter au calendrier</span>
             <button type="button" className="calendar-logo-button" title="Ajouter à Apple Calendrier" aria-label="Ajouter à Apple Calendrier" onClick={()=>addApple(x)}>
-              <AppleCalendarIcon />
+              <AppleLogo />
             </button>
             <button type="button" className="calendar-logo-button" title="Ajouter à Google Agenda" aria-label="Ajouter à Google Agenda" onClick={()=>addGoogle(x)}>
-              <GoogleCalendarIcon />
+              <GoogleLogo />
             </button>
           </div>
         </>}
