@@ -76,10 +76,10 @@ export function AuthProvider({ children }) {
     hasAccess: profile?.active === true,
     loading,
     configured: isSupabaseConfigured,
-    requestMemberLogin: async (email, accessType) => {
+    requestMemberLogin: async (email) => {
       if (!supabase) throw new Error('Supabase n’est pas encore configuré.')
       const { data, error } = await supabase.functions.invoke('send-member-login-link', {
-        body: { email: email.trim().toLowerCase(), accessType },
+        body: { email: email.trim().toLowerCase() },
       })
       if (error) throw error
       if (data?.error) throw new Error(data.error)
