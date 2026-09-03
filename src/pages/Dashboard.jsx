@@ -40,7 +40,7 @@ export default function Dashboard() {
       <div className="home-welcome-copy">
         <span className="eyebrow">Amicale DANZ Antilles</span>
         <h1>{firstName ? `Bonjour ${firstName} !` : 'Bienvenue !'}</h1>
-        <p>Votre espace rassemble les informations utiles de la DANZ et de l’Amicale. Retrouvez directement les prochains rendez-vous, les dernières informations, les documents et les photos partagées.</p>
+        <p>Votre espace rassemble les informations utiles de la DANZ et de l’Amicale. Retrouvez directement les prochains rendez-vous, les dernières informations, les documents, les photos et les bons plans en Martinique.</p>
       </div>
       <img className="home-welcome-logo" src="/danz/amicale-danz-icon.png" alt="Insigne DANZ Antilles" />
     </section>
@@ -91,6 +91,7 @@ export default function Dashboard() {
       <div className="home-shortcuts" style={{marginTop:'16px'}}>
         <Link className="home-shortcut" to="/agenda"><span className="home-shortcut-icon">📅</span><strong>Agenda</strong><span>Événements, horaires et ajout au calendrier personnel.</span></Link>
         <Link className="home-shortcut" to="/actualites"><span className="home-shortcut-icon">📣</span><strong>Actualités</strong><span>Informations et messages publiés pour votre profil.</span></Link>
+        <Link className="home-shortcut" to="/bons-plans"><span className="home-shortcut-icon">⭐</span><strong>Bons plans</strong><span>Adresses, avantages, sorties et idées utiles en Martinique.</span></Link>
         <Link className="home-shortcut" to="/documents"><span className="home-shortcut-icon">📄</span><strong>Documents</strong><span>Notes, fichiers et ressources internes à consulter.</span></Link>
         <Link className="home-shortcut" to="/galerie"><span className="home-shortcut-icon">📷</span><strong>Photos</strong><span>Galerie et souvenirs partagés par l’Amicale.</span></Link>
       </div>
