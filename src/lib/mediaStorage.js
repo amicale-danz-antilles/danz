@@ -1,6 +1,8 @@
 import { supabase } from './supabase.js'
 
 const FALLBACK_LIMIT = 45 * 1024 * 1024
+const URL_CACHE_MS = 45 * 60 * 1000
+const mediaUrlCache = new Map()
 
 const safeName = (name = 'fichier') => name
   .normalize('NFD')
@@ -9,10 +11,48 @@ const safeName = (name = 'fichier') => name
   .replace(/-+/g, '-')
   .toLowerCase()
 
+const cacheKey = (item, entity) => `${entity}:${item.id || item.storage_path}:${item.storage_path}`
+const getCached = (item, entity) => {
+  const cached = mediaUrlCache.get(cacheKey(item, entity))
+  if (!cached || cached.expiresAt < Date.now()) return null
+  return cached.url
+}
+const setCached = (item, entity, url) => {
+  if (url) mediaUrlCache.set(cacheKey(item, entity), { url, expiresAt: Date.now() + URL_CACHE_MS })
+}
+
 export async function getR2Status() {
   const { data, error } = await supabase.functions.invoke('r2-media', { body: { action: 'status' } })
   if (error) return false
   return data?.configured === true
+}
+
+export async function optimizeImageFile(file, { maxDimension = 1920, quality = 0.82 } = {}) {
+  if (!file?.type?.startsWith('image/') || file.type === 'image/gif') return file
+  let bitmap
+  try {
+    bitmap = await createImageBitmap(file)
+  } catch (_) {
+    return file
+  }
+  try {
+    const longest = Math.max(bitmap.width, bitmap.height)
+    if (longest <= maxDimension && file.size <= 1.5 * 1024 * 1024) return file
+    const scale = Math.min(1, maxDimension / longest)
+    const width = Math.max(1, Math.round(bitmap.width * scale))
+    const height = Math.max(1, Math.round(bitmap.height * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext('2d', { alpha: false })
+    ctx.drawImage(bitmap, 0, 0, width, height)
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', quality))
+    if (!blob || blob.size >= file.size) return file
+    const base = (file.name || 'photo').replace(/\.[^.]+$/, '')
+    return new File([blob], `${base}.webp`, { type: 'image/webp', lastModified: file.lastModified || Date.now() })
+  } finally {
+    bitmap.close?.()
+  }
 }
 
 export async function uploadPrivateMedia(file, { scope, parentId, fallbackBucket }) {
@@ -46,23 +86,68 @@ export async function uploadPrivateMedia(file, { scope, parentId, fallbackBucket
   return { storage_provider: 'supabase', storage_path: path }
 }
 
-export async function resolvePrivateMedia(item, { entity, fallbackBucket }) {
-  if (!item?.storage_path) return item?.image_url || null
-  if (item.storage_provider === 'r2') {
-    if (String(item.mime_type || '').startsWith('image/')) {
-      const { data, error } = await supabase.functions.invoke('r2-media', { body: { action: 'view-image', entity, id: item.id } })
-      if (!error && data instanceof Blob) return URL.createObjectURL(data)
+export async function resolvePrivateMediaBatch(items, { entity, fallbackBucket }) {
+  const list = (items || []).filter(item => item?.storage_path || item?.image_url)
+  const urls = new Map()
+  const unresolvedR2 = []
+  const unresolvedSupabase = []
+
+  for (const item of list) {
+    if (!item.storage_path && item.image_url) {
+      urls.set(item.id, item.image_url)
+      continue
     }
-    const { data, error } = await supabase.functions.invoke('r2-media', { body: { action: 'view', entity, id: item.id } })
-    if (error || !data?.url) return null
-    return data.url
+    const cached = getCached(item, entity)
+    if (cached) {
+      urls.set(item.id, cached)
+      continue
+    }
+    if (item.storage_provider === 'r2') unresolvedR2.push(item)
+    else unresolvedSupabase.push(item)
   }
-  const { data } = await supabase.storage.from(fallbackBucket).createSignedUrl(item.storage_path, 3600)
-  return data?.signedUrl || null
+
+  if (unresolvedR2.length) {
+    const { data, error } = await supabase.functions.invoke('r2-media', {
+      body: { action: 'batch-view', entity, ids: unresolvedR2.map(item => item.id) },
+    })
+    if (!error) {
+      for (const item of unresolvedR2) {
+        const url = data?.urls?.[item.id]
+        if (url) {
+          urls.set(item.id, url)
+          setCached(item, entity, url)
+        }
+      }
+    }
+  }
+
+  if (unresolvedSupabase.length) {
+    const paths = unresolvedSupabase.map(item => item.storage_path)
+    const { data, error } = await supabase.storage.from(fallbackBucket).createSignedUrls(paths, 3600)
+    if (!error) {
+      ;(data || []).forEach((entry, index) => {
+        const item = unresolvedSupabase[index]
+        const url = entry?.signedUrl || null
+        if (item && url) {
+          urls.set(item.id, url)
+          setCached(item, entity, url)
+        }
+      })
+    }
+  }
+
+  return urls
+}
+
+export async function resolvePrivateMedia(item, options) {
+  if (!item) return null
+  const urls = await resolvePrivateMediaBatch([item], options)
+  return urls.get(item.id) || item.image_url || null
 }
 
 export async function removePrivateMedia(item, { entity, fallbackBucket } = {}) {
   if (!item?.storage_path) return
+  mediaUrlCache.delete(cacheKey(item, entity || 'media'))
   if (item.storage_provider === 'r2') {
     if (entity && item.id) {
       await supabase.functions.invoke('r2-media', { body: { action: 'delete', entity, id: item.id } })
