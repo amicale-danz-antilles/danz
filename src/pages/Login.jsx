@@ -3,6 +3,11 @@ import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { supabase } from '../lib/supabase.js'
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || ''
+const SUPABASE_HOST = (() => {
+  try { return new URL(SUPABASE_URL).host } catch { return 'service Supabase' }
+})()
+
 export default function Login() {
   const { user, hasAccess, requestMemberLogin, signInAdmin, configured } = useAuth()
   const [mode, setMode] = useState('standard')
@@ -16,6 +21,8 @@ export default function Login() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [busy, setBusy] = useState(false)
+  const [networkTest, setNetworkTest] = useState(null)
+  const [testingNetwork, setTestingNetwork] = useState(false)
 
   if (user && hasAccess) return <Navigate to="/" replace />
 
@@ -33,6 +40,47 @@ export default function Login() {
     setApplicantType('military')
     setIsAmicaliste('')
     setEmail('')
+  }
+
+  const isNetworkFailure = (err) => {
+    const message = String(err?.message || err || '').toLowerCase()
+    return message.includes('networkerror') || message.includes('failed to fetch') || message.includes('network request failed') || message.includes('load failed')
+  }
+
+  const testNetwork = async () => {
+    setTestingNetwork(true)
+    setNetworkTest(null)
+    try {
+      if (!SUPABASE_URL) throw new Error('Supabase non configuré')
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 8000)
+      const started = performance.now()
+      let response
+      try {
+        response = await fetch(`${SUPABASE_URL}/auth/v1/health`, {
+          method: 'GET',
+          cache: 'no-store',
+          signal: controller.signal,
+          headers: { Accept: 'application/json' },
+        })
+      } finally {
+        clearTimeout(timer)
+      }
+      const elapsed = Math.round(performance.now() - started)
+      if (!response.ok) throw new Error(`Réponse HTTP ${response.status}`)
+      setNetworkTest({
+        ok: true,
+        text: `Connexion au service d’authentification réussie (${elapsed} ms). Le réseau autorise ${SUPABASE_HOST}.`,
+      })
+    } catch (err) {
+      const timeout = err?.name === 'AbortError'
+      setNetworkTest({
+        ok: false,
+        text: `${timeout ? 'Le test a expiré.' : 'Le service d’authentification est inaccessible depuis ce réseau.'} Demandez à votre support informatique d’autoriser les connexions HTTPS (port 443) vers ${SUPABASE_HOST}.`,
+      })
+    } finally {
+      setTestingNetwork(false)
+    }
   }
 
   const submit = async (event) => {
@@ -72,7 +120,11 @@ export default function Login() {
         setSuccess('Si cette adresse correspond à un compte validé, un lien de connexion sécurisé vient de vous être envoyé par e-mail.')
       }
     } catch (err) {
-      setError(err.message === 'Invalid login credentials' ? 'Identifiants administrateur incorrects.' : err.message)
+      if (isNetworkFailure(err)) {
+        setError(`Impossible de joindre le service de connexion depuis ce réseau. Cela ressemble à un filtrage réseau de ${SUPABASE_HOST}. Lancez le diagnostic réseau ci-dessous.`)
+      } else {
+        setError(err.message === 'Invalid login credentials' ? 'Identifiants administrateur incorrects.' : err.message)
+      }
     } finally {
       setBusy(false)
     }
@@ -174,6 +226,17 @@ export default function Login() {
               </div>
             </>
           )}
+
+          <div style={{marginTop:'1.35rem',paddingTop:'1rem',borderTop:'1px solid #dce5e2'}}>
+            <button type="button" className="ghost-button" style={{marginTop:0}} disabled={testingNetwork || !configured} onClick={testNetwork}>
+              {testingNetwork ? 'Test du réseau…' : 'Tester la connexion réseau'}
+            </button>
+            {networkTest && <div className={`alert ${networkTest.ok ? '' : 'error'}`} style={{marginTop:'.75rem'}}>
+              <strong>{networkTest.ok ? 'Réseau compatible' : 'Accès réseau bloqué'}</strong><br />
+              {networkTest.text}
+              {!networkTest.ok && <><br /><br /><small>Information à transmettre au support réseau : autoriser HTTPS/443 vers <strong>{SUPABASE_HOST}</strong>. Le site ne demande aucune ouverture de port entrant.</small></>}
+            </div>}
+          </div>
         </form>
       </section>
     </div>
