@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { PageTitle } from './Actualites.jsx'
 
 export default function AdminRequests() {
-  const { isAdmin, loading: authLoading } = useAuth()
+  const { user, isAdmin, loading: authLoading } = useAuth()
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -45,7 +45,7 @@ export default function AdminRequests() {
     setError('')
     const { error: updateError } = await supabase
       .from('membership_requests')
-      .update({ status: 'rejected', reviewed_at: new Date().toISOString() })
+      .update({ status: 'rejected', reviewed_at: new Date().toISOString(), reviewed_by: user?.id || null })
       .eq('id', id)
     if (updateError) setError(updateError.message)
     else await load()
@@ -53,15 +53,17 @@ export default function AdminRequests() {
   }
 
   const tools = [
+    ['/administration/utilisateurs', '🛡️', 'Utilisateurs & RGPD', 'Activer, suspendre ou supprimer un compte et consulter le journal des accès.'],
     ['/administration/contenus', '✍️', 'Publications', 'Créer, modifier ou supprimer une actualité ou un événement.'],
     ['/administration/galerie', '🖼️', 'Albums & médias', 'Ajouter des photos ou vidéos à n’importe quel événement, même ancien.'],
     ['/administration/bons-plans', '⭐', 'Bons plans', 'Valider les propositions, ajouter, corriger ou retirer une fiche.'],
     ['/administration/sondages', '✓', 'Sondages', 'Créer, clôturer ou supprimer les sondages.'],
     ['/administration/bureau', '👥', 'Bureau', 'Renseigner ou modifier les membres du bureau.'],
+    ['/confidentialite', '📄', 'Politique de confidentialité', 'Relire la notice RGPD visible par les membres avant leur connexion.'],
   ]
 
   return <div className="admin-hub">
-    <PageTitle eyebrow="Espace réservé" title="Administration" text="Toutes les créations, validations et modifications du site sont regroupées ici afin de garder les pages membres propres et d’éviter les fausses manipulations." />
+    <PageTitle eyebrow="Espace réservé" title="Administration" text="Toutes les créations, validations, modifications et décisions d’accès du site sont regroupées ici afin de garder les pages membres propres, traçables et de limiter les fausses manipulations." />
 
     <section>
       <div className="admin-section-heading"><div><span className="eyebrow">Gestion du site</span><h2>Que voulez-vous administrer ?</h2></div></div>
