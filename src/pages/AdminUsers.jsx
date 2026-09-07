@@ -15,6 +15,8 @@ const auditLabels = {
   user_access_updated: 'Accès modifié / compte réactivé',
   user_suspended: 'Compte suspendu',
   user_deleted: 'Compte et données personnelles supprimés',
+  membership_approved: 'Demande d’accès approuvée',
+  membership_rejected: 'Demande d’accès refusée',
 }
 
 export default function AdminUsers() {
@@ -74,14 +76,18 @@ export default function AdminUsers() {
     setError('')
     setSuccess('')
     try {
-      const { error: rpcError } = await supabase.rpc('admin_set_user_access', {
-        p_user_id: profile.id,
-        p_active: active,
-        p_access_type: values?.access_type || profile.access_type,
-        p_applicant_type: values?.applicant_type || null,
-        p_is_amicaliste: values?.is_amicaliste === 'unknown' ? null : values?.is_amicaliste === 'yes',
+      const isAmicaliste = values?.is_amicaliste === 'unknown' ? null : values?.is_amicaliste === 'yes'
+      const { data, error: fnError } = await supabase.functions.invoke('admin-user-management', {
+        body: {
+          action: 'set-access',
+          userId: profile.id,
+          active,
+          accessType: values?.access_type || profile.access_type,
+          applicantType: values?.applicant_type || null,
+          isAmicaliste,
+        },
       })
-      if (rpcError) throw rpcError
+      if (fnError || data?.error) throw new Error(data?.error || fnError?.message || 'Impossible de modifier ce compte.')
       setEditingId(null)
       setDraft(null)
       setSuccess(active ? 'Les droits de l’utilisateur ont été enregistrés.' : 'Le compte a été suspendu. Les règles d’accès bloquent désormais ses données privées.')
@@ -185,7 +191,7 @@ export default function AdminUsers() {
     <section>
       <div className="admin-section-heading"><div><span className="eyebrow">Traçabilité</span><h2>Journal d’administration</h2></div><span>40 dernières actions</span></div>
       {audit.length === 0 ? <div className="empty-state">Aucune modification d’accès enregistrée pour le moment.</div> : <div className="admin-audit-list">
-        {audit.map((entry) => <article key={entry.id}><div><strong>{auditLabels[entry.action] || entry.action}</strong><span>{entry.target_user_id ? nameById[entry.target_user_id] || 'Utilisateur' : 'Compte supprimé'}</span></div><small>{new Date(entry.created_at).toLocaleString('fr-FR')} · par {entry.actor_id ? nameById[entry.actor_id] || 'Administrateur' : 'ancien administrateur'}</small></article>)}
+        {audit.map((entry) => <article key={entry.id}><div><strong>{auditLabels[entry.action] || entry.action}</strong><span>{entry.target_user_id ? nameById[entry.target_user_id] || 'Utilisateur' : entry.action.startsWith('membership_') ? 'Demande d’accès' : 'Compte supprimé'}</span></div><small>{new Date(entry.created_at).toLocaleString('fr-FR')} · par {entry.actor_id ? nameById[entry.actor_id] || 'Administrateur' : 'ancien administrateur'}</small></article>)}
       </div>}
     </section>
   </div>
