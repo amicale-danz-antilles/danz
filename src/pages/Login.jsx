@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { supabase } from '../lib/supabase.js'
 
@@ -138,6 +138,7 @@ export default function Login() {
                 <input type="email" required autoComplete="email" placeholder="prenom.nom@exemple.fr" value={email} onChange={(e) => setEmail(e.target.value)} />
               </label>
 
+              <p className="login-help">Les informations de ce formulaire servent uniquement à vérifier et gérer votre accès à l’espace privé. <Link to="/confidentialite">Consulter la politique de confidentialité</Link>.</p>
               <button className="primary-button" disabled={busy || !configured}>{busy ? 'Envoi…' : 'Envoyer ma demande'}</button>
               <button type="button" className="ghost-button" onClick={() => { setRegistering(false); setMode('standard'); setError(''); setSuccess('') }}>J’ai déjà un compte</button>
             </>
@@ -174,6 +175,8 @@ export default function Login() {
               </div>
             </>
           )}
+
+          <p className="login-help" style={{textAlign:'center',marginTop:'1.2rem'}}><Link to="/confidentialite">Confidentialité et données personnelles</Link></p>
         </form>
       </section>
     </div>
