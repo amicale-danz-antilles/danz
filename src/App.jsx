@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
 import Login from './pages/Login.jsx'
+import Privacy from './pages/Privacy.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Agenda from './pages/Agenda.jsx'
 import Galerie from './pages/Galerie.jsx'
@@ -11,10 +12,12 @@ import Profile from './pages/Profile.jsx'
 import Amicale from './pages/Amicale.jsx'
 import AdminRequests from './pages/AdminRequests.jsx'
 import AdminContent from './pages/AdminContent.jsx'
+import AdminUsers from './pages/AdminUsers.jsx'
 
 export default function App(){
  return <Routes>
   <Route path="/connexion" element={<Login/>}/>
+  <Route path="/confidentialite" element={<Privacy/>}/>
   <Route element={<ProtectedRoute><Layout/></ProtectedRoute>}>
     <Route index element={<Dashboard/>}/>
     <Route path="agenda" element={<Agenda/>}/>
@@ -27,6 +30,7 @@ export default function App(){
     <Route path="amicale" element={<Navigate to="/" replace/>}/>
 
     <Route path="administration" element={<AdminRequests/>}/>
+    <Route path="administration/utilisateurs" element={<AdminUsers/>}/>
     <Route path="administration/contenus" element={<AdminContent/>}/>
     <Route path="administration/galerie" element={<Galerie/>}/>
     <Route path="administration/bons-plans" element={<BonsPlans/>}/>
