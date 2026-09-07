@@ -39,10 +39,11 @@ export default function Layout() {
           <span>{(profile?.full_name||user?.email||'A')[0].toUpperCase()}</span>
           <small><strong>{profile?.full_name||user?.email}</strong><em>Mon profil</em></small>
         </NavLink>
+        <NavLink to="/confidentialite" onClick={()=>setOpen(false)} style={{fontSize:'11px',color:'var(--muted)',textAlign:'center'}}>Confidentialité & RGPD</NavLink>
         <button className="ghost-button" onClick={logout}>Se déconnecter</button>
       </div>
     </aside>
-    <div className="main-column"><header className="topbar"><button className="menu-button" aria-label="Ouvrir le menu" onClick={()=>setOpen(!open)}>☰</button><div><strong>{spaceTitle}</strong><span>{spaceSubtitle}</span></div></header><main className={`page ${inAdministration?'admin-surface':'public-surface'}`}><Outlet/></main><footer>Amicale DANZ Antilles · Espace privé</footer></div>
+    <div className="main-column"><header className="topbar"><button className="menu-button" aria-label="Ouvrir le menu" onClick={()=>setOpen(!open)}>☰</button><div><strong>{spaceTitle}</strong><span>{spaceSubtitle}</span></div></header><main className={`page ${inAdministration?'admin-surface':'public-surface'}`}><Outlet/></main><footer>Amicale DANZ Antilles · Espace privé · <NavLink to="/confidentialite">Confidentialité</NavLink></footer></div>
     {open&&<button aria-label="Fermer le menu" className="backdrop" onClick={()=>setOpen(false)}/>} 
   </div>
 }
