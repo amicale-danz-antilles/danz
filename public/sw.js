@@ -1,4 +1,4 @@
-const CACHE_NAME='danz-shell-v7'
+const CACHE_NAME='danz-shell-v8'
 const THUMB_CACHE='danz-private-thumbs-v2'
 const STATIC_URLS=[
   '/danz/',
