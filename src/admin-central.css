@@ -1,10 +1,11 @@
 .profile-chip-link{text-decoration:none;color:inherit}.profile-chip-link small{display:grid;gap:1px;min-width:0}.profile-chip-link small strong{font:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.profile-chip-link small em{font-style:normal;font-size:10px;color:var(--muted)}.profile-chip-link:hover{background:rgba(255,255,255,.07)}
 
-/* Dans les pages de consultation, aucun contrôle d’administration n’est exposé. */
+/* Dans les pages de consultation, aucun contrôle d’administration n’est exposé.
+   Le formulaire membre de proposition de bon plan reste volontairement visible. */
 .public-surface .home-admin-banner,
 .public-surface .good-deals-admin-bar,
 .public-surface .good-deal-submissions-review,
-.public-surface .good-deals-admin-panel,
+.public-surface .good-deals-admin-panel:not(.good-deals-proposal-panel),
 .public-surface .good-deal-admin-actions,
 .public-surface .poll-admin-bar,
 .public-surface .poll-create-panel,
