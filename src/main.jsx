@@ -7,6 +7,7 @@ import { AuthProvider } from './context/AuthContext.jsx'
 import './styles.css'
 import './quality.css'
 import './home-app.css'
+import './mobile-fixes.css'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -19,3 +20,9 @@ createRoot(document.getElementById('root')).render(
     </AppErrorBoundary>
   </StrictMode>,
 )
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/danz/sw.js', { scope: '/danz/' }).catch(() => {})
+  })
+}
