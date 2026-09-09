@@ -1,41 +1,49 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
 import Login from './pages/Login.jsx'
 import Privacy from './pages/Privacy.jsx'
-import Dashboard from './pages/Dashboard.jsx'
-import Agenda from './pages/Agenda.jsx'
-import Galerie from './pages/Galerie.jsx'
-import BonsPlans from './pages/BonsPlans.jsx'
-import Sondages from './pages/Sondages.jsx'
-import Profile from './pages/Profile.jsx'
-import Amicale from './pages/Amicale.jsx'
-import AdminRequests from './pages/AdminRequests.jsx'
-import AdminContent from './pages/AdminContent.jsx'
-import AdminUsers from './pages/AdminUsers.jsx'
+
+const Dashboard = lazy(() => import('./pages/Dashboard.jsx'))
+const Agenda = lazy(() => import('./pages/Agenda.jsx'))
+const Galerie = lazy(() => import('./pages/Galerie.jsx'))
+const BonsPlans = lazy(() => import('./pages/BonsPlans.jsx'))
+const Sondages = lazy(() => import('./pages/Sondages.jsx'))
+const Profile = lazy(() => import('./pages/Profile.jsx'))
+const Amicale = lazy(() => import('./pages/Amicale.jsx'))
+const AdminRequests = lazy(() => import('./pages/AdminRequests.jsx'))
+const AdminContent = lazy(() => import('./pages/AdminContent.jsx'))
+const AdminUsers = lazy(() => import('./pages/AdminUsers.jsx'))
+
+function PageLoader(){
+ return <div className="route-loader" role="status" aria-live="polite"><span className="route-loader-spinner"/><span>Chargement…</span></div>
+}
+
+const withLoader = (element) => <Suspense fallback={<PageLoader/>}>{element}</Suspense>
 
 export default function App(){
  return <Routes>
   <Route path="/connexion" element={<Login/>}/>
   <Route path="/confidentialite" element={<Privacy/>}/>
   <Route element={<ProtectedRoute><Layout/></ProtectedRoute>}>
-    <Route index element={<Dashboard/>}/>
-    <Route path="agenda" element={<Agenda/>}/>
-    <Route path="sondages" element={<Sondages/>}/>
-    <Route path="galerie" element={<Galerie/>}/>
-    <Route path="bons-plans" element={<BonsPlans/>}/>
-    <Route path="profil" element={<Profile/>}/>
+    <Route index element={withLoader(<Dashboard/>)}/>
+    <Route path="agenda" element={withLoader(<Agenda/>)}/>
+    <Route path="sondages" element={withLoader(<Sondages/>)}/>
+    <Route path="galerie" element={withLoader(<Galerie/>)}/>
+    <Route path="bons-plans" element={withLoader(<BonsPlans/>)}/>
+    <Route path="profil" element={withLoader(<Profile/>)}/>
     <Route path="actualites" element={<Navigate to="/" replace/>}/>
     <Route path="documents" element={<Navigate to="/" replace/>}/>
     <Route path="amicale" element={<Navigate to="/" replace/>}/>
 
-    <Route path="administration" element={<AdminRequests/>}/>
-    <Route path="administration/utilisateurs" element={<AdminUsers/>}/>
-    <Route path="administration/contenus" element={<AdminContent/>}/>
-    <Route path="administration/galerie" element={<Galerie/>}/>
-    <Route path="administration/bons-plans" element={<BonsPlans/>}/>
-    <Route path="administration/sondages" element={<Sondages/>}/>
-    <Route path="administration/bureau" element={<Amicale/>}/>
+    <Route path="administration" element={withLoader(<AdminRequests/>)}/>
+    <Route path="administration/utilisateurs" element={withLoader(<AdminUsers/>)}/>
+    <Route path="administration/contenus" element={withLoader(<AdminContent/>)}/>
+    <Route path="administration/galerie" element={withLoader(<Galerie/>)}/>
+    <Route path="administration/bons-plans" element={withLoader(<BonsPlans/>)}/>
+    <Route path="administration/sondages" element={withLoader(<Sondages/>)}/>
+    <Route path="administration/bureau" element={withLoader(<Amicale/>)}/>
     <Route path="administration/demandes" element={<Navigate to="/administration" replace/>}/>
   </Route>
   <Route path="*" element={<Navigate to="/" replace/>}/>
