@@ -15,6 +15,13 @@ const auditLabels = {
   data_exported: 'Sauvegarde / export des données',
 }
 
+const situationLabel = (value) => ({
+  military: 'Militaire DANZ',
+  danz_military: 'Militaire DANZ',
+  military_other: 'Militaire hors DANZ',
+  spouse: 'Conjoint(e) militaire DANZ',
+}[value] || 'Situation non renseignée')
+
 const valuesFor = (profile) => ({
   active: profile.active === true,
   role: profile.role === 'admin' ? 'admin' : 'member',
@@ -31,24 +38,19 @@ const sameValues = (left, right) => Boolean(left && right)
 export default function AdminUsers() {
   const { user, isAdmin, loading: authLoading } = useAuth()
   const [profiles, setProfiles] = useState([])
-  const [drafts, setDrafts] = useState({})
   const [audit, setAudit] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [busyId, setBusyId] = useState(null)
   const [query, setQuery] = useState('')
+  const [selectedId, setSelectedId] = useState(null)
+  const [draft, setDraft] = useState(null)
   const [passwordTarget, setPasswordTarget] = useState(null)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const load = async ({ preserveDirty = false, exceptId = null } = {}) => {
-    const previousProfiles = profiles
-    const previousDrafts = drafts
-    const dirtyIds = preserveDirty
-      ? new Set(previousProfiles.filter((profile) => !sameValues(previousDrafts[profile.id], valuesFor(profile))).map((profile) => profile.id))
-      : new Set()
-
+  const load = async ({ keepSelection = true } = {}) => {
     setLoading(true)
     setError('')
     const [profilesResult, auditResult] = await Promise.all([
@@ -59,32 +61,35 @@ export default function AdminUsers() {
     if (auditResult.error) setError((current) => current || auditResult.error.message)
     const rows = profilesResult.data || []
     setProfiles(rows)
-    setDrafts(Object.fromEntries(rows.map((profile) => {
-      const keepDraft = preserveDirty && profile.id !== exceptId && dirtyIds.has(profile.id) && previousDrafts[profile.id]
-      return [profile.id, keepDraft ? previousDrafts[profile.id] : valuesFor(profile)]
-    })))
     setAudit(auditResult.data || [])
+    if (keepSelection && selectedId) {
+      const fresh = rows.find((profile) => profile.id === selectedId)
+      if (fresh) setDraft(valuesFor(fresh))
+      else { setSelectedId(null); setDraft(null) }
+    }
     setLoading(false)
   }
 
   useEffect(() => {
-    if (isAdmin) load()
+    if (isAdmin) load({ keepSelection: false })
     else if (!authLoading) setLoading(false)
   }, [isAdmin, authLoading])
 
   useEffect(() => {
-    if (!passwordTarget) return undefined
+    if (!selectedId && !passwordTarget) return undefined
     const previous = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const onKeyDown = (event) => {
-      if (event.key === 'Escape' && busyId !== passwordTarget.id) setPasswordTarget(null)
+      if (event.key !== 'Escape') return
+      if (passwordTarget && busyId !== passwordTarget.id) setPasswordTarget(null)
+      else if (!busyId) { setSelectedId(null); setDraft(null) }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => {
       document.body.style.overflow = previous
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [passwordTarget, busyId])
+  }, [selectedId, passwordTarget, busyId])
 
   if (!authLoading && !isAdmin) return <Navigate to="/" replace />
 
@@ -101,24 +106,34 @@ export default function AdminUsers() {
     return profiles.filter((profile) => `${profile.full_name || ''} ${profile.email || ''}`.toLowerCase().includes(needle))
   }, [profiles, query])
 
-  const dirtyCount = useMemo(() => profiles.reduce((count, profile) => count + (!sameValues(drafts[profile.id], valuesFor(profile)) ? 1 : 0), 0), [profiles, drafts])
+  const selectedProfile = useMemo(() => profiles.find((profile) => profile.id === selectedId) || null, [profiles, selectedId])
   const nameById = useMemo(() => Object.fromEntries(profiles.map((profile) => [profile.id, profile.full_name || profile.email || 'Utilisateur'])), [profiles])
+  const dirty = selectedProfile && draft ? !sameValues(draft, valuesFor(selectedProfile)) : false
 
-  const updateDraft = (id, key, value) => setDrafts((current) => ({ ...current, [id]: { ...current[id], [key]: value } }))
-  const isDirty = (profile) => !sameValues(drafts[profile.id], valuesFor(profile))
-  const resetRow = (profile) => setDrafts((current) => ({ ...current, [profile.id]: valuesFor(profile) }))
+  const openUser = (profile) => {
+    setError('')
+    setSuccess('')
+    setSelectedId(profile.id)
+    setDraft(valuesFor(profile))
+  }
 
-  const saveRow = async (profile) => {
-    const draft = drafts[profile.id]
-    if (!draft || !isDirty(profile)) return
-    setBusyId(profile.id)
+  const closeUser = () => {
+    if (busyId) return
+    if (dirty && !window.confirm('Abandonner les modifications non enregistrées ?')) return
+    setSelectedId(null)
+    setDraft(null)
+  }
+
+  const saveUser = async () => {
+    if (!selectedProfile || !draft || !dirty) return
+    setBusyId(selectedProfile.id)
     setError('')
     setSuccess('')
     try {
       const { data, error: fnError } = await supabase.functions.invoke('admin-user-management', {
         body: {
           action: 'set-access',
-          userId: profile.id,
+          userId: selectedProfile.id,
           active: draft.active,
           role: draft.role,
           applicantType: draft.applicant_type || null,
@@ -126,8 +141,8 @@ export default function AdminUsers() {
         },
       })
       if (fnError || data?.error) throw new Error(data?.error || fnError?.message || 'Impossible de modifier ce compte.')
-      setSuccess(`Compte de ${profile.full_name || profile.email} mis à jour.`)
-      await load({ preserveDirty: true, exceptId: profile.id })
+      setSuccess(`Compte de ${selectedProfile.full_name || selectedProfile.email} mis à jour.`)
+      await load()
     } catch (err) {
       setError(err.message || 'Impossible de modifier ce compte.')
     } finally {
@@ -158,8 +173,8 @@ export default function AdminUsers() {
       setPasswordTarget(null)
       setNewPassword('')
       setConfirmPassword('')
-      setSuccess(`Nouveau mot de passe enregistré pour ${label}. L’ancien mot de passe n’est plus valable pour les prochaines connexions.`)
-      await load({ preserveDirty: true })
+      setSuccess(`Nouveau mot de passe enregistré pour ${label}.`)
+      await load()
     } catch (err) {
       setError(err.message || 'Impossible de remplacer le mot de passe.')
     } finally {
@@ -168,7 +183,7 @@ export default function AdminUsers() {
   }
 
   const deleteUser = async (profile) => {
-    const answer = window.prompt(`Suppression RGPD définitive de ${profile.full_name || profile.email}.\n\nCette action supprime le compte, ses votes, préférences et abonnements push. Le contenu collectif déjà publié est conservé mais anonymisé.\n\nTapez SUPPRIMER pour confirmer.`)
+    const answer = window.prompt(`Suppression RGPD définitive de ${profile.full_name || profile.email}.\n\nTapez SUPPRIMER pour confirmer.`)
     if (answer !== 'SUPPRIMER') return
     setBusyId(profile.id)
     setError('')
@@ -176,8 +191,10 @@ export default function AdminUsers() {
     try {
       const { data, error: fnError } = await supabase.functions.invoke('admin-user-management', { body: { action: 'delete', userId: profile.id } })
       if (fnError || data?.error) throw new Error(data?.error || fnError?.message || 'Suppression impossible.')
-      setSuccess('Le compte et les données personnelles directement rattachées ont été supprimés.')
-      await load({ preserveDirty: true, exceptId: profile.id })
+      setSelectedId(null)
+      setDraft(null)
+      setSuccess('Le compte et ses données personnelles directement rattachées ont été supprimés.')
+      await load({ keepSelection: false })
     } catch (err) {
       setError(err.message || 'Suppression impossible.')
     } finally {
@@ -193,58 +210,81 @@ export default function AdminUsers() {
   }
 
   return <div className="admin-users-page">
-    <PageTitle eyebrow="Administration · RGPD" title="Utilisateurs & droits" text="Tous les comptes sont regroupés dans un tableau éditable. Modifiez l’accès, le rôle administrateur, le statut amicaliste ou la situation puis enregistrez la ligne concernée." />
+    <PageTitle eyebrow="Administration · Membres" title="Utilisateurs" text="Touchez un utilisateur pour consulter sa situation et gérer ses droits. Les actions sensibles restent regroupées dans sa fiche." />
 
     <div className="admin-user-stats">
-      <article><strong>{counts.total}</strong><span>comptes enregistrés</span></article>
-      <article><strong>{counts.active}</strong><span>accès actifs</span></article>
-      <article><strong>{counts.admins}</strong><span>administrateurs actifs</span></article>
+      <article><strong>{counts.total}</strong><span>comptes</span></article>
+      <article><strong>{counts.active}</strong><span>actifs</span></article>
       <article><strong>{counts.amicalistes}</strong><span>amicalistes</span></article>
+      <article><strong>{counts.admins}</strong><span>admins</span></article>
     </div>
 
-    <div className="privacy-note admin-rgpd-note"><strong>Gestion des mots de passe</strong><br />Un administrateur ne peut jamais consulter le mot de passe actuel. Le bouton « Nouveau mot de passe » le remplace directement dans le service d’authentification et l’opération est journalisée sans enregistrer la valeur saisie.</div>
-
-    {dirtyCount > 0 && <div className="admin-unsaved-note" role="status">{dirtyCount} ligne{dirtyCount > 1 ? 's' : ''} modifiée{dirtyCount > 1 ? 's' : ''} mais non enregistrée{dirtyCount > 1 ? 's' : ''}. Enregistrez chaque ligne concernée.</div>}
     {error && <div className="alert error">{error}</div>}
     {success && <div className="alert">{success}</div>}
 
     <section>
-      <div className="admin-section-heading"><div><span className="eyebrow">Base utilisateurs</span><h2>Tableau des comptes</h2></div><span>{filteredProfiles.length} affiché{filteredProfiles.length > 1 ? 's' : ''}</span></div>
+      <div className="admin-section-heading"><div><span className="eyebrow">Base membres</span><h2>Liste des utilisateurs</h2></div><span>{filteredProfiles.length} affiché{filteredProfiles.length > 1 ? 's' : ''}</span></div>
       <div className="admin-user-toolbar"><input type="search" placeholder="Rechercher un nom ou une adresse e-mail…" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
 
-      {loading ? <div className="skeleton-card" /> : profiles.length === 0 ? <div className="empty-state">Aucun compte.</div> : filteredProfiles.length === 0 ? <div className="empty-state">Aucun utilisateur ne correspond à cette recherche.</div> : <div className="admin-user-table-wrap">
-        <table className="admin-user-table">
-          <thead><tr><th>Utilisateur</th><th>Accès</th><th>Rôle</th><th>Amicaliste</th><th>Situation</th><th>Mot de passe</th><th>Actions</th></tr></thead>
-          <tbody>{filteredProfiles.map((profile) => {
-            const self = profile.id === user?.id
-            const draft = drafts[profile.id] || valuesFor(profile)
-            const busy = busyId === profile.id
-            const dirty = isDirty(profile)
-            return <tr key={profile.id} className={profile.active ? '' : 'is-suspended'}>
-              <td data-label="Utilisateur"><div className="admin-table-user"><span className="admin-user-avatar">{(profile.full_name || profile.email || '?')[0].toUpperCase()}</span><div><strong>{profile.full_name || 'Nom non renseigné'}</strong><small>{profile.email}</small>{self && <em>Votre compte</em>}</div></div></td>
-              <td data-label="Accès"><select value={draft.active ? 'active' : 'suspended'} disabled={busy || self} onChange={(event) => updateDraft(profile.id, 'active', event.target.value === 'active')}><option value="active">Actif</option><option value="suspended">Suspendu</option></select></td>
-              <td data-label="Rôle"><select value={draft.role} disabled={busy || self} onChange={(event) => updateDraft(profile.id, 'role', event.target.value)}><option value="member">Membre</option><option value="admin">Administrateur</option></select></td>
-              <td data-label="Amicaliste"><select value={draft.is_amicaliste} disabled={busy} onChange={(event) => updateDraft(profile.id, 'is_amicaliste', event.target.value)}><option value="yes">Amicaliste</option><option value="no">Non-amicaliste</option></select></td>
-              <td data-label="Situation"><select value={draft.applicant_type} disabled={busy} onChange={(event) => updateDraft(profile.id, 'applicant_type', event.target.value)}><option value="">Non renseignée</option><option value="military">Militaire DANZ</option><option value="spouse">Conjoint(e)</option></select></td>
-              <td data-label="Mot de passe"><button type="button" className="ghost-button table-password-button" onClick={() => openPasswordReset(profile)} disabled={busy}>Nouveau mot de passe</button></td>
-              <td data-label="Actions"><div className="admin-table-actions"><button type="button" className="primary-button" disabled={busy || !dirty} onClick={() => saveRow(profile)}>{busy ? '…' : 'Enregistrer'}</button>{dirty&&<button type="button" className="ghost-button" disabled={busy} onClick={()=>resetRow(profile)}>Annuler</button>}<button type="button" className="ghost-button danger-action" disabled={busy || self} onClick={() => deleteUser(profile)}>Supprimer</button></div></td>
-            </tr>
-          })}</tbody>
-        </table>
+      {loading ? <div className="skeleton-card" /> : profiles.length === 0 ? <div className="empty-state">Aucun compte.</div> : filteredProfiles.length === 0 ? <div className="empty-state">Aucun utilisateur ne correspond à cette recherche.</div> : <div className="admin-member-list">
+        {filteredProfiles.map((profile) => {
+          const self = profile.id === user?.id
+          return <button type="button" className={`admin-member-row ${profile.active ? '' : 'is-suspended'}`} key={profile.id} onClick={() => openUser(profile)}>
+            <span className="admin-user-avatar">{(profile.full_name || profile.email || '?')[0].toUpperCase()}</span>
+            <span className="admin-member-identity"><strong>{profile.full_name || 'Nom non renseigné'}</strong><small>{profile.email}</small><em>{situationLabel(profile.applicant_type)}</em></span>
+            <span className="admin-member-badges">
+              <span className={`admin-state-badge ${profile.active ? 'ok' : 'off'}`}>{profile.active ? 'Actif' : 'Suspendu'}</span>
+              <span className={`admin-state-badge ${profile.is_amicaliste ? 'member' : 'neutral'}`}>{profile.is_amicaliste ? 'Amicaliste' : 'Non-amicaliste'}</span>
+              {profile.role === 'admin' && <span className="admin-state-badge admin">Admin</span>}
+              {self && <span className="admin-state-badge self">Vous</span>}
+            </span>
+            <span className="admin-member-chevron" aria-hidden="true">›</span>
+          </button>
+        })}
       </div>}
     </section>
 
-    <section>
-      <div className="admin-section-heading"><div><span className="eyebrow">Traçabilité</span><h2>Journal d’administration</h2></div><span>50 dernières actions</span></div>
-      {audit.length === 0 ? <div className="empty-state">Aucune modification enregistrée pour le moment.</div> : <div className="admin-audit-list">{audit.map((entry) => <article key={entry.id}><div><strong>{auditLabels[entry.action] || entry.action}</strong><span>{auditTargetLabel(entry)}</span></div><small>{new Date(entry.created_at).toLocaleString('fr-FR')} · par {entry.actor_id ? nameById[entry.actor_id] || 'Administrateur' : 'ancien administrateur'}</small></article>)}</div>}
+    <section className="admin-audit-section">
+      <details>
+        <summary>Journal d’administration · 50 dernières actions</summary>
+        {audit.length === 0 ? <div className="empty-state">Aucune modification enregistrée pour le moment.</div> : <div className="admin-audit-list">{audit.map((entry) => <article key={entry.id}><div><strong>{auditLabels[entry.action] || entry.action}</strong><span>{auditTargetLabel(entry)}</span></div><small>{new Date(entry.created_at).toLocaleString('fr-FR')} · par {entry.actor_id ? nameById[entry.actor_id] || 'Administrateur' : 'ancien administrateur'}</small></article>)}</div>}
+      </details>
     </section>
+
+    {selectedProfile && draft && <div className="admin-user-sheet-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeUser() }}>
+      <section className="admin-user-sheet" role="dialog" aria-modal="true" aria-labelledby="admin-user-sheet-title">
+        <div className="admin-user-sheet-head"><div className="admin-table-user"><span className="admin-user-avatar large">{(selectedProfile.full_name || selectedProfile.email || '?')[0].toUpperCase()}</span><div><span className="eyebrow">Gestion du compte</span><h2 id="admin-user-sheet-title">{selectedProfile.full_name || 'Utilisateur'}</h2><small>{selectedProfile.email}</small></div></div><button type="button" className="admin-sheet-close" aria-label="Fermer" onClick={closeUser}>×</button></div>
+
+        <div className="admin-user-sheet-summary">
+          <span>{selectedProfile.active ? '● Accès actif' : '○ Accès suspendu'}</span>
+          <span>{draft.is_amicaliste === 'yes' ? '✓ Amicaliste' : 'Non-amicaliste'}</span>
+          <span>{situationLabel(draft.applicant_type)}</span>
+        </div>
+
+        <div className="admin-user-edit-grid">
+          <label>Accès<select value={draft.active ? 'active' : 'suspended'} disabled={busyId === selectedProfile.id || selectedProfile.id === user?.id} onChange={(event) => setDraft({ ...draft, active: event.target.value === 'active' })}><option value="active">Actif</option><option value="suspended">Suspendu</option></select></label>
+          <label>Rôle<select value={draft.role} disabled={busyId === selectedProfile.id || selectedProfile.id === user?.id} onChange={(event) => setDraft({ ...draft, role: event.target.value })}><option value="member">Membre</option><option value="admin">Administrateur</option></select></label>
+          <label>Statut amicale<select value={draft.is_amicaliste} disabled={busyId === selectedProfile.id} onChange={(event) => setDraft({ ...draft, is_amicaliste: event.target.value })}><option value="yes">Amicaliste</option><option value="no">Non-amicaliste</option></select></label>
+          <label>Situation<select value={draft.applicant_type} disabled={busyId === selectedProfile.id} onChange={(event) => setDraft({ ...draft, applicant_type: event.target.value })}><option value="">Non renseignée</option><option value="military">Militaire DANZ</option><option value="spouse">Conjoint(e) militaire DANZ</option></select></label>
+        </div>
+
+        <div className="privacy-note admin-user-help"><strong>Amicaliste ≠ accès au site.</strong><br/>Le statut amicaliste est une information séparée. Suspendre un compte coupe son accès ; changer le statut amicaliste ne le déconnecte pas.</div>
+
+        <div className="admin-user-sheet-actions">
+          <button type="button" className="primary-button" disabled={busyId === selectedProfile.id || !dirty} onClick={saveUser}>{busyId === selectedProfile.id ? 'Enregistrement…' : dirty ? 'Enregistrer les modifications' : 'Aucune modification'}</button>
+          {dirty && <button type="button" className="secondary-button" disabled={busyId === selectedProfile.id} onClick={() => setDraft(valuesFor(selectedProfile))}>Annuler les changements</button>}
+          <button type="button" className="secondary-button" disabled={busyId === selectedProfile.id} onClick={() => openPasswordReset(selectedProfile)}>Changer le mot de passe</button>
+          <button type="button" className="ghost-button danger-action" disabled={busyId === selectedProfile.id || selectedProfile.id === user?.id} onClick={() => deleteUser(selectedProfile)}>Supprimer définitivement le compte</button>
+        </div>
+      </section>
+    </div>}
 
     {passwordTarget && <div className="admin-password-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && busyId !== passwordTarget.id) setPasswordTarget(null) }}>
       <form className="admin-password-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-password-title" onSubmit={replacePassword}>
         <span className="eyebrow">Sécurité du compte</span><h2 id="admin-password-title">Nouveau mot de passe</h2><p>Compte : <strong>{passwordTarget.full_name || passwordTarget.email}</strong></p>
         <label>Nouveau mot de passe<input type="password" autoFocus required minLength="10" maxLength="128" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="10 caractères minimum" /></label>
         <label>Confirmer le mot de passe<input type="password" required minLength="10" maxLength="128" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></label>
-        <small>Au moins 10 caractères, dont une lettre et un chiffre. L’ancien mot de passe n’est jamais affiché.</small>
+        <small>Au moins 10 caractères, dont une lettre et un chiffre. Le mot de passe actuel n’est jamais affiché.</small>
         <div className="admin-password-actions"><button className="primary-button" disabled={busyId === passwordTarget.id}>{busyId === passwordTarget.id ? 'Enregistrement…' : 'Remplacer le mot de passe'}</button><button type="button" className="ghost-button" disabled={busyId === passwordTarget.id} onClick={() => setPasswordTarget(null)}>Annuler</button></div>
       </form>
     </div>}
