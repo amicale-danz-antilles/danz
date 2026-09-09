@@ -1,4 +1,5 @@
-const CACHE_NAME='danz-shell-v3'
+const CACHE_NAME='danz-shell-v4'
+const THUMB_CACHE='danz-private-thumbs-v2'
 const STATIC_URLS=[
   '/danz/',
   '/danz/manifest.webmanifest',
@@ -27,6 +28,12 @@ self.addEventListener('fetch',(event)=>{
   // Ne jamais mettre en cache Supabase, R2, WeTransfer ou toute autre donnée privée distante.
   if(url.origin!==self.location.origin)return
   if(!url.pathname.startsWith('/danz/'))return
+
+  // Les miniatures privées sont copiées explicitement par l’application sous une URL locale synthétique.
+  if(url.pathname.startsWith('/danz/offline-thumb/')){
+    event.respondWith(caches.open(THUMB_CACHE).then(cache=>cache.match(request)).then(hit=>hit||new Response('',{status:404})))
+    return
+  }
 
   if(request.mode==='navigate'){
     event.respondWith((async()=>{
