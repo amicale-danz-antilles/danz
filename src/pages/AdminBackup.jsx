@@ -8,8 +8,8 @@ import '../admin-backup.css'
 const dateStamp=()=>new Date().toISOString().slice(0,10)
 const safeCell=value=>{
   if(value==null)return ''
-  if(typeof value==='object')return JSON.stringify(value)
-  return String(value)
+  const raw=typeof value==='object'?JSON.stringify(value):String(value)
+  return /^[=+\-@]/.test(raw)?`'${raw}`:raw
 }
 const toCsv=(rows,columns)=>{
   const escape=value=>`"${safeCell(value).replace(/"/g,'""')}"`
@@ -19,6 +19,8 @@ const download=(content,name,type)=>{
   const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a')
   a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)
 }
+const readLastBackup=()=>{try{return localStorage.getItem('danz-last-backup')||''}catch{return''}}
+const saveLastBackup=value=>{try{localStorage.setItem('danz-last-backup',value)}catch{}}
 
 export default function AdminBackup(){
  const {isAdmin,loading:authLoading}=useAuth()
@@ -26,7 +28,7 @@ export default function AdminBackup(){
  const [error,setError]=useState('')
  const [success,setSuccess]=useState('')
  const [lastBackup,setLastBackup]=useState('')
- useEffect(()=>{setLastBackup(localStorage.getItem('danz-last-backup')||'')},[])
+ useEffect(()=>{setLastBackup(readLastBackup())},[])
  if(!authLoading&&!isAdmin)return <Navigate to="/" replace/>
 
  const snapshot=async()=>{
@@ -35,12 +37,13 @@ export default function AdminBackup(){
   return data
  }
  const run=async(kind)=>{
+  if(busy)return
   setBusy(kind);setError('');setSuccess('')
   try{
    const data=await snapshot(),stamp=dateStamp()
    if(kind==='json'){
     download(JSON.stringify(data,null,2),`danz-sauvegarde-${stamp}.json`,'application/json;charset=utf-8')
-    const when=new Date().toISOString();localStorage.setItem('danz-last-backup',when);setLastBackup(when)
+    const when=new Date().toISOString();saveLastBackup(when);setLastBackup(when)
     setSuccess('Sauvegarde complète téléchargée. Conservez-la dans un emplacement protégé et maîtrisé.')
    }
    if(kind==='users'){
