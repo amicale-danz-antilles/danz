@@ -8,64 +8,77 @@ const PROFILE_FIELDS = 'id, full_name, email, role, active, access_type, applica
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [sessionReady, setSessionReady] = useState(false)
+  const [profileUserId, setProfileUserId] = useState(null)
 
   useEffect(() => {
-    if (!supabase) { setLoading(false); return undefined }
+    if (!supabase) { setSessionReady(true); return undefined }
     let mounted = true
+
     supabase.auth.getSession().then(({ data, error }) => {
       if (!mounted) return
       if (!error) setSession(data.session)
-      setLoading(false)
+      setProfileUserId(null)
+      setSessionReady(true)
     })
+
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!mounted) return
       setSession(nextSession)
+      setProfileUserId(null)
+      if (!nextSession?.user) setProfile(null)
     })
+
     return () => { mounted = false; listener.subscription.unsubscribe() }
   }, [])
 
   useEffect(() => {
-    if (!supabase) return
+    if (!supabase || !sessionReady) return undefined
     let cancelled = false
 
     const loadProfile = async () => {
-      if (!session?.user) { setProfile(null); return }
-      setLoading(true)
-      const cached = readOfflineData(session.user.id, 'profile')
-
-      if (!navigator.onLine && cached?.active) {
-        setProfile(cached)
-        setLoading(false)
+      const currentUserId = session?.user?.id || null
+      if (!currentUserId) {
+        setProfile(null)
+        setProfileUserId(null)
         return
       }
 
-      const { data, error } = await supabase.from('profiles').select(PROFILE_FIELDS).eq('id', session.user.id).maybeSingle()
+      const cached = readOfflineData(currentUserId, 'profile')
+      if (!navigator.onLine && cached?.active) {
+        setProfile(cached)
+        setProfileUserId(currentUserId)
+        return
+      }
+
+      const { data, error } = await supabase.from('profiles').select(PROFILE_FIELDS).eq('id', currentUserId).maybeSingle()
       if (cancelled) return
 
       if (error) {
         if (cached?.active) setProfile(cached)
         else setProfile(null)
-        setLoading(false)
+        setProfileUserId(currentUserId)
         return
       }
 
       if (!data?.active) {
-        clearOfflineData(session.user.id)
+        clearOfflineData(currentUserId)
         setProfile(null)
-        setLoading(false)
+        setProfileUserId(currentUserId)
         await supabase.auth.signOut({ scope: 'local' })
         return
       }
 
       setProfile(data)
-      saveOfflineData(session.user.id, 'profile', data)
-      setLoading(false)
+      setProfileUserId(currentUserId)
+      saveOfflineData(currentUserId, 'profile', data)
     }
 
     loadProfile()
     return () => { cancelled = true }
-  }, [session?.user?.id])
+  }, [session?.user?.id, sessionReady])
+
+  const loading = !sessionReady || Boolean(session?.user?.id && profileUserId !== session.user.id)
 
   const value = useMemo(() => ({
     session,
@@ -93,6 +106,7 @@ export function AuthProvider({ children }) {
 
       saveOfflineData(data.user.id, 'profile', accountProfile)
       setProfile(accountProfile)
+      setProfileUserId(data.user.id)
       setSession(data.session)
     },
     requestMembership: async ({ firstName, lastName, applicantType, email, password }) => {
@@ -131,6 +145,8 @@ export function AuthProvider({ children }) {
     },
     signOut: async () => {
       if (session?.user?.id) clearOfflineData(session.user.id)
+      setProfile(null)
+      setProfileUserId(null)
       if (supabase) await supabase.auth.signOut()
     },
   }), [session, profile, loading])
