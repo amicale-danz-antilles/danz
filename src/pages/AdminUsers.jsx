@@ -17,6 +17,7 @@ const auditLabels = {
   user_deleted: 'Compte et données personnelles supprimés',
   membership_approved: 'Demande d’accès approuvée',
   membership_rejected: 'Demande d’accès refusée',
+  data_exported: 'Sauvegarde / export des données',
 }
 
 export default function AdminUsers() {
@@ -59,6 +60,12 @@ export default function AdminUsers() {
   }), [profiles])
 
   const nameById = useMemo(() => Object.fromEntries(profiles.map((profile) => [profile.id, profile.full_name || profile.email || 'Utilisateur'])), [profiles])
+  const auditTargetLabel = (entry) => {
+    if (entry.action === 'data_exported') return 'Données du site'
+    if (entry.target_user_id) return nameById[entry.target_user_id] || 'Utilisateur'
+    if (entry.action.startsWith('membership_')) return 'Demande d’accès'
+    return 'Compte supprimé'
+  }
 
   const beginEdit = (profile) => {
     setEditingId(profile.id)
@@ -191,7 +198,7 @@ export default function AdminUsers() {
     <section>
       <div className="admin-section-heading"><div><span className="eyebrow">Traçabilité</span><h2>Journal d’administration</h2></div><span>40 dernières actions</span></div>
       {audit.length === 0 ? <div className="empty-state">Aucune modification d’accès enregistrée pour le moment.</div> : <div className="admin-audit-list">
-        {audit.map((entry) => <article key={entry.id}><div><strong>{auditLabels[entry.action] || entry.action}</strong><span>{entry.target_user_id ? nameById[entry.target_user_id] || 'Utilisateur' : entry.action.startsWith('membership_') ? 'Demande d’accès' : 'Compte supprimé'}</span></div><small>{new Date(entry.created_at).toLocaleString('fr-FR')} · par {entry.actor_id ? nameById[entry.actor_id] || 'Administrateur' : 'ancien administrateur'}</small></article>)}
+        {audit.map((entry) => <article key={entry.id}><div><strong>{auditLabels[entry.action] || entry.action}</strong><span>{auditTargetLabel(entry)}</span></div><small>{new Date(entry.created_at).toLocaleString('fr-FR')} · par {entry.actor_id ? nameById[entry.actor_id] || 'Administrateur' : 'ancien administrateur'}</small></article>)}
       </div>}
     </section>
   </div>
