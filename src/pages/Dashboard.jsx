@@ -11,6 +11,7 @@ import '../polls-bureau.css'
 const formatDate=value=>new Date(value).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})
 const trimText=(value,max=120)=>{const text=String(value||'').trim();return text.length>max?`${text.slice(0,max).trim()}…`:text}
 const isAlbumExpired=album=>Boolean(album?.transfer_expires_at&&new Date(album.transfer_expires_at).getTime()<Date.now())
+const offlineAlbum=album=>album?{id:album.id,event_id:album.event_id,item_count:album.item_count,transfer_expires_at:album.transfer_expires_at,expired:isAlbumExpired(album)}:null
 
 export default function Dashboard(){
  const {profile,user}=useAuth()
@@ -72,12 +73,13 @@ export default function Dashboard(){
 
   setNews(newsState);setEvents(eventsState);setBureau(bureauState);setClock(Date.now());setLoading(false)
   if(user?.id){
-   const safeNews=newsState.map(item=>({...item,cover:null,assets:(item.assets||[]).map(asset=>({...asset,url:undefined}))}))
-   const safeEvents=eventsState.map(item=>({...item,cover:null,album:item.album?{...item.album,cover:null}:null}))
+   const safeNews=newsState.map(item=>({...item,cover:null,assets:(item.assets||[]).map(asset=>({id:asset.id,file_name:asset.file_name,is_cover:asset.is_cover,mime_type:asset.mime_type,file_size:asset.file_size}))}))
+   const safeEvents=eventsState.map(item=>({...item,cover:null,album:offlineAlbum(item.album)}))
    saveOfflineData(user.id,'dashboard',{news:safeNews,events:safeEvents,bureau:bureauState})
   }
  }
  useEffect(()=>{load()},[])
+ useEffect(()=>{const onOnline=()=>load();window.addEventListener('online',onOnline);return()=>window.removeEventListener('online',onOnline)},[])
  useEffect(()=>{const timer=window.setInterval(()=>setClock(Date.now()),60000);return()=>window.clearInterval(timer)},[])
  useEffect(()=>{
   if(!detail)return undefined
