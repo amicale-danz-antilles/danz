@@ -4,17 +4,17 @@ html,body,#root{width:100%;max-width:100%;overflow-x:hidden}.app-shell,.main-col
 .public-surface .good-deals-admin-bar,.public-surface .good-deal-submissions-review,.public-surface .good-deals-admin-panel:not(.good-deals-proposal-panel),.public-surface .good-deal-admin-actions,.public-surface .poll-admin-bar,.public-surface .poll-admin-actions,.public-surface .poll-create-panel{display:none!important}
 
 @media(max-width:900px){
- .sidebar{width:min(86vw,300px);padding:20px 16px;z-index:100;box-shadow:18px 0 45px rgba(7,31,38,.22)}
+ .sidebar{width:min(86vw,300px);padding:calc(20px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));z-index:100;box-shadow:18px 0 45px rgba(7,31,38,.22)}
  .sidebar nav{margin-top:24px;gap:4px;overflow-y:auto;overscroll-behavior:contain}
  .sidebar nav a{padding:11px 12px}
  .sidebar-footer{padding-top:14px}
  .backdrop{z-index:90;background:rgba(8,28,34,.46)}
- .topbar{height:64px;padding:0 14px}
+ .topbar{height:calc(64px + env(safe-area-inset-top));padding:env(safe-area-inset-top) 14px 0}
  .topbar>div{min-width:0;overflow:hidden}
  .topbar strong,.topbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
  .main-column{padding-bottom:0!important}
- .page{width:100%;max-width:760px;padding:22px 16px 48px}
- .main-column footer{padding:16px 16px 24px;margin-bottom:0!important}
+ .page{width:100%;max-width:760px;padding:22px 16px calc(48px + env(safe-area-inset-bottom))}
+ .main-column footer{padding:16px 16px calc(24px + env(safe-area-inset-bottom));margin-bottom:0!important}
  .page-title{margin-bottom:24px}
  .page-title h1{font-size:clamp(32px,9vw,40px);line-height:1.05}
  .page-title p{font-size:14px;line-height:1.55}
@@ -24,8 +24,8 @@ html,body,#root{width:100%;max-width:100%;overflow-x:hidden}.app-shell,.main-col
 }
 
 @media(max-width:620px){
- .page{padding:18px 12px 42px}
- .topbar{padding:0 10px}
+ .page{padding:18px 12px calc(42px + env(safe-area-inset-bottom))}
+ .topbar{padding-left:10px;padding-right:10px}
  .menu-button{margin-right:9px;font-size:22px}
  .offline-banner{position:relative!important;font-size:10px!important;line-height:1.4;padding:8px 10px!important}
  .home-app-header{gap:12px;padding:16px 14px!important;border-radius:18px!important}
@@ -40,7 +40,7 @@ html,body,#root{width:100%;max-width:100%;overflow-x:hidden}.app-shell,.main-col
  .home-app-dashboard .home-spotlight-grid .home-tile-body,.home-app-dashboard .compact-grid .home-tile-body{min-width:0;padding:9px 10px!important}
  .home-tile-body h3,.home-app-dashboard .home-spotlight-grid .home-tile-body h3,.home-app-dashboard .compact-grid .home-tile-body h3{overflow-wrap:anywhere;font-size:15px!important}
  .home-tile-body p{overflow-wrap:anywhere}
- .home-detail-backdrop,.gallery-viewer-backdrop{padding:0!important}
+ .home-detail-backdrop,.gallery-viewer-backdrop{padding:0!important;padding-bottom:env(safe-area-inset-bottom)!important}
  .home-detail-modal,.gallery-viewer{width:100%!important;max-width:100%!important}
  .gallery-upload-panel{grid-template-columns:1fr!important;padding:14px!important}
  .gallery-album-grid{grid-template-columns:1fr!important}
