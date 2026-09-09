@@ -13,8 +13,13 @@ const safeName = (name = 'fichier') => name
 
 const cacheKey = (item, entity) => `${entity}:${item.id || item.storage_path}:${item.storage_path}`
 const getCached = (item, entity) => {
-  const cached = mediaUrlCache.get(cacheKey(item, entity))
-  if (!cached || cached.expiresAt < Date.now()) return null
+  const key = cacheKey(item, entity)
+  const cached = mediaUrlCache.get(key)
+  if (!cached) return null
+  if (cached.expiresAt < Date.now()) {
+    mediaUrlCache.delete(key)
+    return null
+  }
   return cached.url
 }
 const setCached = (item, entity, url) => {
@@ -45,6 +50,7 @@ export async function optimizeImageFile(file, { maxDimension = 1920, quality = 0
     canvas.width = width
     canvas.height = height
     const ctx = canvas.getContext('2d', { alpha: false })
+    if (!ctx) return file
     ctx.drawImage(bitmap, 0, 0, width, height)
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', quality))
     if (!blob || blob.size >= file.size) return file
@@ -110,7 +116,7 @@ export async function resolvePrivateMediaBatch(items, { entity, fallbackBucket }
     const { data, error } = await supabase.functions.invoke('r2-media', {
       body: { action: 'batch-view', entity, ids: unresolvedR2.map(item => item.id) },
     })
-    if (!error) {
+    if (!error && !data?.error) {
       for (const item of unresolvedR2) {
         const url = data?.urls?.[item.id]
         if (url) {
@@ -148,13 +154,16 @@ export async function resolvePrivateMedia(item, options) {
 export async function removePrivateMedia(item, { entity, fallbackBucket } = {}) {
   if (!item?.storage_path) return
   mediaUrlCache.delete(cacheKey(item, entity || 'media'))
+
   if (item.storage_provider === 'r2') {
-    if (entity && item.id) {
-      await supabase.functions.invoke('r2-media', { body: { action: 'delete', entity, id: item.id } })
-    } else {
-      await supabase.functions.invoke('r2-media', { body: { action: 'delete-key', key: item.storage_path } })
-    }
+    const { data, error } = entity && item.id
+      ? await supabase.functions.invoke('r2-media', { body: { action: 'delete', entity, id: item.id } })
+      : await supabase.functions.invoke('r2-media', { body: { action: 'delete-key', key: item.storage_path } })
+    if (error || data?.error) throw new Error(data?.error || error?.message || 'Impossible de supprimer ce média R2.')
     return
   }
-  await supabase.storage.from(fallbackBucket).remove([item.storage_path])
+
+  if (!fallbackBucket) throw new Error('Bucket de stockage manquant pour la suppression du média.')
+  const { error } = await supabase.storage.from(fallbackBucket).remove([item.storage_path])
+  if (error) throw error
 }
