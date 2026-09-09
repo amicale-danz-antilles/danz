@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { PageTitle } from './Actualites.jsx'
@@ -7,6 +8,8 @@ import '../polls-bureau.css'
 
 export default function Sondages() {
   const { user, isAdmin } = useAuth()
+  const location = useLocation()
+  const adminMode = isAdmin && location.pathname.startsWith('/administration/sondages')
   const [polls, setPolls] = useState([])
   const [options, setOptions] = useState({})
   const [votes, setVotes] = useState({})
@@ -89,6 +92,15 @@ export default function Sondages() {
       setError('Ajoutez au moins deux propositions.')
       return
     }
+    if (new Set(cleaned.map((choice) => choice.toLocaleLowerCase('fr-FR'))).size !== cleaned.length) {
+      setError('Deux propositions sont identiques. Modifiez-les avant de publier le sondage.')
+      return
+    }
+    if (closesAt && new Date(closesAt).getTime() <= Date.now()) {
+      setError('La date de clôture doit être située dans le futur.')
+      return
+    }
+
     setCreating(true)
     setError('')
     const { data: poll, error: pollError } = await supabase.from('polls').insert({
@@ -137,23 +149,23 @@ export default function Sondages() {
   }
 
   return <>
-    <PageTitle eyebrow="Votre avis compte" title="Sondages" text="Votez pour les futures activités de l’Amicale et suivez les préférences des membres." />
+    <PageTitle eyebrow={adminMode ? 'Administration' : 'Votre avis compte'} title={adminMode ? 'Gestion des sondages' : 'Sondages'} text={adminMode ? 'Créez, clôturez ou supprimez les sondages depuis cet espace réservé.' : 'Votez pour les futures activités de l’Amicale et suivez les préférences des membres.'} />
 
-    {isAdmin && <div className="poll-admin-bar">
+    {adminMode && <div className="poll-admin-bar">
       <div><strong>Gestion des sondages</strong><span>Créez un vote pour choisir une prochaine activité ou recueillir l’avis des membres.</span></div>
       <button className="secondary-button" onClick={() => setShowCreate(!showCreate)}>{showCreate ? 'Fermer' : '＋ Nouveau sondage'}</button>
     </div>}
 
-    {showCreate && isAdmin && <section className="text-panel poll-create-panel">
+    {showCreate && adminMode && <section className="text-panel poll-create-panel">
       <form onSubmit={createPoll}>
         <h2>Nouveau sondage</h2>
         <label>Titre<input required maxLength="180" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex. Quelle activité pour le mois prochain ?" /></label>
-        <label>Description (facultatif)<textarea rows="3" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Précisez le contexte, la période ou les contraintes." /></label>
+        <label>Description (facultatif)<textarea rows="3" maxLength="1200" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Précisez le contexte, la période ou les contraintes." /></label>
         <label>Date et heure de clôture (facultatif)<input type="datetime-local" value={closesAt} onChange={(e) => setClosesAt(e.target.value)} /></label>
         <div className="poll-choice-editor">
           <strong>Propositions</strong>
           {choices.map((choice, index) => <div className="poll-choice-line" key={index}>
-            <input value={choice} onChange={(e) => setChoices(choices.map((item, i) => i === index ? e.target.value : item))} placeholder={`Proposition ${index + 1}`} />
+            <input required={index < 2} maxLength="180" value={choice} onChange={(e) => setChoices(choices.map((item, i) => i === index ? e.target.value : item))} placeholder={`Proposition ${index + 1}`} />
             {choices.length > 2 && <button type="button" className="ghost-button" onClick={() => setChoices(choices.filter((_, i) => i !== index))}>Retirer</button>}
           </div>)}
           <button type="button" className="ghost-button" onClick={() => setChoices([...choices, ''])}>＋ Ajouter une proposition</button>
@@ -165,8 +177,8 @@ export default function Sondages() {
     {error && <div className="alert error" style={{marginBottom:'1rem'}}>{error}</div>}
 
     {loading ? <div className="skeleton-card tall" /> : <>
-      <PollSection title="Sondages ouverts" empty="Aucun sondage ouvert pour le moment." polls={activePolls} options={options} votes={votes} busyPoll={busyPoll} isAdmin={isAdmin} onVote={vote} onClose={closePoll} onRemove={removePoll} />
-      {closedPolls.length > 0 && <PollSection title="Sondages clôturés" polls={closedPolls} options={options} votes={votes} busyPoll={busyPoll} isAdmin={isAdmin} onVote={vote} onClose={closePoll} onRemove={removePoll} />}
+      <PollSection title="Sondages ouverts" empty="Aucun sondage ouvert pour le moment." polls={activePolls} options={options} votes={votes} busyPoll={busyPoll} isAdmin={adminMode} onVote={vote} onClose={closePoll} onRemove={removePoll} />
+      {closedPolls.length > 0 && <PollSection title="Sondages clôturés" polls={closedPolls} options={options} votes={votes} busyPoll={busyPoll} isAdmin={adminMode} onVote={vote} onClose={closePoll} onRemove={removePoll} />}
     </>}
   </>
 }
@@ -190,7 +202,7 @@ function PollCard({ poll, options, vote, busy, isAdmin, onVote, onClose, onRemov
         <span className={`poll-status ${open ? 'open' : 'closed'}`}>{open ? 'Vote ouvert' : 'Vote clôturé'}</span>
         <h3>{poll.title}</h3>
         {poll.description && <p>{poll.description}</p>}
-        <small>{poll.closes_at ? `${open ? 'Clôture' : 'Clôturé'} : ${new Date(poll.closes_at).toLocaleString('fr-FR')}` : 'Sans date de clôture'}</small>
+        <small>{poll.closes_at ? `${open ? 'Clôture' : 'Date de clôture'} : ${new Date(poll.closes_at).toLocaleString('fr-FR')}` : 'Sans date de clôture'}</small>
       </div>
       {isAdmin && <div className="poll-admin-actions">
         {open && <button type="button" className="ghost-button" onClick={() => onClose(poll)}>Clôturer</button>}
