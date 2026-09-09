@@ -15,6 +15,7 @@ const Amicale = lazy(() => import('./pages/Amicale.jsx'))
 const AdminRequests = lazy(() => import('./pages/AdminRequests.jsx'))
 const AdminContent = lazy(() => import('./pages/AdminContent.jsx'))
 const AdminUsers = lazy(() => import('./pages/AdminUsers.jsx'))
+const AdminBackup = lazy(() => import('./pages/AdminBackup.jsx'))
 
 function PageLoader(){
  return <div className="route-loader" role="status" aria-live="polite"><span className="route-loader-spinner"/><span>Chargement…</span></div>
@@ -39,6 +40,7 @@ export default function App(){
 
     <Route path="administration" element={withLoader(<AdminRequests/>)}/>
     <Route path="administration/utilisateurs" element={withLoader(<AdminUsers/>)}/>
+    <Route path="administration/sauvegardes" element={withLoader(<AdminBackup/>)}/>
     <Route path="administration/contenus" element={withLoader(<AdminContent/>)}/>
     <Route path="administration/galerie" element={withLoader(<Galerie/>)}/>
     <Route path="administration/bons-plans" element={withLoader(<BonsPlans/>)}/>
