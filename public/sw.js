@@ -1,11 +1,11 @@
-const CACHE_NAME='danz-shell-v6'
+const CACHE_NAME='danz-shell-v7'
 const THUMB_CACHE='danz-private-thumbs-v2'
 const STATIC_URLS=[
   '/danz/',
   '/danz/manifest.webmanifest',
-  '/danz/apple-touch-icon-v3.png',
-  '/danz/icon-192-v3.png',
-  '/danz/icon-512-v3.png',
+  '/danz/apple-touch-icon-v4.png',
+  '/danz/icon-192-v4.png',
+  '/danz/icon-512-v4.png',
   '/danz/Insigne%20CND%20-%20ANTILLES.png',
 ]
 
@@ -25,12 +25,9 @@ self.addEventListener('fetch',(event)=>{
   const request=event.request
   if(request.method!=='GET')return
   const url=new URL(request.url)
-
-  // Ne jamais mettre en cache Supabase, R2, WeTransfer ou toute autre donnée privée distante.
   if(url.origin!==self.location.origin)return
   if(!url.pathname.startsWith('/danz/'))return
 
-  // Les miniatures privées sont copiées explicitement par l’application sous une URL locale synthétique.
   if(url.pathname.startsWith('/danz/offline-thumb/')){
     event.respondWith(caches.open(THUMB_CACHE).then(cache=>cache.match(request)).then(hit=>hit||new Response('',{status:404})))
     return
@@ -62,37 +59,27 @@ self.addEventListener('fetch',(event)=>{
   })())
 })
 
-self.addEventListener('push', (event) => {
-  let data = {}
-  try {
-    data = event.data ? event.data.json() : {}
-  } catch (_) {
-    data = { title: 'Amicale DANZ Antilles', body: event.data?.text() || 'Nouvelle information disponible.' }
+self.addEventListener('push',(event)=>{
+  let data={}
+  try{data=event.data?event.data.json():{}}catch(_){data={title:'Amicale DANZ Antilles',body:event.data?.text()||'Nouvelle information disponible.'}}
+  const title=data.title||'Amicale DANZ Antilles'
+  const options={
+    body:data.body||'Nouvelle information disponible.',
+    icon:'/danz/icon-192-v4.png',
+    badge:'/danz/icon-192-v4.png',
+    tag:data.type?`danz-${data.type}`:'danz-notification',
+    data:{url:data.url||'/danz/#/'},
   }
-
-  const title = data.title || 'Amicale DANZ Antilles'
-  const options = {
-    body: data.body || 'Nouvelle information disponible.',
-    icon: '/danz/icon-192-v3.png',
-    badge: '/danz/icon-192-v3.png',
-    tag: data.type ? `danz-${data.type}` : 'danz-notification',
-    data: { url: data.url || '/danz/#/' },
-  }
-
-  event.waitUntil(self.registration.showNotification(title, options))
+  event.waitUntil(self.registration.showNotification(title,options))
 })
 
-self.addEventListener('notificationclick', (event) => {
+self.addEventListener('notificationclick',(event)=>{
   event.notification.close()
-  const target = new URL(event.notification.data?.url || '/danz/#/', self.location.origin).href
-
-  event.waitUntil((async () => {
-    const windows = await clients.matchAll({ type: 'window', includeUncontrolled: true })
-    for (const client of windows) {
-      if ('focus' in client) {
-        await client.navigate(target)
-        return client.focus()
-      }
+  const target=new URL(event.notification.data?.url||'/danz/#/',self.location.origin).href
+  event.waitUntil((async()=>{
+    const windows=await clients.matchAll({type:'window',includeUncontrolled:true})
+    for(const client of windows){
+      if('focus' in client){await client.navigate(target);return client.focus()}
     }
     return clients.openWindow(target)
   })())
