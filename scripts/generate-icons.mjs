@@ -10,27 +10,45 @@ const sourceCandidates = [
 
 let source = null
 for (const candidate of sourceCandidates) {
-  try {
-    await access(candidate)
-    source = candidate
-    break
-  } catch {}
+  try { await access(candidate); source = candidate; break } catch {}
 }
-
 if (!source) throw new Error('Source d’icône introuvable dans public/.')
 await mkdir(publicDir, { recursive: true })
 
 const background = { r: 247, g: 250, b: 251, alpha: 1 }
 
-// L'image historique contient des marges/bandes sur les côtés. On les retire
-// avant tout redimensionnement afin que l'insigne garde sa géométrie réelle.
-const cleanedSource = await sharp(source)
-  .rotate()
-  .trim({ threshold: 14 })
-  .png()
-  .toBuffer()
+async function removeSideBars(input) {
+  const { data, info } = await sharp(input).rotate().ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  const { width, height, channels } = info
+  const darkColumn = (x) => {
+    let dark = 0
+    for (let y = 0; y < height; y += 1) {
+      const i = (y * width + x) * channels
+      const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3]
+      if (a < 16 || (r < 28 && g < 28 && b < 28)) dark += 1
+    }
+    return dark / height > 0.92
+  }
 
-async function makeIcon(size, filename, paddingRatio = 0.09) {
+  let left = 0
+  let right = width - 1
+  while (left < right && darkColumn(left)) left += 1
+  while (right > left && darkColumn(right)) right -= 1
+
+  // Petite marge de sécurité pour ne pas coller le dessin au bord du recadrage.
+  left = Math.max(0, left - 2)
+  right = Math.min(width - 1, right + 2)
+  const cropWidth = Math.max(1, right - left + 1)
+
+  return sharp(data, { raw: info })
+    .extract({ left, top: 0, width: cropWidth, height })
+    .png()
+    .toBuffer()
+}
+
+const cleanedSource = await removeSideBars(source)
+
+async function makeIcon(size, filename, paddingRatio = 0.10) {
   const inner = Math.round(size * (1 - paddingRatio * 2))
   const mark = await sharp(cleanedSource)
     .resize({ width: inner, height: inner, fit: 'contain', withoutEnlargement: false })
@@ -48,9 +66,9 @@ async function makeIcon(size, filename, paddingRatio = 0.09) {
 }
 
 await Promise.all([
-  makeIcon(180, 'apple-touch-icon-v3.png'),
-  makeIcon(192, 'icon-192-v3.png'),
-  makeIcon(512, 'icon-512-v3.png'),
+  makeIcon(180, 'apple-touch-icon-v4.png'),
+  makeIcon(192, 'icon-192-v4.png'),
+  makeIcon(512, 'icon-512-v4.png'),
 ])
 
-console.log('Icônes PWA V3 générées après suppression des marges latérales, sans déformation.')
+console.log('Icônes PWA V4 générées après suppression explicite des bandes noires latérales.')
