@@ -34,6 +34,14 @@ export default function AdminBackup(){
  const snapshot=async()=>{
   const {data,error:fnError}=await supabase.functions.invoke('admin-data-export',{body:{action:'export'}})
   if(fnError||data?.error)throw new Error(data?.error||fnError?.message||'Export impossible.')
+
+  // Les cotisations sont ajoutées à la sauvegarde dès que la table dédiée est disponible.
+  // Une ancienne base sans cette table reste exportable sans erreur.
+  const {data:dues,error:duesError}=await supabase.from('membership_dues').select('user_id,year,paid,paid_at,updated_by,updated_at').order('year',{ascending:false})
+  if(!duesError){
+    data.tables=data.tables||{}
+    data.tables.membership_dues=dues||[]
+  }
   return data
  }
  const run=async(kind)=>{
@@ -48,9 +56,18 @@ export default function AdminBackup(){
    }
    if(kind==='users'){
     const authById=Object.fromEntries((data.auth_users||[]).map(item=>[item.id,item]))
-    const rows=(data.tables?.profiles||[]).map(profile=>({...profile,last_sign_in_at:authById[profile.id]?.last_sign_in_at||'',email_confirmed_at:authById[profile.id]?.email_confirmed_at||''}))
-    download('\ufeff'+toCsv(rows,['id','full_name','email','role','active','access_type','applicant_type','is_amicaliste','created_at','updated_at','deactivated_at','last_sign_in_at','email_confirmed_at']),`danz-utilisateurs-${stamp}.csv`,'text/csv;charset=utf-8')
-    setSuccess('Export utilisateurs CSV téléchargé.')
+    const currentYear=new Date().getFullYear()
+    const duesByUser=Object.fromEntries((data.tables?.membership_dues||[]).filter(item=>Number(item.year)===currentYear).map(item=>[item.user_id,item]))
+    const rows=(data.tables?.profiles||[]).map(profile=>({
+      ...profile,
+      cotisation_annee:profile.is_amicaliste?currentYear:'',
+      cotisation_reglee:profile.is_amicaliste?(duesByUser[profile.id]?.paid===true?'oui':'non'):'non_concerne',
+      cotisation_reglee_le:duesByUser[profile.id]?.paid_at||'',
+      last_sign_in_at:authById[profile.id]?.last_sign_in_at||'',
+      email_confirmed_at:authById[profile.id]?.email_confirmed_at||'',
+    }))
+    download('\ufeff'+toCsv(rows,['id','full_name','email','role','active','access_type','applicant_type','military_reference','is_amicaliste','cotisation_annee','cotisation_reglee','cotisation_reglee_le','created_at','updated_at','deactivated_at','last_sign_in_at','email_confirmed_at']),`danz-utilisateurs-${stamp}.csv`,'text/csv;charset=utf-8')
+    setSuccess('Export utilisateurs CSV téléchargé avec situation, statut amicaliste et cotisation annuelle.')
    }
    if(kind==='events'){
     download('\ufeff'+toCsv(data.tables?.events||[],['id','title','description','location','starts_at','ends_at','audience','publish_at','created_at']),`danz-evenements-${stamp}.csv`,'text/csv;charset=utf-8')
@@ -69,16 +86,16 @@ export default function AdminBackup(){
   {error&&<div className="alert error">{error}</div>}{success&&<div className="alert">{success}</div>}
 
   <section className="backup-primary-card">
-   <div><span className="eyebrow">Sauvegarde de reprise</span><h2>Copie complète des données</h2><p>Inclut comptes et droits, demandes d’accès, actualités, événements, albums, bons plans, sondages, votes, bureau et journal d’administration. Les mots de passe, clés privées et fichiers photo/vidéo ne sont jamais inclus.</p>{lastBackup&&<small>Dernière sauvegarde téléchargée depuis cet appareil : {new Date(lastBackup).toLocaleString('fr-FR')}</small>}</div>
+   <div><span className="eyebrow">Sauvegarde de reprise</span><h2>Copie complète des données</h2><p>Inclut comptes et droits, situations déclarées, suivi des cotisations lorsqu’il est activé, demandes d’accès, actualités, événements, albums, bons plans, sondages, votes, bureau et journal d’administration. Les mots de passe, clés privées et fichiers photo/vidéo ne sont jamais inclus.</p>{lastBackup&&<small>Dernière sauvegarde téléchargée depuis cet appareil : {new Date(lastBackup).toLocaleString('fr-FR')}</small>}</div>
    <button className="primary-button backup-main-button" onClick={()=>run('json')} disabled={Boolean(busy)}>{busy==='json'?'Préparation…':'Télécharger la sauvegarde JSON'}</button>
   </section>
 
   <section><div className="admin-section-heading"><div><span className="eyebrow">Exports de contrôle</span><h2>Fichiers CSV</h2></div></div><div className="backup-export-grid">
-   <article><span>👥</span><h3>Utilisateurs</h3><p>Identité, e-mail, droits, état du compte et dernière connexion.</p><button className="secondary-button" onClick={()=>run('users')} disabled={Boolean(busy)}>{busy==='users'?'Export…':'Exporter en CSV'}</button></article>
+   <article><span>👥</span><h3>Utilisateurs</h3><p>Identité, situation, statut amicaliste, cotisation annuelle, droits, état du compte et dernière connexion.</p><button className="secondary-button" onClick={()=>run('users')} disabled={Boolean(busy)}>{busy==='users'?'Export…':'Exporter en CSV'}</button></article>
    <article><span>📅</span><h3>Événements</h3><p>Dates, lieux, descriptions, audiences et dates de publication.</p><button className="secondary-button" onClick={()=>run('events')} disabled={Boolean(busy)}>{busy==='events'?'Export…':'Exporter en CSV'}</button></article>
    <article><span>★</span><h3>Bons plans</h3><p>Annuaire complet avec catégories, coordonnées et validité des offres.</p><button className="secondary-button" onClick={()=>run('deals')} disabled={Boolean(busy)}>{busy==='deals'?'Export…':'Exporter en CSV'}</button></article>
   </div></section>
 
-  <div className="privacy-note backup-security-note"><strong>Règle de conservation :</strong> ces exports contiennent des données personnelles. Stockez-les uniquement sur un emplacement autorisé, protégé et accessible aux seules personnes habilitées. La sauvegarde JSON contient aussi les chemins des médias et les liens externes, mais pas les fichiers binaires eux-mêmes.</div>
+  <div className="privacy-note backup-security-note"><strong>Règle de conservation :</strong> ces exports contiennent des données personnelles et, lorsqu’il est actif, le suivi des cotisations. Stockez-les uniquement sur un emplacement autorisé, protégé et accessible aux seules personnes habilitées. La sauvegarde JSON contient aussi les chemins des médias et les liens externes, mais pas les fichiers binaires eux-mêmes.</div>
  </div>
 }
