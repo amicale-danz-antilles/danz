@@ -22,10 +22,17 @@ await mkdir(publicDir, { recursive: true })
 
 const background = { r: 247, g: 250, b: 251, alpha: 1 }
 
-async function makeIcon(size, filename, paddingRatio = 0.13) {
+// L'image historique contient des marges/bandes sur les côtés. On les retire
+// avant tout redimensionnement afin que l'insigne garde sa géométrie réelle.
+const cleanedSource = await sharp(source)
+  .rotate()
+  .trim({ threshold: 14 })
+  .png()
+  .toBuffer()
+
+async function makeIcon(size, filename, paddingRatio = 0.09) {
   const inner = Math.round(size * (1 - paddingRatio * 2))
-  const mark = await sharp(source)
-    .rotate()
+  const mark = await sharp(cleanedSource)
     .resize({ width: inner, height: inner, fit: 'contain', withoutEnlargement: false })
     .png()
     .toBuffer()
@@ -41,9 +48,9 @@ async function makeIcon(size, filename, paddingRatio = 0.13) {
 }
 
 await Promise.all([
-  makeIcon(180, 'apple-touch-icon-v2.png', 0.14),
-  makeIcon(192, 'icon-192-v2.png', 0.14),
-  makeIcon(512, 'icon-512-v2.png', 0.14),
+  makeIcon(180, 'apple-touch-icon-v3.png'),
+  makeIcon(192, 'icon-192-v3.png'),
+  makeIcon(512, 'icon-512-v3.png'),
 ])
 
-console.log('Icônes PWA V2 générées sans déformation.')
+console.log('Icônes PWA V3 générées après suppression des marges latérales, sans déformation.')
