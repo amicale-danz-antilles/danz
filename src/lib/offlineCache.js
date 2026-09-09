@@ -1,9 +1,21 @@
-const PREFIX='danz-offline-v1'
+const PREFIX='danz-offline-v2'
+const LEGACY_PREFIXES=['danz-offline-v1:']
 const THUMB_CACHE='danz-private-thumbs-v2'
 export const OFFLINE_TTL_MS=12*60*60*1000
 
 const storage=()=>{try{return window.localStorage}catch{return null}}
 const key=(userId,name)=>`${PREFIX}:${userId}:${name}`
+
+function purgeLegacyOfflineData(){
+ const store=storage();if(!store)return
+ try{
+  for(let i=store.length-1;i>=0;i-=1){
+   const k=store.key(i)
+   if(k&&LEGACY_PREFIXES.some(prefix=>k.startsWith(prefix)))store.removeItem(k)
+  }
+ }catch{}
+}
+purgeLegacyOfflineData()
 
 export function saveOfflineData(userId,name,data){
  if(!userId)return
@@ -29,8 +41,8 @@ export function readOfflineData(userId,name){
 export function clearOfflineData(userId){
  const store=storage();if(store&&userId){
   try{
-   const prefix=`${PREFIX}:${userId}:`
-   for(let i=store.length-1;i>=0;i-=1){const k=store.key(i);if(k?.startsWith(prefix))store.removeItem(k)}
+   const prefixes=[`${PREFIX}:${userId}:`,...LEGACY_PREFIXES.map(prefix=>`${prefix}${userId}:`)]
+   for(let i=store.length-1;i>=0;i-=1){const k=store.key(i);if(k&&prefixes.some(prefix=>k.startsWith(prefix)))store.removeItem(k)}
   }catch{}
  }
  if('caches' in window&&userId){
