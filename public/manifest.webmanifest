@@ -9,10 +9,10 @@
   "theme_color": "#0b5165",
   "icons": [
     {
-      "src": "/danz/app-icon.png",
+      "src": "/danz/app-icon-safe.svg",
       "sizes": "any",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ]
 }
