@@ -115,6 +115,8 @@ export function AuthProvider({ children }) {
       const normalizedFirstName = firstName.trim()
       const normalizedLastName = lastName.trim()
       const fullName = `${normalizedFirstName} ${normalizedLastName}`.trim()
+      const broadApplicantType = applicantType === 'spouse' ? 'spouse' : 'military'
+      const militaryReference = applicantType === 'military_other' ? 'other' : 'danz'
 
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: normalizedEmail,
@@ -124,7 +126,9 @@ export function AuthProvider({ children }) {
             full_name: fullName,
             first_name: normalizedFirstName,
             last_name: normalizedLastName,
-            applicant_type: applicantType === 'spouse' ? 'spouse' : 'military',
+            applicant_type: broadApplicantType,
+            military_reference: militaryReference,
+            situation_label: applicantType,
             membership_request: true,
           },
         },
