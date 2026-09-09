@@ -33,7 +33,7 @@ export default function AdminContent(){
  const loadRecent=async()=>{
   if(!isAdmin)return
   const {data,error:loadError}=await supabase.from(type).select('*').order(type==='events'?'starts_at':'publish_at',{ascending:false}).limit(20)
-  if(loadError)setError(loadError.message)
+  if(loadError)setError('Impossible de charger la liste des publications enregistrées.')
   setRecent(data||[])
  }
  useEffect(()=>{loadRecent()},[type,isAdmin])
@@ -48,15 +48,26 @@ export default function AdminContent(){
 
  const addAttachment=async(file,parentType,parentId,isCover=false)=>{
   const stored=await uploadPrivateMedia(file,{scope:'content',parentId,fallbackBucket:'content'})
-  if(isCover)await supabase.from('content_attachments').update({is_cover:false}).eq(parentType==='news'?'news_id':'event_id',parentId).eq('is_cover',true)
+  const parentColumn=parentType==='news'?'news_id':'event_id'
   const payload={news_id:parentType==='news'?parentId:null,event_id:parentType==='events'?parentId:null,file_name:file.name||'fichier',storage_provider:stored.storage_provider,storage_path:stored.storage_path,mime_type:file.type||null,file_size:file.size,is_cover:isCover,created_by:user.id}
   const {data,error:insertError}=await supabase.from('content_attachments').insert(payload).select('*').single()
-  if(insertError){await removePrivateMedia({...stored},{fallbackBucket:'content'});throw insertError}
+  if(insertError){await removePrivateMedia({...stored},{fallbackBucket:'content'}).catch(()=>{});throw insertError}
+  if(isCover){
+   const {error:demoteError}=await supabase.from('content_attachments').update({is_cover:false}).eq(parentColumn,parentId).eq('is_cover',true).neq('id',data.id)
+   if(demoteError){
+    await supabase.from('content_attachments').delete().eq('id',data.id)
+    await removePrivateMedia({...data,...stored},{entity:'attachment',fallbackBucket:'content'}).catch(()=>{})
+    throw demoteError
+   }
+  }
   return data
  }
 
  const submit=async(e)=>{
-  e.preventDefault();setBusy(true);setError('');setSuccess('')
+  e.preventDefault();if(busy)return;setBusy(true);setError('');setSuccess('')
+  let parentId=editing?.id||null
+  let createdParent=false
+  const createdAssets=[]
   try{
    if(!title.trim())throw new Error('Ajoutez un titre.')
    validatePhoto(cover);validateFiles(files)
@@ -69,13 +80,12 @@ export default function AdminContent(){
     publicationIso=d.toISOString();resetNotification=Boolean(editing)
    }else{publicationIso=new Date().toISOString();if(editing?.publish_at&&new Date(editing.publish_at)>new Date())resetNotification=true}
 
-   let parentId=editing?.id
    if(type==='news'){
     const payload={title:title.trim(),summary:text.trim().slice(0,260)||null,content:text.trim()||null,audience,published:true,publish_at:publicationIso}
     if(!editing||schedule!=='keep')payload.published_at=publicationIso
     if(resetNotification)payload.notified_at=null
     const result=editing?await supabase.from('news').update(payload).eq('id',editing.id).select('id').single():await supabase.from('news').insert({...payload,published_at:publicationIso,created_by:user.id}).select('id').single()
-    if(result.error)throw result.error;parentId=result.data.id
+    if(result.error)throw result.error;parentId=result.data.id;createdParent=!editing
    }else{
     if(!startsAt)throw new Error('Indiquez la date et l’heure de l’événement.')
     const start=new Date(startsAt),end=endsAt?new Date(endsAt):null
@@ -84,40 +94,54 @@ export default function AdminContent(){
     const payload={title:title.trim(),description:text.trim()||null,location:location.trim()||null,starts_at:start.toISOString(),ends_at:end?end.toISOString():null,audience,publish_at:publicationIso}
     if(resetNotification)payload.notified_at=null
     const result=editing?await supabase.from('events').update(payload).eq('id',editing.id).select('id').single():await supabase.from('events').insert({...payload,created_by:user.id}).select('id').single()
-    if(result.error)throw result.error;parentId=result.data.id
+    if(result.error)throw result.error;parentId=result.data.id;createdParent=!editing
    }
 
-   if(cover){const optimizedCover=await optimizeImageFile(cover);await addAttachment(optimizedCover,type,parentId,true)}
-   if(type==='news'&&files.length)for(const file of files)await addAttachment(file,'news',parentId,false)
+   if(cover){const optimizedCover=await optimizeImageFile(cover);createdAssets.push(await addAttachment(optimizedCover,type,parentId,true))}
+   if(type==='news'&&files.length)for(const file of files)createdAssets.push(await addAttachment(file,'news',parentId,false))
    setSuccess(`${type==='news'?'Actualité':'Événement'} ${editing?'modifié':'publié'}${cover?' ; photo optimisée automatiquement':''}${r2Ready?' sur le stockage R2':''}.`)
    reset();await loadRecent()
-  }catch(err){setError(err.message||'Impossible d’enregistrer cette publication.')}finally{setBusy(false)}
+  }catch(err){
+   if(createdParent&&parentId){
+    for(const asset of createdAssets)await removePrivateMedia(asset,{entity:'attachment',fallbackBucket:'content'}).catch(()=>{})
+    await supabase.from(type).delete().eq('id',parentId)
+   }
+   const suffix=editing&&createdAssets.length?' Les modifications du texte ont pu être enregistrées avant l’échec d’un fichier ; vérifiez la publication avant de recommencer.':''
+   setError(`${err.message||'Impossible d’enregistrer cette publication.'}${suffix}`)
+  }finally{setBusy(false)}
  }
 
  const removeItem=async(item)=>{
-  if(!window.confirm(`Supprimer « ${item.title} » ?`))return
-  const parentColumn=type==='news'?'news_id':'event_id'
-  const {data:attachments}=await supabase.from('content_attachments').select('*').eq(parentColumn,item.id)
-  for(const asset of attachments||[])await removePrivateMedia(asset,{entity:'attachment',fallbackBucket:'content'})
-  const {error:deleteError}=await supabase.from(type).delete().eq('id',item.id)
-  if(deleteError)setError(deleteError.message);else await loadRecent()
+  if(busy||!window.confirm(`Supprimer « ${item.title} » ?`))return
+  setBusy(true);setError('');setSuccess('')
+  try{
+   const parentColumn=type==='news'?'news_id':'event_id'
+   const {data:attachments,error:attachmentsError}=await supabase.from('content_attachments').select('*').eq(parentColumn,item.id)
+   if(attachmentsError)throw attachmentsError
+   for(const asset of attachments||[])await removePrivateMedia(asset,{entity:'attachment',fallbackBucket:'content'})
+   const {error:deleteError}=await supabase.from(type).delete().eq('id',item.id)
+   if(deleteError)throw deleteError
+   if(editing?.id===item.id)reset()
+   setSuccess('Publication supprimée.')
+   await loadRecent()
+  }catch(err){setError(err.message||'Suppression impossible. Aucun nouvel essai automatique n’a été effectué.')}finally{setBusy(false)}
  }
 
  return <>
   <PageTitle eyebrow="Administration" title="Publier" text="Publiez simplement une actualité ou un événement. Les photos sont automatiquement redimensionnées pour rester rapides à afficher."/>
   <div className="text-panel"><form onSubmit={submit}>
     {editing&&<div className="alert"><strong>Modification :</strong> {editing.title}</div>}
-    <label>Type<select disabled={Boolean(editing)} value={type} onChange={e=>{reset();setType(e.target.value)}}><option value="news">Actualité</option><option value="events">Événement</option></select></label>
-    <label>Titre<input required maxLength="160" value={title} onChange={e=>setTitle(e.target.value)}/></label>
-    <label>{type==='news'?'Information':'Description'}<textarea rows="6" value={text} onChange={e=>setText(e.target.value)} placeholder={type==='news'?'Écrivez directement l’information à publier…':'Présentez le rendez-vous…'}/></label>
-    {type==='events'&&<><label>Lieu<input maxLength="180" value={location} onChange={e=>setLocation(e.target.value)}/></label><label>Date et heure<input type="datetime-local" required value={startsAt} onChange={e=>setStartsAt(e.target.value)}/></label><label>Fin (facultatif)<input type="datetime-local" value={endsAt} onChange={e=>setEndsAt(e.target.value)}/></label></>}
-    <label>Photo principale (facultatif)<input id="content-cover" type="file" accept="image/*" onChange={e=>setCover(e.target.files?.[0]||null)}/><small>La photo sera automatiquement optimisée jusqu’à 1920 px avant l’envoi.</small></label>
-    {type==='news'&&<label>Fichiers joints (facultatif)<input id="content-files" type="file" multiple onChange={e=>setFiles([...e.target.files])}/><small>PDF, Word, Excel, images ou autres fichiers utiles. Plusieurs fichiers possibles.</small></label>}
-    <details className="good-deals-advanced"><summary>Options avancées</summary><div style={{display:'grid',gap:'1rem',marginTop:'1rem'}}><label>Audience<select value={audience} onChange={e=>setAudience(e.target.value)}><option value="everyone">Tout le monde</option><option value="military">Militaires DANZ uniquement</option><option value="amicaliste">Amicalistes uniquement</option><option value="admin">Bureau / Admin uniquement</option></select></label><label>Publication<select value={schedule} onChange={e=>setSchedule(e.target.value)}>{editing&&<option value="keep">Conserver la publication actuelle</option>}<option value="now">Publier maintenant</option><option value="later">Programmer pour plus tard</option></select></label>{schedule==='later'&&<label>Date de publication<input type="datetime-local" required value={publishAt} onChange={e=>setPublishAt(e.target.value)}/></label>}</div></details>
+    <label>Type<select disabled={Boolean(editing)||busy} value={type} onChange={e=>{reset();setType(e.target.value)}}><option value="news">Actualité</option><option value="events">Événement</option></select></label>
+    <label>Titre<input required maxLength="160" disabled={busy} value={title} onChange={e=>setTitle(e.target.value)}/></label>
+    <label>{type==='news'?'Information':'Description'}<textarea rows="6" maxLength="10000" disabled={busy} value={text} onChange={e=>setText(e.target.value)} placeholder={type==='news'?'Écrivez directement l’information à publier…':'Présentez le rendez-vous…'}/></label>
+    {type==='events'&&<><label>Lieu<input maxLength="180" disabled={busy} value={location} onChange={e=>setLocation(e.target.value)}/></label><label>Date et heure<input type="datetime-local" required disabled={busy} value={startsAt} onChange={e=>setStartsAt(e.target.value)}/></label><label>Fin (facultatif)<input type="datetime-local" disabled={busy} value={endsAt} onChange={e=>setEndsAt(e.target.value)}/></label></>}
+    <label>Photo principale (facultatif)<input id="content-cover" type="file" accept="image/*" disabled={busy} onChange={e=>setCover(e.target.files?.[0]||null)}/><small>La photo sera automatiquement optimisée jusqu’à 1920 px avant l’envoi.</small></label>
+    {type==='news'&&<label>Fichiers joints (facultatif)<input id="content-files" type="file" multiple disabled={busy} onChange={e=>setFiles([...e.target.files])}/><small>PDF, Word, Excel, images ou autres fichiers utiles. Plusieurs fichiers possibles.</small></label>}
+    <details className="good-deals-advanced"><summary>Options avancées</summary><div style={{display:'grid',gap:'1rem',marginTop:'1rem'}}><label>Audience<select disabled={busy} value={audience} onChange={e=>setAudience(e.target.value)}><option value="everyone">Tout le monde</option><option value="military">Militaires DANZ uniquement</option><option value="amicaliste">Amicalistes uniquement</option><option value="admin">Bureau / Admin uniquement</option></select></label><label>Publication<select disabled={busy} value={schedule} onChange={e=>setSchedule(e.target.value)}>{editing&&<option value="keep">Conserver la publication actuelle</option>}<option value="now">Publier maintenant</option><option value="later">Programmer pour plus tard</option></select></label>{schedule==='later'&&<label>Date de publication<input type="datetime-local" required disabled={busy} value={publishAt} onChange={e=>setPublishAt(e.target.value)}/></label>}</div></details>
     <div className="privacy-note">☁️ {r2Ready?'Cloudflare R2 est connecté pour les nouveaux fichiers.':'Supabase sert de stockage de secours tant que R2 n’est pas disponible.'}</div>
     {error&&<div className="alert error">{error}</div>}{success&&<div className="alert">{success}</div>}
-    <div style={{display:'flex',gap:'.65rem',flexWrap:'wrap'}}><button className="primary-button" disabled={busy}>{busy?'Enregistrement…':editing?'Enregistrer':'Publier'}</button>{editing&&<button type="button" className="ghost-button" onClick={reset}>Annuler</button>}</div>
+    <div style={{display:'flex',gap:'.65rem',flexWrap:'wrap'}}><button className="primary-button" disabled={busy}>{busy?'Enregistrement…':editing?'Enregistrer':'Publier'}</button>{editing&&<button type="button" className="ghost-button" disabled={busy} onClick={reset}>Annuler</button>}</div>
    </form></div>
-  <div className="text-panel" style={{marginTop:'1.25rem'}}><h2>{type==='news'?'Actualités':'Événements'} enregistrés</h2>{recent.length===0?<div className="empty-state">Aucune publication.</div>:<div className="document-list">{recent.map(item=><article className="document-row" key={item.id}><div><h3>{item.title}</h3><p><span className="role-badge">{audienceLabels[item.audience]||'Tout le monde'}</span></p><small>{type==='events'&&item.starts_at?new Date(item.starts_at).toLocaleString('fr-FR'):new Date(item.publish_at||item.created_at).toLocaleString('fr-FR')}</small></div><div style={{display:'flex',gap:'.5rem',flexWrap:'wrap'}}><button type="button" className="ghost-button" onClick={()=>beginEdit(item)}>Modifier</button><button type="button" className="ghost-button" onClick={()=>removeItem(item)}>Supprimer</button></div></article>)}</div>}</div>
+  <div className="text-panel" style={{marginTop:'1.25rem'}}><h2>{type==='news'?'Actualités':'Événements'} enregistrés</h2>{recent.length===0?<div className="empty-state">Aucune publication.</div>:<div className="document-list">{recent.map(item=><article className="document-row" key={item.id}><div><h3>{item.title}</h3><p><span className="role-badge">{audienceLabels[item.audience]||'Tout le monde'}</span></p><small>{type==='events'&&item.starts_at?new Date(item.starts_at).toLocaleString('fr-FR'):new Date(item.publish_at||item.created_at).toLocaleString('fr-FR')}</small></div><div style={{display:'flex',gap:'.5rem',flexWrap:'wrap'}}><button type="button" className="ghost-button" disabled={busy} onClick={()=>beginEdit(item)}>Modifier</button><button type="button" className="ghost-button" disabled={busy} onClick={()=>removeItem(item)}>Supprimer</button></div></article>)}</div>}</div>
  </>
 }
