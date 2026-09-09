@@ -112,35 +112,32 @@ export function AuthProvider({ children }) {
     requestMembership: async ({ firstName, lastName, applicantType, email, password }) => {
       if (!supabase) throw new Error('Supabase n’est pas encore configuré.')
       const normalizedEmail = email.trim().toLowerCase()
-      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
+      const normalizedFirstName = firstName.trim()
+      const normalizedLastName = lastName.trim()
+      const fullName = `${normalizedFirstName} ${normalizedLastName}`.trim()
 
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: normalizedEmail,
         password,
-        options: { data: { full_name: fullName } },
+        options: {
+          data: {
+            full_name: fullName,
+            first_name: normalizedFirstName,
+            last_name: normalizedLastName,
+            applicant_type: applicantType === 'spouse' ? 'spouse' : 'military',
+            membership_request: true,
+          },
+        },
       })
-      if (signUpError) throw signUpError
+      if (signUpError) {
+        if (/database error/i.test(signUpError.message || '')) throw new Error('Impossible de créer cette demande pour le moment. Vérifiez que cette adresse n’a pas déjà une demande en attente, puis réessayez.')
+        throw signUpError
+      }
       if (!signUpData?.user?.id || signUpData.user.identities?.length === 0) {
         throw new Error('Un compte existe déjà pour cette adresse e-mail. Essayez de vous connecter ou contactez un administrateur.')
       }
 
-      const { error: requestError } = await supabase.from('membership_requests').insert({
-        auth_user_id: signUpData.user.id,
-        full_name: fullName,
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        applicant_type: applicantType === 'spouse' ? 'spouse' : 'military',
-        is_amicaliste: false,
-        requested_access: 'member',
-        email: normalizedEmail,
-        status: 'pending',
-      })
-
       if (signUpData.session) await supabase.auth.signOut({ scope: 'local' })
-      if (requestError) {
-        if (requestError.code === '23505') throw new Error('Une demande est déjà en attente pour cette adresse e-mail.')
-        throw requestError
-      }
       return { ok: true }
     },
     signOut: async () => {
