@@ -88,21 +88,46 @@ export function AuthProvider({ children }) {
       }
       if (accountProfile.active !== true) {
         await supabase.auth.signOut({ scope: 'local' })
-        throw new Error('Votre compte existe mais son accès n’est pas actif. Attendez la validation de votre demande ou contactez un administrateur.')
+        throw new Error('Votre compte existe mais n’a pas encore été approuvé par un administrateur.')
       }
 
       saveOfflineData(data.user.id, 'profile', accountProfile)
       setProfile(accountProfile)
       setSession(data.session)
     },
-    requestMembership: async ({ firstName, lastName, applicantType, email, password }) => {
+    requestMembership: async ({ firstName, lastName, applicantType, isAmicaliste, email, password }) => {
       if (!supabase) throw new Error('Supabase n’est pas encore configuré.')
-      const { data, error } = await supabase.functions.invoke('request-membership', {
-        body: { firstName, lastName, applicantType, email: email.trim().toLowerCase(), password },
+      const normalizedEmail = email.trim().toLowerCase()
+      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
+
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password,
+        options: { data: { full_name: fullName } },
       })
-      if (error) throw error
-      if (data?.error) throw new Error(data.error)
-      return data
+      if (signUpError) throw signUpError
+      if (!signUpData?.user?.id || signUpData.user.identities?.length === 0) {
+        throw new Error('Un compte existe déjà pour cette adresse e-mail. Essayez de vous connecter ou contactez un administrateur.')
+      }
+
+      const { error: requestError } = await supabase.from('membership_requests').insert({
+        auth_user_id: signUpData.user.id,
+        full_name: fullName,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        applicant_type: applicantType === 'spouse' ? 'spouse' : 'military',
+        is_amicaliste: isAmicaliste === true,
+        requested_access: applicantType === 'spouse' ? 'amicaliste' : 'personnel_danz',
+        email: normalizedEmail,
+        status: 'pending',
+      })
+
+      if (signUpData.session) await supabase.auth.signOut({ scope: 'local' })
+      if (requestError) {
+        if (requestError.code === '23505') throw new Error('Une demande est déjà en attente pour cette adresse e-mail.')
+        throw requestError
+      }
+      return { ok: true }
     },
     signOut: async () => {
       if (session?.user?.id) clearOfflineData(session.user.id)
