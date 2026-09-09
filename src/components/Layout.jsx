@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
+import OfflineDataSync from './OfflineDataSync.jsx'
 import '../admin-central.css'
 
 const links = [
@@ -52,6 +53,7 @@ export default function Layout() {
   const spaceSubtitle = isAdmin ? 'Administration et vie de l’amicale' : memberDetails.join(' · ') || 'Compte membre validé'
 
   return <div className="app-shell">
+    <OfflineDataSync userId={user?.id}/>
     <aside className={`sidebar ${open ? 'open' : ''}`} aria-label="Navigation principale">
       <div className="brand"><img src="/danz/Insigne%20CND%20-%20ANTILLES.png" alt="Insigne DANZ Antilles" style={{width:52,height:52,objectFit:'contain',borderRadius:'12px'}}/><div><strong>Amicale DANZ</strong><span>Antilles</span></div></div>
       <nav>
@@ -69,7 +71,7 @@ export default function Layout() {
     </aside>
     <div className="main-column">
       <header className="topbar"><button className="menu-button" aria-label={open?'Fermer le menu':'Ouvrir le menu'} aria-expanded={open} onClick={()=>setOpen(!open)}>☰</button><div><strong>{spaceTitle}</strong><span>{spaceSubtitle}</span></div></header>
-      {!online&&<div className="offline-banner" role="status">Mode hors ligne · Accueil et Agenda peuvent afficher leur dernière copie disponible. Les modifications et téléchargements nécessitent Internet.</div>}
+      {!online&&<div className="offline-banner" role="status">Mode hors ligne · Accueil, Agenda, Bons plans, Sondages et Albums utilisent leur dernière copie disponible. Toutes les modifications et les téléchargements nécessitent Internet.</div>}
       <main className={`page ${inAdministration?'admin-surface':'public-surface'}`}><Outlet/></main>
       <footer>Amicale DANZ Antilles · Espace privé · <NavLink to="/confidentialite">Confidentialité</NavLink></footer>
     </div>
