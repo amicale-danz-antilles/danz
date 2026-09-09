@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
+import { clearOfflineData, readOfflineData, saveOfflineData } from '../lib/offlineCache.js'
 
 const AuthContext = createContext(null)
 
@@ -9,42 +10,35 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!supabase) {
-      setLoading(false)
-      return undefined
-    }
-
+    if (!supabase) { setLoading(false); return undefined }
     let mounted = true
-
     supabase.auth.getSession().then(({ data, error }) => {
       if (!mounted) return
       if (!error) setSession(data.session)
       setLoading(false)
     })
-
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!mounted) return
       setSession(nextSession)
     })
-
-    return () => {
-      mounted = false
-      listener.subscription.unsubscribe()
-    }
+    return () => { mounted = false; listener.subscription.unsubscribe() }
   }, [])
 
   useEffect(() => {
     if (!supabase) return
-
     let cancelled = false
 
     const loadProfile = async () => {
-      if (!session?.user) {
-        setProfile(null)
+      if (!session?.user) { setProfile(null); return }
+      setLoading(true)
+      const cached = readOfflineData(session.user.id, 'profile')
+
+      if (!navigator.onLine && cached?.active) {
+        setProfile(cached)
+        setLoading(false)
         return
       }
 
-      setLoading(true)
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, email, role, active, access_type, applicant_type, is_amicaliste')
@@ -53,7 +47,15 @@ export function AuthProvider({ children }) {
 
       if (cancelled) return
 
-      if (error || !data?.active) {
+      if (error) {
+        if (cached?.active) setProfile(cached)
+        else setProfile(null)
+        setLoading(false)
+        return
+      }
+
+      if (!data?.active) {
+        clearOfflineData(session.user.id)
         setProfile(null)
         setLoading(false)
         await supabase.auth.signOut({ scope: 'local' })
@@ -61,6 +63,7 @@ export function AuthProvider({ children }) {
       }
 
       setProfile(data)
+      saveOfflineData(session.user.id, 'profile', data)
       setLoading(false)
     }
 
@@ -78,9 +81,7 @@ export function AuthProvider({ children }) {
     configured: isSupabaseConfigured,
     requestMemberLogin: async (email) => {
       if (!supabase) throw new Error('Supabase n’est pas encore configuré.')
-      const { data, error } = await supabase.functions.invoke('send-member-login-link', {
-        body: { email: email.trim().toLowerCase() },
-      })
+      const { data, error } = await supabase.functions.invoke('send-member-login-link', { body: { email: email.trim().toLowerCase() } })
       if (error) throw error
       if (data?.error) throw new Error(data.error)
     },
@@ -88,22 +89,17 @@ export function AuthProvider({ children }) {
       if (!supabase) throw new Error('Supabase n’est pas encore configuré.')
       const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password })
       if (error) throw error
-
-      const { data: adminProfile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, role, active, access_type, applicant_type, is_amicaliste')
-        .eq('id', data.user.id)
-        .single()
-
+      const { data: adminProfile, error: profileError } = await supabase.from('profiles').select('id, full_name, email, role, active, access_type, applicant_type, is_amicaliste').eq('id', data.user.id).single()
       if (profileError || adminProfile?.role !== 'admin' || adminProfile?.access_type !== 'admin' || adminProfile?.active !== true) {
         await supabase.auth.signOut({ scope: 'local' })
         throw new Error('Cet accès est réservé aux administrateurs validés.')
       }
-
+      saveOfflineData(data.user.id, 'profile', adminProfile)
       setProfile(adminProfile)
       setSession(data.session)
     },
     signOut: async () => {
+      if (session?.user?.id) clearOfflineData(session.user.id)
       if (supabase) await supabase.auth.signOut()
     },
   }), [session, profile, loading])
