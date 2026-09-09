@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { resolvePrivateMediaBatch } from '../lib/mediaStorage.js'
+import { readOfflineData, saveOfflineData } from '../lib/offlineCache.js'
+import { useAuth } from '../context/AuthContext.jsx'
 import { PageTitle } from './Actualites.jsx'
 import '../extra.css'
 import '../home-refactor.css'
@@ -13,14 +15,28 @@ function GoogleLogo(){return <img className="calendar-brand-logo" src="/danz/goo
 
 export default function Agenda(){
  const navigate=useNavigate()
+ const {user}=useAuth()
  const [items,setItems]=useState([]),[albums,setAlbums]=useState({}),[covers,setCovers]=useState({}),[loading,setLoading]=useState(true),[error,setError]=useState('')
+
+ const useCached=()=>{
+  const cached=readOfflineData(user?.id,'agenda')
+  if(!cached)return false
+  setItems(cached.items||[]);setAlbums(cached.albums||{});setCovers({})
+  setError('Mode hors ligne · agenda affiché depuis la dernière copie enregistrée sur cet appareil.')
+  setLoading(false)
+  return true
+ }
+
  const load=async()=>{
   setLoading(true);setError('')
+  if(!navigator.onLine){if(!useCached()){setError('Aucune copie hors ligne de l’agenda n’est encore disponible sur cet appareil.');setLoading(false)};return}
+
   const eventsResult=await supabase.from('events').select('*').order('starts_at',{ascending:true})
+  if(eventsResult.error&&/fetch|network|failed/i.test(String(eventsResult.error.message||''))&&useCached())return
   if(eventsResult.error)setError(eventsResult.error.message)
   const events=eventsResult.data||[],ids=events.map(e=>e.id)
   setItems(events)
-  if(!ids.length){setCovers({});setAlbums({});setLoading(false);return}
+  if(!ids.length){setCovers({});setAlbums({});setLoading(false);if(user?.id)saveOfflineData(user.id,'agenda',{items:[],albums:{}});return}
 
   const [assetsResult,albumsResult]=await Promise.all([
    supabase.from('content_attachments').select('*').in('event_id',ids).eq('is_cover',true),
@@ -42,12 +58,14 @@ export default function Agenda(){
    if(album)albumMap[event.id]=album
   }
   setCovers(coverMap);setAlbums(albumMap);setLoading(false)
+  if(user?.id)saveOfflineData(user.id,'agenda',{items:events,albums:albumMap})
  }
  useEffect(()=>{load()},[])
+
  const addApple=event=>{const start=new Date(event.starts_at),end=event.ends_at?new Date(event.ends_at):new Date(start.getTime()+3600000);const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Amicale DANZ Antilles//Agenda//FR','CALSCALE:GREGORIAN','METHOD:PUBLISH','BEGIN:VEVENT',`UID:${event.id}@amicale-danz-antilles`,`DTSTAMP:${icsDate(new Date())}`,`DTSTART:${icsDate(start)}`,`DTEND:${icsDate(end)}`,`SUMMARY:${escapeIcs(event.title)}`,event.description?`DESCRIPTION:${escapeIcs(event.description)}`:null,event.location?`LOCATION:${escapeIcs(event.location)}`:null,'END:VEVENT','END:VCALENDAR'].filter(Boolean).join('\r\n');const blob=new Blob([lines],{type:'text/calendar;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`${(event.title||'evenement').replace(/[^a-zA-Z0-9À-ÿ _-]/g,'').trim().replace(/\s+/g,'-')||'evenement'}.ics`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)}
- const addGoogle=event=>{const start=new Date(event.starts_at),end=event.ends_at?new Date(event.ends_at):new Date(start.getTime()+3600000),params=new URLSearchParams({action:'TEMPLATE',text:event.title||'Événement DANZ',dates:`${icsDate(start)}/${icsDate(end)}`,details:event.description||'',location:event.location||''});window.open(`https://calendar.google.com/calendar/render?${params.toString()}`,'_blank','noopener,noreferrer')}
+ const addGoogle=event=>{if(!navigator.onLine)return;const start=new Date(event.starts_at),end=event.ends_at?new Date(event.ends_at):new Date(start.getTime()+3600000),params=new URLSearchParams({action:'TEMPLATE',text:event.title||'Événement DANZ',dates:`${icsDate(start)}/${icsDate(end)}`,details:event.description||'',location:event.location||''});window.open(`https://calendar.google.com/calendar/render?${params.toString()}`,'_blank','noopener,noreferrer')}
  const formatEnd=event=>{if(!event.ends_at)return null;const start=new Date(event.starts_at),end=new Date(event.ends_at);return start.toDateString()===end.toDateString()?end.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):end.toLocaleString('fr-FR',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'})}
- return <><PageTitle eyebrow="Vie de l'amicale" title="Agenda" text="Consultez les rendez-vous et ouvrez leur album de téléchargement lorsqu’il est disponible."/>{error&&<div className="alert error" style={{marginBottom:'1rem'}}>{error}</div>}{loading?<div className="skeleton-card tall"/>:<div className="timeline">{items.length?items.map(x=>{const d=new Date(x.starts_at),endLabel=formatEnd(x),album=albums[x.id];return <article className="timeline-item" key={x.id}><div className="timeline-date"><strong>{d.getDate()}</strong><span>{d.toLocaleDateString('fr-FR',{month:'short',year:'numeric'})}</span></div><div className="timeline-card">
- {covers[x.id]&&<img className="event-cover-image" src={covers[x.id]} alt="" loading="lazy" decoding="async"/>}<div className="event-card-heading"><div><span className="event-time">{d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}{endLabel?` → ${endLabel}`:''}</span><h2>{x.title}</h2></div></div>{x.location&&<p><strong>Lieu :</strong> 📍 {x.location}</p>}{x.description&&<p>{x.description}</p>}<div className="calendar-quick-add"><span>Ajouter au calendrier</span><button type="button" className="calendar-logo-button" aria-label="Ajouter à Apple Calendrier" onClick={()=>addApple(x)}><AppleLogo/></button><button type="button" className="calendar-logo-button" aria-label="Ajouter à Google Agenda" onClick={()=>addGoogle(x)}><GoogleLogo/></button></div>{album&&<div style={{marginTop:'.75rem'}}><button type="button" className="secondary-button" onClick={()=>navigate(`/galerie?event=${x.id}`)}>📷 Ouvrir l’album{album.item_count!=null?` (${album.item_count})`:''}</button></div>}
+ return <><PageTitle eyebrow="Vie de l'amicale" title="Agenda" text="Consultez les rendez-vous et ouvrez leur album de téléchargement lorsqu’il est disponible."/>{error&&<div className={`alert ${error.startsWith('Mode hors ligne')?'warning':'error'}`} style={{marginBottom:'1rem'}}>{error}</div>}{loading?<div className="skeleton-card tall"/>:<div className="timeline">{items.length?items.map(x=>{const d=new Date(x.starts_at),endLabel=formatEnd(x),album=albums[x.id];return <article className="timeline-item" key={x.id}><div className="timeline-date"><strong>{d.getDate()}</strong><span>{d.toLocaleDateString('fr-FR',{month:'short',year:'numeric'})}</span></div><div className="timeline-card">
+ {covers[x.id]&&<img className="event-cover-image" src={covers[x.id]} alt="" loading="lazy" decoding="async"/>}<div className="event-card-heading"><div><span className="event-time">{d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}{endLabel?` → ${endLabel}`:''}</span><h2>{x.title}</h2></div></div>{x.location&&<p><strong>Lieu :</strong> 📍 {x.location}</p>}{x.description&&<p>{x.description}</p>}<div className="calendar-quick-add"><span>Ajouter au calendrier</span><button type="button" className="calendar-logo-button" aria-label="Ajouter à Apple Calendrier" onClick={()=>addApple(x)}><AppleLogo/></button><button type="button" className="calendar-logo-button" aria-label="Ajouter à Google Agenda" disabled={!navigator.onLine} onClick={()=>addGoogle(x)}><GoogleLogo/></button></div>{album&&<div style={{marginTop:'.75rem'}}>{navigator.onLine?<button type="button" className="secondary-button" onClick={()=>navigate(`/galerie?event=${x.id}`)}>📷 Ouvrir l’album{album.item_count!=null?` (${album.item_count})`:''}</button>:<span className="login-help">Album disponible en ligne.</span>}</div>}
  </div></article>}) : <div className="empty-state">Aucun événement enregistré.</div>}</div>}</>
 }
