@@ -69,13 +69,10 @@ export default function Layout() {
     </aside>
     <div className="main-column">
       <header className="topbar"><button className="menu-button" aria-label={open?'Fermer le menu':'Ouvrir le menu'} aria-expanded={open} onClick={()=>setOpen(!open)}>☰</button><div><strong>{spaceTitle}</strong><span>{spaceSubtitle}</span></div></header>
-      {!online&&<div className="offline-banner" role="status">Connexion Internet interrompue. Le contenu déjà affiché reste visible, mais les nouvelles données et médias peuvent être indisponibles.</div>}
+      {!online&&<div className="offline-banner" role="status">Mode hors ligne · Accueil et Agenda peuvent afficher leur dernière copie disponible. Les modifications et téléchargements nécessitent Internet.</div>}
       <main className={`page ${inAdministration?'admin-surface':'public-surface'}`}><Outlet/></main>
       <footer>Amicale DANZ Antilles · Espace privé · <NavLink to="/confidentialite">Confidentialité</NavLink></footer>
     </div>
-    <nav className="mobile-tabbar" aria-label="Navigation rapide">
-      {links.map(([to,label,icon])=><NavLink key={to} to={to} end={to==='/' }><span aria-hidden="true">{icon}</span><small>{label}</small></NavLink>)}
-    </nav>
     {open&&<button aria-label="Fermer le menu" className="backdrop" onClick={()=>setOpen(false)}/>} 
   </div>
 }
