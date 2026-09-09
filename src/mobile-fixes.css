@@ -1,4 +1,4 @@
-html,body,#root{width:100%;max-width:100%;overflow-x:hidden}.app-shell,.main-column,.page,.public-surface,.admin-surface{min-width:0;max-width:100%}img,video,canvas,svg,iframe{max-width:100%}input,select,textarea,button{min-width:0;max-width:100%}.page>*{min-width:0}.card-grid>* ,.gallery-album-grid>* ,.home-editorial-grid>* ,.home-spotlight-grid>* ,.admin-hub-grid>* ,.admin-user-stats>*{min-width:0}
+html,body,#root{width:100%;max-width:100%;overflow-x:hidden}.app-shell,.main-column,.page,.public-surface,.admin-surface{min-width:0;max-width:100%}.mobile-tabbar{display:none!important}img,video,canvas,svg,iframe{max-width:100%}input,select,textarea,button{min-width:0;max-width:100%}.page>*{min-width:0}.card-grid>* ,.gallery-album-grid>* ,.home-editorial-grid>* ,.home-spotlight-grid>* ,.admin-hub-grid>* ,.admin-user-stats>*{min-width:0}
 
 @media(max-width:900px){
  .sidebar{width:min(86vw,300px);padding:20px 16px;z-index:100;box-shadow:18px 0 45px rgba(7,31,38,.22)}
@@ -9,8 +9,9 @@ html,body,#root{width:100%;max-width:100%;overflow-x:hidden}.app-shell,.main-col
  .topbar{height:64px;padding:0 14px}
  .topbar>div{min-width:0;overflow:hidden}
  .topbar strong,.topbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .main-column{padding-bottom:0!important}
  .page{width:100%;max-width:760px;padding:22px 16px 48px}
- .main-column footer{padding:16px 16px 24px}
+ .main-column footer{padding:16px 16px 24px;margin-bottom:0!important}
  .page-title{margin-bottom:24px}
  .page-title h1{font-size:clamp(32px,9vw,40px);line-height:1.05}
  .page-title p{font-size:14px;line-height:1.55}
