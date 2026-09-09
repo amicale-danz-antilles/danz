@@ -18,6 +18,7 @@ export default function Layout() {
   const location = useLocation()
   const [open, setOpen] = useState(false)
   const [online, setOnline] = useState(() => navigator.onLine)
+  const [updateReady, setUpdateReady] = useState(false)
   const inAdministration = location.pathname.startsWith('/administration')
 
   useEffect(() => {
@@ -34,6 +35,12 @@ export default function Layout() {
       window.removeEventListener('online', onOnline)
       window.removeEventListener('offline', onOffline)
     }
+  }, [])
+
+  useEffect(() => {
+    const onUpdate = () => setUpdateReady(true)
+    window.addEventListener('danz-update-ready', onUpdate)
+    return () => window.removeEventListener('danz-update-ready', onUpdate)
   }, [])
 
   useEffect(() => {
@@ -79,6 +86,7 @@ export default function Layout() {
     </aside>
     <div className="main-column">
       <header className="topbar"><button className="menu-button" aria-label={open?'Fermer le menu':'Ouvrir le menu'} aria-expanded={open} onClick={()=>setOpen(!open)}>☰</button><div><strong>{spaceTitle}</strong><span>{spaceSubtitle}</span></div></header>
+      {updateReady&&<div className="app-update-banner" role="status"><span>Une nouvelle version de l’application est prête.</span><button type="button" onClick={()=>window.location.reload()}>Mettre à jour</button></div>}
       {!online&&<div className="offline-banner" role="status">Mode hors ligne · Accueil, Agenda, Bons plans, Sondages et Albums utilisent leur dernière copie disponible. Toutes les modifications et les téléchargements nécessitent Internet.</div>}
       <main className={`page ${inAdministration?'admin-surface':'public-surface'}`}><Outlet/></main>
       <footer>Amicale DANZ Antilles · Espace privé · <NavLink to="/confidentialite">Confidentialité</NavLink></footer>
