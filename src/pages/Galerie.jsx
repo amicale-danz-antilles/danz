@@ -36,8 +36,8 @@ export default function Galerie(){
       supabase.from('event_albums').select('id,event_id,storage_provider,storage_path,image_url,mime_type,file_size,source_gallery_id,transfer_provider,transfer_url,transfer_expires_at,item_count,download_note,updated_at,event:events(id,title,description,location,starts_at,audience)').order('updated_at',{ascending:false}),
       adminMode ? supabase.from('events').select('id,title,description,location,starts_at,audience').order('starts_at',{ascending:false}) : Promise.resolve({data:[],error:null}),
     ])
-    if(albumsResult.error)setError(albumsResult.error.message)
-    if(eventsResult.error)setError(eventsResult.error.message)
+    if(albumsResult.error)setError('Impossible de charger les albums pour le moment.')
+    if(eventsResult.error)setError((current)=>current||'Impossible de charger la liste des événements.')
     const rows = albumsResult.data || []
     const urls = await resolvePrivateMediaBatch(rows,{entity:'album',fallbackBucket:'gallery'})
     setAlbums(rows); setEvents(eventsResult.data || []); setCoverUrls(urls); setLoading(false)
@@ -45,6 +45,7 @@ export default function Galerie(){
 
   useEffect(()=>{load()},[adminMode])
   useEffect(()=>{if(selectedEventId)setEditEventId(selectedEventId)},[selectedEventId])
+  useEffect(()=>{const onOnline=()=>load();window.addEventListener('online',onOnline);return()=>window.removeEventListener('online',onOnline)},[adminMode])
 
   const selectedAlbum = useMemo(()=>albums.find(album=>album.event_id===selectedEventId)||null,[albums,selectedEventId])
   const editingAlbum = useMemo(()=>albums.find(album=>album.event_id===editEventId)||null,[albums,editEventId])
@@ -63,13 +64,17 @@ export default function Galerie(){
 
   const saveAlbum = async (event) => {
     event.preventDefault()
+    if(saving)return
     if(!editEventId)return setError('Choisissez un événement.')
     if(!editingAlbum && !coverFile)return setError('Ajoutez une photo de miniature pour ce nouvel album.')
     if(coverFile && (!coverFile.type.startsWith('image/') || coverFile.size > IMAGE_LIMIT))return setError('La miniature doit être une image de 30 Mo maximum avant optimisation.')
     if(transferUrl && !/^https:\/\//i.test(transferUrl.trim()))return setError('Le lien de téléchargement doit commencer par https://')
+    if(transferUrl && expiresAt && new Date(`${expiresAt}T23:59:59`).getTime() <= Date.now())return setError('Pour un nouveau lien de téléchargement, choisissez une date d’expiration future.')
 
     setSaving(true); setError(''); setSuccess('')
     let uploaded = null
+    let databaseSaved = false
+    let cleanupWarning = false
     try{
       const payload = {
         event_id: editEventId,
@@ -89,26 +94,33 @@ export default function Galerie(){
       }
       const {error:upsertError} = await supabase.from('event_albums').upsert(payload,{onConflict:'event_id'})
       if(upsertError)throw upsertError
-      if(coverFile && editingAlbum?.storage_path && editingAlbum.source_gallery_id == null)await removePrivateMedia(editingAlbum,{fallbackBucket:'gallery'})
+      databaseSaved = true
+      if(coverFile && editingAlbum?.storage_path && editingAlbum.source_gallery_id == null){
+        try{await removePrivateMedia(editingAlbum,{fallbackBucket:'gallery'})}catch(_){cleanupWarning=true}
+      }
       setCoverFile(null)
       const input=document.getElementById('album-cover-file'); if(input)input.value=''
-      setSuccess('Album enregistré. Le site ne stocke que sa miniature ; le téléchargement complet reste externe.')
+      setSuccess(cleanupWarning?'Album enregistré. La nouvelle miniature est active ; l’ancienne n’a pas pu être nettoyée automatiquement du stockage.':'Album enregistré. Le site ne stocke que sa miniature ; le téléchargement complet reste externe.')
       setSearchParams({event:editEventId})
       await load()
-    }catch(err){if(uploaded)await removePrivateMedia(uploaded,{fallbackBucket:'gallery'});setError(err.message||'Impossible d’enregistrer cet album.')}finally{setSaving(false)}
+    }catch(err){
+      if(uploaded&&!databaseSaved)await removePrivateMedia(uploaded,{fallbackBucket:'gallery'}).catch(()=>{})
+      setError(err.message||'Impossible d’enregistrer cet album.')
+    }finally{setSaving(false)}
   }
 
   const deleteAlbum = async album => {
-    if(!window.confirm(`Retirer l’album « ${album.event?.title||'sans titre'} » du site ? Le transfert WeTransfer ne sera pas supprimé.`))return
-    setError(''); setSuccess('')
+    if(saving||!window.confirm(`Retirer l’album « ${album.event?.title||'sans titre'} » du site ? Le transfert WeTransfer ne sera pas supprimé.`))return
+    setSaving(true);setError('');setSuccess('')
     try{
-      if(album.storage_path && album.source_gallery_id == null)await removePrivateMedia(album,{fallbackBucket:'gallery'})
       const {error:deleteError}=await supabase.from('event_albums').delete().eq('id',album.id)
       if(deleteError)throw deleteError
+      let cleanupWarning=false
+      if(album.storage_path && album.source_gallery_id == null){try{await removePrivateMedia(album,{fallbackBucket:'gallery'})}catch(_){cleanupWarning=true}}
       setSearchParams({}); if(editEventId===album.event_id)setEditEventId('')
-      setSuccess('Album retiré du site. Le lien externe WeTransfer reste géré dans votre compte WeTransfer.')
+      setSuccess(cleanupWarning?'Album retiré du site. Un ancien fichier de miniature n’a pas pu être nettoyé automatiquement du stockage.':'Album retiré du site. Le lien externe WeTransfer reste géré dans votre compte WeTransfer.')
       await load()
-    }catch(err){setError(err.message||'Suppression impossible.')}
+    }catch(err){setError(err.message||'Suppression impossible.')}finally{setSaving(false)}
   }
 
   return <>
@@ -119,12 +131,12 @@ export default function Galerie(){
       <section className="gallery-upload-panel light-album-admin">
         <div><span className="eyebrow">Administration</span><h2>Album léger</h2><p>1. Créez votre transfert complet sur WeTransfer. 2. Copiez le lien. 3. Ajoutez ici uniquement une miniature et ce lien.</p><div className="privacy-note"><strong>Expiration :</strong> à la date indiquée, le bouton de téléchargement disparaît automatiquement pour les membres. Seule la miniature reste consultable jusqu’à ce que vous remplaciez ou supprimiez l’album.</div><a className="secondary-button external-album-link" href="https://wetransfer.com/" target="_blank" rel="noopener noreferrer">Ouvrir WeTransfer ↗</a></div>
         <form onSubmit={saveAlbum}>
-          <label>Événement<select required value={editEventId} onChange={e=>setEditEventId(e.target.value)}><option value="">Choisir un événement…</option>{events.map(item=><option key={item.id} value={item.id}>{formatDate(item.starts_at)} — {item.title}</option>)}</select></label>
-          <label>Miniature {editingAlbum?'(laisser vide pour conserver l’actuelle)':'(obligatoire)'}<input id="album-cover-file" type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>setCoverFile(e.target.files?.[0]||null)}/></label>
+          <label>Événement<select required disabled={saving} value={editEventId} onChange={e=>setEditEventId(e.target.value)}><option value="">Choisir un événement…</option>{events.map(item=><option key={item.id} value={item.id}>{formatDate(item.starts_at)} — {item.title}</option>)}</select></label>
+          <label>Miniature {editingAlbum?'(laisser vide pour conserver l’actuelle)':'(obligatoire)'}<input id="album-cover-file" type="file" accept="image/jpeg,image/png,image/webp" disabled={saving} onChange={e=>setCoverFile(e.target.files?.[0]||null)}/></label>
           {editingAlbum&&coverFor(editingAlbum)&&<img className="album-admin-current-cover" src={coverFor(editingAlbum)} alt="Miniature actuelle"/>}
-          <label>Lien WeTransfer<input type="url" placeholder="https://we.tl/..." value={transferUrl} onChange={e=>setTransferUrl(e.target.value)}/></label>
-          <div className="album-admin-two"><label>Expiration du lien<input type="date" value={expiresAt} onChange={e=>setExpiresAt(e.target.value)}/></label><label>Nombre de médias (facultatif)<input type="number" min="0" inputMode="numeric" value={itemCount} onChange={e=>setItemCount(e.target.value)}/></label></div>
-          <label>Information pour les membres (facultatif)<input maxLength="180" placeholder="Ex. Mot de passe transmis séparément" value={downloadNote} onChange={e=>setDownloadNote(e.target.value)}/></label>
+          <label>Lien WeTransfer<input type="url" maxLength="1000" disabled={saving} placeholder="https://we.tl/..." value={transferUrl} onChange={e=>setTransferUrl(e.target.value)}/></label>
+          <div className="album-admin-two"><label>Expiration du lien<input type="date" disabled={saving} value={expiresAt} onChange={e=>setExpiresAt(e.target.value)}/></label><label>Nombre de médias (facultatif)<input type="number" min="0" max="100000" inputMode="numeric" disabled={saving} value={itemCount} onChange={e=>setItemCount(e.target.value)}/></label></div>
+          <label>Information pour les membres (facultatif)<input maxLength="180" disabled={saving} placeholder="Ex. Mot de passe transmis séparément" value={downloadNote} onChange={e=>setDownloadNote(e.target.value)}/></label>
           <div className="gallery-upload-limits">La miniature est automatiquement réduite à 1280 px. Aucune vidéo ni album complet n’est envoyé vers notre serveur.</div>
           <button className="primary-button" disabled={saving}>{saving?'Enregistrement…':editingAlbum?'Mettre à jour l’album':'Créer l’album'}</button>
           {editingAlbum&&<button type="button" className="ghost-button danger-action" onClick={()=>deleteAlbum(editingAlbum)} disabled={saving}>Retirer cet album du site</button>}
