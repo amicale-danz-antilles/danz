@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { PageTitle } from './Actualites.jsx'
 import '../admin-users.css'
 
+const CURRENT_YEAR = new Date().getFullYear()
+
 const auditLabels = {
   user_access_updated: 'Compte / statut modifié',
   user_suspended: 'Compte suspendu',
@@ -15,12 +17,12 @@ const auditLabels = {
   data_exported: 'Sauvegarde / export des données',
 }
 
-const situationLabel = (value) => ({
-  military: 'Militaire DANZ',
-  danz_military: 'Militaire DANZ',
-  military_other: 'Militaire hors DANZ',
-  spouse: 'Conjoint(e) militaire DANZ',
-}[value] || 'Situation non renseignée')
+const situationLabel = (profile) => {
+  if (profile?.applicant_type === 'spouse') return 'Conjoint(e) d’un militaire de la DANZ'
+  if (profile?.military_reference === 'other') return 'Militaire hors DANZ'
+  if (profile?.applicant_type === 'military' || profile?.military_reference === 'danz') return 'Militaire de la DANZ'
+  return 'Situation non renseignée'
+}
 
 const valuesFor = (profile) => ({
   active: profile.active === true,
@@ -38,11 +40,14 @@ const sameValues = (left, right) => Boolean(left && right)
 export default function AdminUsers() {
   const { user, isAdmin, loading: authLoading } = useAuth()
   const [profiles, setProfiles] = useState([])
+  const [dues, setDues] = useState({})
+  const [duesReady, setDuesReady] = useState(false)
   const [audit, setAudit] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [busyId, setBusyId] = useState(null)
+  const [duesBusyId, setDuesBusyId] = useState(null)
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState(null)
   const [draft, setDraft] = useState(null)
@@ -53,8 +58,9 @@ export default function AdminUsers() {
   const load = async ({ keepSelection = true } = {}) => {
     setLoading(true)
     setError('')
-    const [profilesResult, auditResult] = await Promise.all([
-      supabase.from('profiles').select('id,full_name,email,role,active,access_type,applicant_type,is_amicaliste,created_at,updated_at,deactivated_at').order('full_name', { ascending: true }),
+    const [profilesResult, duesResult, auditResult] = await Promise.all([
+      supabase.from('profiles').select('*').order('full_name', { ascending: true }),
+      supabase.from('membership_dues').select('user_id,year,paid,paid_at,updated_at').eq('year', CURRENT_YEAR),
       supabase.from('admin_audit_log').select('id,actor_id,action,target_user_id,created_at').order('created_at', { ascending: false }).limit(50),
     ])
     if (profilesResult.error) setError(profilesResult.error.message)
@@ -62,6 +68,13 @@ export default function AdminUsers() {
     const rows = profilesResult.data || []
     setProfiles(rows)
     setAudit(auditResult.data || [])
+    if (duesResult.error) {
+      setDuesReady(false)
+      setDues({})
+    } else {
+      setDuesReady(true)
+      setDues(Object.fromEntries((duesResult.data || []).map((entry) => [entry.user_id, entry])))
+    }
     if (keepSelection && selectedId) {
       const fresh = rows.find((profile) => profile.id === selectedId)
       if (fresh) setDraft(valuesFor(fresh))
@@ -82,14 +95,14 @@ export default function AdminUsers() {
     const onKeyDown = (event) => {
       if (event.key !== 'Escape') return
       if (passwordTarget && busyId !== passwordTarget.id) setPasswordTarget(null)
-      else if (!busyId) { setSelectedId(null); setDraft(null) }
+      else if (!busyId && !duesBusyId) { setSelectedId(null); setDraft(null) }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => {
       document.body.style.overflow = previous
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [selectedId, passwordTarget, busyId])
+  }, [selectedId, passwordTarget, busyId, duesBusyId])
 
   if (!authLoading && !isAdmin) return <Navigate to="/" replace />
 
@@ -98,12 +111,13 @@ export default function AdminUsers() {
     active: profiles.filter((profile) => profile.active).length,
     admins: profiles.filter((profile) => profile.active && profile.role === 'admin').length,
     amicalistes: profiles.filter((profile) => profile.is_amicaliste === true).length,
-  }), [profiles])
+    duesPaid: profiles.filter((profile) => profile.is_amicaliste === true && dues[profile.id]?.paid === true).length,
+  }), [profiles, dues])
 
   const filteredProfiles = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (!needle) return profiles
-    return profiles.filter((profile) => `${profile.full_name || ''} ${profile.email || ''}`.toLowerCase().includes(needle))
+    return profiles.filter((profile) => `${profile.full_name || ''} ${profile.email || ''} ${situationLabel(profile)}`.toLowerCase().includes(needle))
   }, [profiles, query])
 
   const selectedProfile = useMemo(() => profiles.find((profile) => profile.id === selectedId) || null, [profiles, selectedId])
@@ -118,7 +132,7 @@ export default function AdminUsers() {
   }
 
   const closeUser = () => {
-    if (busyId) return
+    if (busyId || duesBusyId) return
     if (dirty && !window.confirm('Abandonner les modifications non enregistrées ?')) return
     setSelectedId(null)
     setDraft(null)
@@ -147,6 +161,31 @@ export default function AdminUsers() {
       setError(err.message || 'Impossible de modifier ce compte.')
     } finally {
       setBusyId(null)
+    }
+  }
+
+  const setDuePaid = async (profile, paid) => {
+    if (!duesReady || !profile?.id) return
+    setDuesBusyId(profile.id)
+    setError('')
+    setSuccess('')
+    try {
+      const now = new Date().toISOString()
+      const { error: dueError } = await supabase.from('membership_dues').upsert({
+        user_id: profile.id,
+        year: CURRENT_YEAR,
+        paid,
+        paid_at: paid ? now : null,
+        updated_by: user.id,
+        updated_at: now,
+      }, { onConflict: 'user_id,year' })
+      if (dueError) throw dueError
+      setSuccess(paid ? `Cotisation ${CURRENT_YEAR} marquée comme réglée pour ${profile.full_name || profile.email}.` : `Cotisation ${CURRENT_YEAR} marquée comme non réglée pour ${profile.full_name || profile.email}.`)
+      await load()
+    } catch (err) {
+      setError(err.message || 'Impossible de mettre à jour la cotisation.')
+    } finally {
+      setDuesBusyId(null)
     }
   }
 
@@ -209,14 +248,22 @@ export default function AdminUsers() {
     return 'Compte supprimé'
   }
 
+  const dueBadge = (profile) => {
+    if (!duesReady) return null
+    if (!profile.is_amicaliste) return <span className="admin-state-badge neutral">Cotisation —</span>
+    return dues[profile.id]?.paid
+      ? <span className="admin-state-badge fee-ok">Cotisation {CURRENT_YEAR} ✓</span>
+      : <span className="admin-state-badge fee-due">Cotisation {CURRENT_YEAR} à régler</span>
+  }
+
   return <div className="admin-users-page">
-    <PageTitle eyebrow="Administration · Membres" title="Utilisateurs" text="Touchez un utilisateur pour consulter sa situation et gérer ses droits. Les actions sensibles restent regroupées dans sa fiche." />
+    <PageTitle eyebrow="Administration · Membres" title="Utilisateurs" text="Touchez un utilisateur pour consulter sa situation et gérer ses droits, son statut amicaliste et sa cotisation annuelle." />
 
     <div className="admin-user-stats">
       <article><strong>{counts.total}</strong><span>comptes</span></article>
       <article><strong>{counts.active}</strong><span>actifs</span></article>
       <article><strong>{counts.amicalistes}</strong><span>amicalistes</span></article>
-      <article><strong>{counts.admins}</strong><span>admins</span></article>
+      <article><strong>{duesReady ? `${counts.duesPaid}/${counts.amicalistes}` : counts.admins}</strong><span>{duesReady ? `cotisations ${CURRENT_YEAR} réglées` : 'admins'}</span></article>
     </div>
 
     {error && <div className="alert error">{error}</div>}
@@ -224,17 +271,18 @@ export default function AdminUsers() {
 
     <section>
       <div className="admin-section-heading"><div><span className="eyebrow">Base membres</span><h2>Liste des utilisateurs</h2></div><span>{filteredProfiles.length} affiché{filteredProfiles.length > 1 ? 's' : ''}</span></div>
-      <div className="admin-user-toolbar"><input type="search" placeholder="Rechercher un nom ou une adresse e-mail…" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
+      <div className="admin-user-toolbar"><input type="search" placeholder="Rechercher un nom, e-mail ou situation…" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
 
       {loading ? <div className="skeleton-card" /> : profiles.length === 0 ? <div className="empty-state">Aucun compte.</div> : filteredProfiles.length === 0 ? <div className="empty-state">Aucun utilisateur ne correspond à cette recherche.</div> : <div className="admin-member-list">
         {filteredProfiles.map((profile) => {
           const self = profile.id === user?.id
           return <button type="button" className={`admin-member-row ${profile.active ? '' : 'is-suspended'}`} key={profile.id} onClick={() => openUser(profile)}>
             <span className="admin-user-avatar">{(profile.full_name || profile.email || '?')[0].toUpperCase()}</span>
-            <span className="admin-member-identity"><strong>{profile.full_name || 'Nom non renseigné'}</strong><small>{profile.email}</small><em>{situationLabel(profile.applicant_type)}</em></span>
+            <span className="admin-member-identity"><strong>{profile.full_name || 'Nom non renseigné'}</strong><small>{profile.email}</small><em>{situationLabel(profile)}</em></span>
             <span className="admin-member-badges">
               <span className={`admin-state-badge ${profile.active ? 'ok' : 'off'}`}>{profile.active ? 'Actif' : 'Suspendu'}</span>
               <span className={`admin-state-badge ${profile.is_amicaliste ? 'member' : 'neutral'}`}>{profile.is_amicaliste ? 'Amicaliste' : 'Non-amicaliste'}</span>
+              {dueBadge(profile)}
               {profile.role === 'admin' && <span className="admin-state-badge admin">Admin</span>}
               {self && <span className="admin-state-badge self">Vous</span>}
             </span>
@@ -258,17 +306,22 @@ export default function AdminUsers() {
         <div className="admin-user-sheet-summary">
           <span>{selectedProfile.active ? '● Accès actif' : '○ Accès suspendu'}</span>
           <span>{draft.is_amicaliste === 'yes' ? '✓ Amicaliste' : 'Non-amicaliste'}</span>
-          <span>{situationLabel(draft.applicant_type)}</span>
+          <span>{situationLabel(selectedProfile)}</span>
         </div>
 
         <div className="admin-user-edit-grid">
           <label>Accès<select value={draft.active ? 'active' : 'suspended'} disabled={busyId === selectedProfile.id || selectedProfile.id === user?.id} onChange={(event) => setDraft({ ...draft, active: event.target.value === 'active' })}><option value="active">Actif</option><option value="suspended">Suspendu</option></select></label>
           <label>Rôle<select value={draft.role} disabled={busyId === selectedProfile.id || selectedProfile.id === user?.id} onChange={(event) => setDraft({ ...draft, role: event.target.value })}><option value="member">Membre</option><option value="admin">Administrateur</option></select></label>
           <label>Statut amicale<select value={draft.is_amicaliste} disabled={busyId === selectedProfile.id} onChange={(event) => setDraft({ ...draft, is_amicaliste: event.target.value })}><option value="yes">Amicaliste</option><option value="no">Non-amicaliste</option></select></label>
-          <label>Situation<select value={draft.applicant_type} disabled={busyId === selectedProfile.id} onChange={(event) => setDraft({ ...draft, applicant_type: event.target.value })}><option value="">Non renseignée</option><option value="military">Militaire DANZ</option><option value="spouse">Conjoint(e) militaire DANZ</option></select></label>
+          <div className="admin-user-readonly-field"><span>Situation déclarée</span><strong>{situationLabel(selectedProfile)}</strong></div>
         </div>
 
-        <div className="privacy-note admin-user-help"><strong>Amicaliste ≠ accès au site.</strong><br/>Le statut amicaliste est une information séparée. Suspendre un compte coupe son accès ; changer le statut amicaliste ne le déconnecte pas.</div>
+        {duesReady && <section className={`admin-dues-card ${selectedProfile.is_amicaliste ? '' : 'disabled'}`}>
+          <div><span className="eyebrow">Cotisation annuelle</span><h3>{CURRENT_YEAR}</h3><p>{selectedProfile.is_amicaliste ? dues[selectedProfile.id]?.paid ? `Réglée${dues[selectedProfile.id]?.paid_at ? ` le ${new Date(dues[selectedProfile.id].paid_at).toLocaleDateString('fr-FR')}` : ''}.` : 'Cotisation à régulariser.' : 'Ce compte est actuellement non-amicaliste.'}</p></div>
+          {selectedProfile.is_amicaliste && <button type="button" className={dues[selectedProfile.id]?.paid ? 'secondary-button' : 'primary-button'} disabled={duesBusyId === selectedProfile.id} onClick={() => setDuePaid(selectedProfile, !dues[selectedProfile.id]?.paid)}>{duesBusyId === selectedProfile.id ? 'Enregistrement…' : dues[selectedProfile.id]?.paid ? 'Marquer non réglée' : `Marquer payée ${CURRENT_YEAR}`}</button>}
+        </section>}
+
+        <div className="privacy-note admin-user-help"><strong>Amicaliste, cotisation et accès sont séparés.</strong><br/>Le statut amicaliste indique l’adhésion à l’Amicale. La cotisation est suivie année par année. Suspendre un compte coupe son accès au site sans modifier ces deux informations.</div>
 
         <div className="admin-user-sheet-actions">
           <button type="button" className="primary-button" disabled={busyId === selectedProfile.id || !dirty} onClick={saveUser}>{busyId === selectedProfile.id ? 'Enregistrement…' : dirty ? 'Enregistrer les modifications' : 'Aucune modification'}</button>
