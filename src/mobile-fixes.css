@@ -1,5 +1,8 @@
 html,body,#root{width:100%;max-width:100%;overflow-x:hidden}.app-shell,.main-column,.page,.public-surface,.admin-surface{min-width:0;max-width:100%}.mobile-tabbar{display:none!important}img,video,canvas,svg,iframe{max-width:100%}input,select,textarea,button{min-width:0;max-width:100%}.page>*{min-width:0}.card-grid>* ,.gallery-album-grid>* ,.home-editorial-grid>* ,.home-spotlight-grid>* ,.admin-hub-grid>* ,.admin-user-stats>*{min-width:0}
 
+/* Les pages membres restent consultatives même lorsqu'un administrateur les ouvre. */
+.public-surface .good-deals-admin-bar,.public-surface .good-deal-submissions-review,.public-surface .good-deals-admin-panel:not(.good-deals-proposal-panel),.public-surface .good-deal-admin-actions,.public-surface .poll-admin-bar,.public-surface .poll-admin-actions,.public-surface .poll-create-panel{display:none!important}
+
 @media(max-width:900px){
  .sidebar{width:min(86vw,300px);padding:20px 16px;z-index:100;box-shadow:18px 0 45px rgba(7,31,38,.22)}
  .sidebar nav{margin-top:24px;gap:4px;overflow-y:auto;overscroll-behavior:contain}
@@ -16,12 +19,15 @@ html,body,#root{width:100%;max-width:100%;overflow-x:hidden}.app-shell,.main-col
  .page-title h1{font-size:clamp(32px,9vw,40px);line-height:1.05}
  .page-title p{font-size:14px;line-height:1.55}
  .text-panel,.profile-card,.content-card,.article-card,.timeline-card{max-width:100%}
+ .good-deals-filter-bar,.good-deals-toolbar,.good-deals-contribute-bar,.poll-admin-bar,.admin-section-heading{flex-wrap:wrap;min-width:0}
+ .good-deals-form,.submission-review-grid{min-width:0}
 }
 
 @media(max-width:620px){
  .page{padding:18px 12px 42px}
  .topbar{padding:0 10px}
  .menu-button{margin-right:9px;font-size:22px}
+ .offline-banner{position:relative!important;font-size:10px!important;line-height:1.4;padding:8px 10px!important}
  .home-app-header{gap:12px;padding:16px 14px!important;border-radius:18px!important}
  .home-app-header h1{font-size:26px!important;max-width:none!important}
  .home-app-header p{max-width:none!important}
@@ -38,7 +44,7 @@ html,body,#root{width:100%;max-width:100%;overflow-x:hidden}.app-shell,.main-col
  .home-detail-modal,.gallery-viewer{width:100%!important;max-width:100%!important}
  .gallery-upload-panel{grid-template-columns:1fr!important;padding:14px!important}
  .gallery-album-grid{grid-template-columns:1fr!important}
- .admin-hub-grid,.admin-user-stats,.backup-grid{grid-template-columns:1fr!important}
+ .admin-hub-grid,.admin-user-stats,.backup-grid,.backup-export-grid{grid-template-columns:1fr!important}
  .admin-user-edit{grid-template-columns:1fr!important}
  .timeline-item{grid-template-columns:52px minmax(0,1fr)!important;gap:8px!important}
  .timeline-card{padding:16px!important;min-width:0}
@@ -51,12 +57,25 @@ html,body,#root{width:100%;max-width:100%;overflow-x:hidden}.app-shell,.main-col
  form{min-width:0}
  label{min-width:0}
  input,select,textarea{width:100%!important}
+ .good-deals-contribute-bar{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;padding:14px!important}
+ .good-deals-contribute-bar .secondary-button{width:100%!important}
+ .good-deals-filter-bar,.good-deals-toolbar{display:grid!important;grid-template-columns:1fr!important;gap:8px!important}
+ .good-deals-form{grid-template-columns:1fr!important}
+ .good-deals-form .full{grid-column:1!important}
+ .good-deals-form-actions,.good-deals-geocode-row,.proposal-location-check{display:grid!important;grid-template-columns:1fr!important;gap:8px!important}
+ .good-deals-form-actions .primary-button,.good-deals-form-actions .secondary-button,.good-deals-geocode-row .secondary-button,.proposal-location-check .secondary-button{width:100%!important}
+ .submission-review-grid{grid-template-columns:1fr!important}
+ .poll-card{padding:16px!important}.poll-card-head{gap:10px!important}.poll-option{padding:11px!important}.poll-option-top{gap:8px!important;align-items:flex-start!important}.poll-option-top strong{white-space:nowrap;font-size:10px!important}
+ .profile-card{padding:18px!important;align-items:flex-start}.profile-avatar{width:56px!important;height:56px!important;flex:0 0 56px}
 }
 
-@media(max-width:360px){
+@media(max-width:390px){
  .page{padding-left:10px;padding-right:10px}
  .home-app-header{padding:14px 12px!important}
+ .home-app-header-copy{min-width:0}.home-app-header h1{font-size:24px!important;overflow-wrap:anywhere}.home-app-header p{font-size:11px!important}
  .home-app-mark{width:44px!important;height:44px!important;flex-basis:44px}
  .home-app-status-row span{white-space:normal}
  .home-app-dashboard .home-spotlight-grid .home-editorial-card,.home-app-dashboard .compact-grid .home-editorial-card{grid-template-columns:31% minmax(0,1fr)!important}
+ .home-tile-body time{font-size:9px!important}.home-tile-more{display:none}
+ .sidebar{width:min(90vw,290px)}
 }
