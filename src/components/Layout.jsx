@@ -73,6 +73,9 @@ export default function Layout() {
       <main className={`page ${inAdministration?'admin-surface':'public-surface'}`}><Outlet/></main>
       <footer>Amicale DANZ Antilles · Espace privé · <NavLink to="/confidentialite">Confidentialité</NavLink></footer>
     </div>
+    <nav className="mobile-tabbar" aria-label="Navigation rapide">
+      {links.map(([to,label,icon])=><NavLink key={to} to={to} end={to==='/' }><span aria-hidden="true">{icon}</span><small>{label}</small></NavLink>)}
+    </nav>
     {open&&<button aria-label="Fermer le menu" className="backdrop" onClick={()=>setOpen(false)}/>} 
   </div>
 }
