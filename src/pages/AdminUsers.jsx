@@ -5,14 +5,9 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { PageTitle } from './Actualites.jsx'
 import '../admin-users.css'
 
-const accessLabels = {
-  admin: 'Administrateur',
-  personnel_danz: 'Personnel DANZ',
-  amicaliste: 'Amicaliste',
-}
 const applicantLabels = { military: 'Militaire DANZ', spouse: 'Conjoint(e)' }
 const auditLabels = {
-  user_access_updated: 'Accès modifié / compte réactivé',
+  user_access_updated: 'Compte / statut modifié',
   user_suspended: 'Compte suspendu',
   user_deleted: 'Compte et données personnelles supprimés',
   membership_approved: 'Demande d’accès approuvée',
@@ -56,7 +51,7 @@ export default function AdminUsers() {
     total: profiles.length,
     active: profiles.filter((profile) => profile.active).length,
     suspended: profiles.filter((profile) => !profile.active).length,
-    admins: profiles.filter((profile) => profile.active && profile.role === 'admin').length,
+    amicalistes: profiles.filter((profile) => profile.is_amicaliste === true).length,
   }), [profiles])
 
   const nameById = useMemo(() => Object.fromEntries(profiles.map((profile) => [profile.id, profile.full_name || profile.email || 'Utilisateur'])), [profiles])
@@ -67,13 +62,15 @@ export default function AdminUsers() {
     return 'Compte supprimé'
   }
 
+  const valuesFor = (profile) => ({
+    role: profile.role === 'admin' ? 'admin' : 'member',
+    applicant_type: profile.applicant_type || '',
+    is_amicaliste: profile.is_amicaliste === true ? 'yes' : 'no',
+  })
+
   const beginEdit = (profile) => {
     setEditingId(profile.id)
-    setDraft({
-      access_type: profile.access_type || 'amicaliste',
-      applicant_type: profile.applicant_type || '',
-      is_amicaliste: profile.is_amicaliste === true ? 'yes' : profile.is_amicaliste === false ? 'no' : 'unknown',
-    })
+    setDraft(valuesFor(profile))
     setError('')
     setSuccess('')
   }
@@ -83,21 +80,20 @@ export default function AdminUsers() {
     setError('')
     setSuccess('')
     try {
-      const isAmicaliste = values?.is_amicaliste === 'unknown' ? null : values?.is_amicaliste === 'yes'
       const { data, error: fnError } = await supabase.functions.invoke('admin-user-management', {
         body: {
           action: 'set-access',
           userId: profile.id,
           active,
-          accessType: values?.access_type || profile.access_type,
+          role: values?.role || profile.role,
           applicantType: values?.applicant_type || null,
-          isAmicaliste,
+          isAmicaliste: values?.is_amicaliste === 'yes',
         },
       })
       if (fnError || data?.error) throw new Error(data?.error || fnError?.message || 'Impossible de modifier ce compte.')
       setEditingId(null)
       setDraft(null)
-      setSuccess(active ? 'Les droits de l’utilisateur ont été enregistrés.' : 'Le compte a été suspendu. Les règles d’accès bloquent désormais ses données privées.')
+      setSuccess(active ? 'Le compte et le statut de l’utilisateur ont été enregistrés.' : 'Le compte a été suspendu. Ses identifiants restent enregistrés mais l’accès au site est bloqué.')
       await load()
     } catch (err) {
       setError(err.message || 'Impossible de modifier ce compte.')
@@ -107,21 +103,11 @@ export default function AdminUsers() {
   }
 
   const suspend = async (profile) => {
-    if (!window.confirm(`Suspendre l’accès de ${profile.full_name || profile.email} ?`)) return
-    await applyAccess(profile, false, {
-      access_type: profile.access_type,
-      applicant_type: profile.applicant_type || '',
-      is_amicaliste: profile.is_amicaliste === true ? 'yes' : profile.is_amicaliste === false ? 'no' : 'unknown',
-    })
+    if (!window.confirm(`Suspendre l’accès de ${profile.full_name || profile.email} ? Ses identifiants resteront enregistrés, mais il ne pourra plus ouvrir le site.`)) return
+    await applyAccess(profile, false, valuesFor(profile))
   }
 
-  const reactivate = async (profile) => {
-    await applyAccess(profile, true, {
-      access_type: profile.access_type,
-      applicant_type: profile.applicant_type || '',
-      is_amicaliste: profile.is_amicaliste === true ? 'yes' : profile.is_amicaliste === false ? 'no' : 'unknown',
-    })
-  }
+  const reactivate = async (profile) => applyAccess(profile, true, valuesFor(profile))
 
   const deleteUser = async (profile) => {
     const answer = window.prompt(`Suppression RGPD définitive de ${profile.full_name || profile.email}.\n\nCette action supprime le compte, ses votes, préférences et abonnements push. Le contenu collectif déjà publié est conservé mais anonymisé.\n\nTapez SUPPRIMER pour confirmer.`)
@@ -142,16 +128,16 @@ export default function AdminUsers() {
   }
 
   return <div className="admin-users-page">
-    <PageTitle eyebrow="Administration · RGPD" title="Utilisateurs & accès" text="Contrôlez qui peut entrer sur le site, suspendez immédiatement un accès, modifiez les droits et conservez une trace des décisions administratives." />
+    <PageTitle eyebrow="Administration · RGPD" title="Utilisateurs & accès" text="Un compte approuvé se connecte avec son e-mail et son mot de passe. Ici vous gérez séparément l’activation du compte, le rôle administrateur, la situation et le statut amicaliste." />
 
     <div className="admin-user-stats">
       <article><strong>{counts.total}</strong><span>compte{counts.total > 1 ? 's' : ''} enregistré{counts.total > 1 ? 's' : ''}</span></article>
       <article><strong>{counts.active}</strong><span>accès actif{counts.active > 1 ? 's' : ''}</span></article>
       <article><strong>{counts.suspended}</strong><span>compte{counts.suspended > 1 ? 's' : ''} suspendu{counts.suspended > 1 ? 's' : ''}</span></article>
-      <article><strong>{counts.admins}</strong><span>administrateur{counts.admins > 1 ? 's' : ''} actif{counts.admins > 1 ? 's' : ''}</span></article>
+      <article><strong>{counts.amicalistes}</strong><span>amicaliste{counts.amicalistes > 1 ? 's' : ''}</span></article>
     </div>
 
-    <div className="privacy-note admin-rgpd-note"><strong>Principe de maîtrise des accès</strong><br />Un compte suspendu reste identifiable dans le registre administratif mais ne peut plus accéder aux données membres. Une suppression RGPD retire son compte et ses données directement liées. Les publications collectives restent disponibles sans identifiant d’auteur.</div>
+    <div className="privacy-note admin-rgpd-note"><strong>Principe</strong><br />« Actif / suspendu » détermine uniquement si la personne peut se connecter. « Administrateur / membre » détermine ses droits de gestion. « Amicaliste / non-amicaliste » est un statut indépendant, modifiable à tout moment sans changer ses identifiants.</div>
 
     {error && <div className="alert error">{error}</div>}
     {success && <div className="alert">{success}</div>}
@@ -169,25 +155,25 @@ export default function AdminUsers() {
                 <div className="admin-user-title"><h3>{profile.full_name || 'Nom non renseigné'}</h3>{self && <span className="role-badge">Votre compte</span>}</div>
                 <p>{profile.email}</p>
                 <div className="admin-user-badges">
-                  <span className={`role-badge ${profile.active ? '' : 'muted'}`}>{profile.active ? 'Actif' : 'Suspendu'}</span>
-                  <span className="role-badge">{accessLabels[profile.access_type] || profile.access_type}</span>
+                  <span className={`role-badge ${profile.active ? '' : 'muted'}`}>{profile.active ? 'Accès actif' : 'Accès suspendu'}</span>
+                  <span className="role-badge">{profile.role === 'admin' ? 'Administrateur' : 'Membre'}</span>
                   {profile.applicant_type && <span>{applicantLabels[profile.applicant_type] || profile.applicant_type}</span>}
-                  {profile.is_amicaliste === true && <span>Amicaliste</span>}
+                  <span>{profile.is_amicaliste === true ? 'Amicaliste' : 'Non-amicaliste'}</span>
                 </div>
                 <small>Compte créé le {new Date(profile.created_at).toLocaleDateString('fr-FR')}{profile.deactivated_at ? ` · suspendu le ${new Date(profile.deactivated_at).toLocaleDateString('fr-FR')}` : ''}</small>
               </div>
             </div>
 
             {!editing && <div className="admin-user-actions">
-              <button type="button" className="ghost-button" onClick={() => beginEdit(profile)} disabled={busyId === profile.id}>Modifier les droits</button>
+              <button type="button" className="ghost-button" onClick={() => beginEdit(profile)} disabled={busyId === profile.id}>Modifier le compte</button>
               {profile.active ? <button type="button" className="ghost-button" onClick={() => suspend(profile)} disabled={self || busyId === profile.id}>Suspendre</button> : <button type="button" className="secondary-button" onClick={() => reactivate(profile)} disabled={busyId === profile.id}>Réactiver</button>}
               <button type="button" className="ghost-button danger-action" onClick={() => deleteUser(profile)} disabled={self || busyId === profile.id}>Supprimer les données</button>
             </div>}
 
             {editing && draft && <form className="admin-user-edit" onSubmit={(event) => { event.preventDefault(); applyAccess(profile, profile.active, draft) }}>
-              <label>Niveau d’accès<select value={draft.access_type} onChange={(event) => setDraft({ ...draft, access_type: event.target.value })}><option value="personnel_danz">Personnel DANZ</option><option value="amicaliste">Amicaliste</option><option value="admin">Administrateur</option></select></label>
+              <label>Rôle du compte<select value={draft.role} onChange={(event) => setDraft({ ...draft, role: event.target.value })}><option value="member">Membre</option><option value="admin">Administrateur</option></select></label>
               <label>Situation<select value={draft.applicant_type} onChange={(event) => setDraft({ ...draft, applicant_type: event.target.value })}><option value="">Non renseignée</option><option value="military">Militaire DANZ</option><option value="spouse">Conjoint(e)</option></select></label>
-              <label>Statut amicaliste<select value={draft.is_amicaliste} onChange={(event) => setDraft({ ...draft, is_amicaliste: event.target.value })}><option value="unknown">Non renseigné</option><option value="yes">Oui</option><option value="no">Non</option></select></label>
+              <label>Statut amicaliste<select value={draft.is_amicaliste} onChange={(event) => setDraft({ ...draft, is_amicaliste: event.target.value })}><option value="yes">Amicaliste</option><option value="no">Non-amicaliste</option></select></label>
               <div className="admin-user-edit-actions"><button className="primary-button" disabled={busyId === profile.id}>{busyId === profile.id ? 'Enregistrement…' : 'Enregistrer'}</button><button type="button" className="ghost-button" onClick={() => { setEditingId(null); setDraft(null) }}>Annuler</button></div>
             </form>}
           </article>
