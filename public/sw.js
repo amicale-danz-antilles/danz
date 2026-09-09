@@ -1,3 +1,59 @@
+const CACHE_NAME='danz-shell-v3'
+const STATIC_URLS=[
+  '/danz/',
+  '/danz/manifest.webmanifest',
+  '/danz/app-icon.png',
+  '/danz/app-icon-safe.svg',
+  '/danz/Insigne%20CND%20-%20ANTILLES.png',
+]
+
+self.addEventListener('install',(event)=>{
+  event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(STATIC_URLS)).then(()=>self.skipWaiting()))
+})
+
+self.addEventListener('activate',(event)=>{
+  event.waitUntil((async()=>{
+    const names=await caches.keys()
+    await Promise.all(names.filter(name=>name.startsWith('danz-shell-')&&name!==CACHE_NAME).map(name=>caches.delete(name)))
+    await self.clients.claim()
+  })())
+})
+
+self.addEventListener('fetch',(event)=>{
+  const request=event.request
+  if(request.method!=='GET')return
+  const url=new URL(request.url)
+
+  // Ne jamais mettre en cache Supabase, R2, WeTransfer ou toute autre donnée privée distante.
+  if(url.origin!==self.location.origin)return
+  if(!url.pathname.startsWith('/danz/'))return
+
+  if(request.mode==='navigate'){
+    event.respondWith((async()=>{
+      try{
+        const response=await fetch(request)
+        if(response.ok){const cache=await caches.open(CACHE_NAME);cache.put('/danz/',response.clone())}
+        return response
+      }catch(_){
+        return (await caches.match('/danz/'))||Response.error()
+      }
+    })())
+    return
+  }
+
+  const cacheable=['script','style','font','image','manifest'].includes(request.destination)||url.pathname.startsWith('/danz/assets/')
+  if(!cacheable)return
+
+  event.respondWith((async()=>{
+    const cached=await caches.match(request)
+    const network=fetch(request).then(async response=>{
+      if(response.ok){const cache=await caches.open(CACHE_NAME);await cache.put(request,response.clone())}
+      return response
+    }).catch(()=>null)
+    return cached||(await network)||Response.error()
+  })())
+})
+
 self.addEventListener('push', (event) => {
   let data = {}
   try {
