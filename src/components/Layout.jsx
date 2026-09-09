@@ -57,8 +57,9 @@ export default function Layout() {
 
   const logout = async () => { await signOut(); navigate('/connexion') }
   const memberDetails = []
-  if (profile?.applicant_type === 'military') memberDetails.push('Militaire DANZ')
-  if (profile?.applicant_type === 'spouse') memberDetails.push('Conjoint(e)')
+  if (profile?.applicant_type === 'spouse') memberDetails.push('Conjoint(e) DANZ')
+  else if (profile?.applicant_type === 'military' && profile?.military_reference === 'other') memberDetails.push('Militaire hors DANZ')
+  else if (profile?.applicant_type === 'military') memberDetails.push('Militaire DANZ')
   if (profile?.is_amicaliste === true) memberDetails.push('Amicaliste')
   else if (profile?.is_amicaliste === false) memberDetails.push('Non-amicaliste')
 
