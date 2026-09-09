@@ -1,7 +1,8 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import '../admin-central.css'
+import '../quality.css'
 
 const links = [
   ['/', 'Accueil', '⌂'],
@@ -16,7 +17,31 @@ export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
   const [open, setOpen] = useState(false)
+  const [online, setOnline] = useState(() => navigator.onLine)
   const inAdministration = location.pathname.startsWith('/administration')
+
+  useEffect(() => {
+    setOpen(false)
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [location.pathname])
+
+  useEffect(() => {
+    const onOnline = () => setOnline(true)
+    const onOffline = () => setOnline(false)
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
+    return () => {
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', onOffline)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!open) return undefined
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previous }
+  }, [open])
 
   const logout = async () => { await signOut(); navigate('/connexion') }
   const memberDetails = []
@@ -28,7 +53,7 @@ export default function Layout() {
   const spaceSubtitle = isAdmin ? 'Administration et vie de l’amicale' : memberDetails.join(' · ') || 'Compte membre validé'
 
   return <div className="app-shell">
-    <aside className={`sidebar ${open ? 'open' : ''}`}>
+    <aside className={`sidebar ${open ? 'open' : ''}`} aria-label="Navigation principale">
       <div className="brand"><img src="/danz/Insigne%20CND%20-%20ANTILLES.png" alt="Insigne DANZ Antilles" style={{width:52,height:52,objectFit:'contain',borderRadius:'12px'}}/><div><strong>Amicale DANZ</strong><span>Antilles</span></div></div>
       <nav>
         {links.map(([to,label,icon])=><NavLink key={to} to={to} end={to==='/' } onClick={()=>setOpen(false)}><span className="nav-icon">{icon}</span>{label}</NavLink>)}
@@ -43,7 +68,12 @@ export default function Layout() {
         <button className="ghost-button" onClick={logout}>Se déconnecter</button>
       </div>
     </aside>
-    <div className="main-column"><header className="topbar"><button className="menu-button" aria-label="Ouvrir le menu" onClick={()=>setOpen(!open)}>☰</button><div><strong>{spaceTitle}</strong><span>{spaceSubtitle}</span></div></header><main className={`page ${inAdministration?'admin-surface':'public-surface'}`}><Outlet/></main><footer>Amicale DANZ Antilles · Espace privé · <NavLink to="/confidentialite">Confidentialité</NavLink></footer></div>
+    <div className="main-column">
+      <header className="topbar"><button className="menu-button" aria-label={open?'Fermer le menu':'Ouvrir le menu'} aria-expanded={open} onClick={()=>setOpen(!open)}>☰</button><div><strong>{spaceTitle}</strong><span>{spaceSubtitle}</span></div></header>
+      {!online&&<div className="offline-banner" role="status">Connexion Internet interrompue. Le contenu déjà affiché reste visible, mais les nouvelles données et médias peuvent être indisponibles.</div>}
+      <main className={`page ${inAdministration?'admin-surface':'public-surface'}`}><Outlet/></main>
+      <footer>Amicale DANZ Antilles · Espace privé · <NavLink to="/confidentialite">Confidentialité</NavLink></footer>
+    </div>
     {open&&<button aria-label="Fermer le menu" className="backdrop" onClick={()=>setOpen(false)}/>} 
   </div>
 }
