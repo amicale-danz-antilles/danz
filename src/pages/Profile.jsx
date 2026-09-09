@@ -8,7 +8,6 @@ const VAPID_PUBLIC_KEY = 'BB0cZFeJlrnRo6sF9JN3pNwNhpkgaZJdxlKj0nO6XZ53r01WLCcPwk
 const preferenceLabels = {
   news: 'Actualités',
   events: 'Événements',
-  documents: 'Documents',
   gallery: 'Photos / Galerie',
 }
 
@@ -22,7 +21,7 @@ function urlBase64ToUint8Array(base64String) {
 export default function Profile() {
   const { user, profile: authProfile, isAdmin } = useAuth()
   const [profile, setProfile] = useState(authProfile)
-  const [preferences, setPreferences] = useState({ news: true, events: true, documents: true, gallery: true })
+  const [preferences, setPreferences] = useState({ news: true, events: true, gallery: true })
   const [pushStatus, setPushStatus] = useState('checking')
   const [pushBusy, setPushBusy] = useState(false)
   const [password, setPassword] = useState('')
@@ -37,7 +36,7 @@ export default function Profile() {
     const load = async () => {
       const [{ data: profileData }, { data: prefsData }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
-        supabase.from('notification_preferences').select('news, events, documents, gallery').eq('user_id', user.id).maybeSingle(),
+        supabase.from('notification_preferences').select('news, events, gallery').eq('user_id', user.id).maybeSingle(),
       ])
 
       if (cancelled) return
