@@ -35,11 +35,15 @@ html,body,#root{width:100%;max-width:100%;overflow-x:hidden}.app-shell,.main-col
  .home-app-actions{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important}
  .home-app-actions a{display:flex!important;justify-content:flex-start!important;text-align:left!important;min-height:58px!important;padding:9px 10px!important}
  .home-app-actions strong{font-size:11px!important}
- .home-spotlight-grid,.home-editorial-grid,.compact-grid{grid-template-columns:1fr!important}
- .home-app-dashboard .home-spotlight-grid .home-editorial-card,.home-app-dashboard .compact-grid .home-editorial-card{grid-template-columns:34% minmax(0,1fr)!important;width:100%;min-height:118px!important}
- .home-app-dashboard .home-spotlight-grid .home-tile-body,.home-app-dashboard .compact-grid .home-tile-body{min-width:0;padding:9px 10px!important}
- .home-tile-body h3,.home-app-dashboard .home-spotlight-grid .home-tile-body h3,.home-app-dashboard .compact-grid .home-tile-body h3{overflow-wrap:anywhere;font-size:15px!important}
- .home-tile-body p{overflow-wrap:anywhere}
+ .home-spotlight-grid,.home-editorial-grid,.compact-grid{grid-template-columns:1fr!important;width:100%!important;min-width:0!important}
+ .home-app-dashboard .home-spotlight-grid .home-editorial-card,.home-app-dashboard .compact-grid .home-editorial-card{display:flex!important;flex-direction:row!important;align-items:stretch!important;width:100%!important;max-width:100%!important;min-width:0!important;min-height:116px!important;overflow:hidden!important}
+ .home-app-dashboard .home-spotlight-grid .home-tile-media,.home-app-dashboard .compact-grid .home-tile-media{flex:0 0 112px!important;width:112px!important;min-width:112px!important;height:auto!important;min-height:116px!important;aspect-ratio:auto!important;align-self:stretch!important}
+ .home-app-dashboard .home-spotlight-grid .home-tile-body,.home-app-dashboard .compact-grid .home-tile-body{flex:1 1 auto!important;width:0!important;min-width:0!important;padding:10px 11px!important;overflow:hidden!important}
+ .home-tile-body h3,.home-app-dashboard .home-spotlight-grid .home-tile-body h3,.home-app-dashboard .compact-grid .home-tile-body h3{overflow-wrap:anywhere;word-break:normal;font-size:15px!important;line-height:1.18!important}
+ .home-tile-body p{overflow-wrap:anywhere;font-size:11px!important;line-height:1.35!important}
+ .home-tile-location{white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;display:block!important}
+ .home-tile-more{font-size:10px!important;padding-top:5px!important}
+ .home-spotlight-grid>.empty-state{min-height:84px!important;padding:18px!important;display:flex!important;align-items:center!important;font-size:14px!important}
  .home-detail-backdrop,.gallery-viewer-backdrop{padding:0!important;padding-bottom:env(safe-area-inset-bottom)!important}
  .home-detail-modal,.gallery-viewer{width:100%!important;max-width:100%!important}
  .gallery-upload-panel{grid-template-columns:1fr!important;padding:14px!important}
@@ -75,7 +79,7 @@ html,body,#root{width:100%;max-width:100%;overflow-x:hidden}.app-shell,.main-col
  .home-app-header-copy{min-width:0}.home-app-header h1{font-size:24px!important;overflow-wrap:anywhere}.home-app-header p{font-size:11px!important}
  .home-app-mark{width:44px!important;height:44px!important;flex-basis:44px}
  .home-app-status-row span{white-space:normal}
- .home-app-dashboard .home-spotlight-grid .home-editorial-card,.home-app-dashboard .compact-grid .home-editorial-card{grid-template-columns:31% minmax(0,1fr)!important}
+ .home-app-dashboard .home-spotlight-grid .home-tile-media,.home-app-dashboard .compact-grid .home-tile-media{flex-basis:96px!important;width:96px!important;min-width:96px!important}
  .home-tile-body time{font-size:9px!important}.home-tile-more{display:none}
  .sidebar{width:min(90vw,290px)}
 }
