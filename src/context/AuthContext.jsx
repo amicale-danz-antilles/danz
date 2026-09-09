@@ -3,6 +3,7 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { clearOfflineData, readOfflineData, saveOfflineData } from '../lib/offlineCache.js'
 
 const AuthContext = createContext(null)
+const PROFILE_FIELDS = 'id, full_name, email, role, active, access_type, applicant_type, is_amicaliste'
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
@@ -39,12 +40,7 @@ export function AuthProvider({ children }) {
         return
       }
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, role, active, access_type, applicant_type, is_amicaliste')
-        .eq('id', session.user.id)
-        .maybeSingle()
-
+      const { data, error } = await supabase.from('profiles').select(PROFILE_FIELDS).eq('id', session.user.id).maybeSingle()
       if (cancelled) return
 
       if (error) {
@@ -75,28 +71,38 @@ export function AuthProvider({ children }) {
     session,
     user: session?.user ?? null,
     profile,
-    isAdmin: profile?.role === 'admin' && profile?.access_type === 'admin' && profile?.active === true,
+    isAdmin: profile?.role === 'admin' && profile?.active === true,
     hasAccess: profile?.active === true,
     loading,
     configured: isSupabaseConfigured,
-    requestMemberLogin: async (email) => {
+    signIn: async (email, password) => {
       if (!supabase) throw new Error('Supabase n’est pas encore configuré.')
-      const { data, error } = await supabase.functions.invoke('send-member-login-link', { body: { email: email.trim().toLowerCase() } })
+      const normalizedEmail = email.trim().toLowerCase()
+      const { data, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password })
+      if (error) throw error
+
+      const { data: accountProfile, error: profileError } = await supabase.from('profiles').select(PROFILE_FIELDS).eq('id', data.user.id).maybeSingle()
+      if (profileError || !accountProfile) {
+        await supabase.auth.signOut({ scope: 'local' })
+        throw new Error('Votre profil utilisateur est introuvable. Contactez un administrateur.')
+      }
+      if (accountProfile.active !== true) {
+        await supabase.auth.signOut({ scope: 'local' })
+        throw new Error('Votre compte existe mais son accès n’est pas actif. Attendez la validation de votre demande ou contactez un administrateur.')
+      }
+
+      saveOfflineData(data.user.id, 'profile', accountProfile)
+      setProfile(accountProfile)
+      setSession(data.session)
+    },
+    requestMembership: async ({ firstName, lastName, applicantType, email, password }) => {
+      if (!supabase) throw new Error('Supabase n’est pas encore configuré.')
+      const { data, error } = await supabase.functions.invoke('request-membership', {
+        body: { firstName, lastName, applicantType, email: email.trim().toLowerCase(), password },
+      })
       if (error) throw error
       if (data?.error) throw new Error(data.error)
-    },
-    signInAdmin: async (email, password) => {
-      if (!supabase) throw new Error('Supabase n’est pas encore configuré.')
-      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password })
-      if (error) throw error
-      const { data: adminProfile, error: profileError } = await supabase.from('profiles').select('id, full_name, email, role, active, access_type, applicant_type, is_amicaliste').eq('id', data.user.id).single()
-      if (profileError || adminProfile?.role !== 'admin' || adminProfile?.access_type !== 'admin' || adminProfile?.active !== true) {
-        await supabase.auth.signOut({ scope: 'local' })
-        throw new Error('Cet accès est réservé aux administrateurs validés.')
-      }
-      saveOfflineData(data.user.id, 'profile', adminProfile)
-      setProfile(adminProfile)
-      setSession(data.session)
+      return data
     },
     signOut: async () => {
       if (session?.user?.id) clearOfflineData(session.user.id)
