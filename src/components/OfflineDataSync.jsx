@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { saveOfflineData } from '../lib/offlineCache.js'
 import { resolvePrivateMediaBatch } from '../lib/mediaStorage.js'
+import useOnlineStatus from '../hooks/useOnlineStatus.js'
 
 const THUMB_CACHE='danz-private-thumbs-v2'
 const MAX_OFFLINE_THUMB=1.5*1024*1024
@@ -24,8 +25,9 @@ async function cacheThumb(userId,album,url){
 }
 
 export default function OfflineDataSync({userId}){
+  const online=useOnlineStatus()
   useEffect(()=>{
-    if(!userId||!navigator.onLine)return undefined
+    if(!userId||!online)return undefined
     let cancelled=false
     const timer=window.setTimeout(async()=>{
       try{
@@ -89,6 +91,6 @@ export default function OfflineDataSync({userId}){
       }catch{}
     },1200)
     return()=>{cancelled=true;window.clearTimeout(timer)}
-  },[userId])
+  },[userId,online])
   return null
 }
