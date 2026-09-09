@@ -40,17 +40,25 @@ export default function Layout() {
     if (!open) return undefined
     const previous = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = previous }
+    const onKeyDown = (event) => { if (event.key === 'Escape') setOpen(false) }
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.body.style.overflow = previous
+      window.removeEventListener('keydown', onKeyDown)
+    }
   }, [open])
 
   const logout = async () => { await signOut(); navigate('/connexion') }
   const memberDetails = []
-  if (!isAdmin) {
-    memberDetails.push(profile?.applicant_type === 'spouse' ? 'Conjoint(e)' : 'Militaire DANZ')
-    if (profile?.is_amicaliste === true) memberDetails.push('Amicaliste')
-  }
+  if (profile?.applicant_type === 'military') memberDetails.push('Militaire DANZ')
+  if (profile?.applicant_type === 'spouse') memberDetails.push('Conjoint(e)')
+  if (profile?.is_amicaliste === true) memberDetails.push('Amicaliste')
+  else if (profile?.is_amicaliste === false) memberDetails.push('Non-amicaliste')
+
   const spaceTitle = isAdmin ? 'Espace administrateur' : 'Espace membre'
-  const spaceSubtitle = isAdmin ? 'Administration et vie de l’amicale' : memberDetails.join(' · ') || 'Compte membre validé'
+  const spaceSubtitle = isAdmin
+    ? ['Administration', ...memberDetails].join(' · ')
+    : memberDetails.join(' · ') || 'Compte membre validé'
 
   return <div className="app-shell">
     <OfflineDataSync userId={user?.id}/>
