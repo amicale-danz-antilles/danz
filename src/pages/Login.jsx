@@ -1,184 +1,128 @@
 import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
-import { supabase } from '../lib/supabase.js'
 
 export default function Login() {
-  const { user, hasAccess, requestMemberLogin, signInAdmin, configured } = useAuth()
-  const [mode, setMode] = useState('standard')
+  const { user, hasAccess, signIn, requestMembership, configured } = useAuth()
   const [registering, setRegistering] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [applicantType, setApplicantType] = useState('military')
-  const [isAmicaliste, setIsAmicaliste] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [busy, setBusy] = useState(false)
 
   if (user && hasAccess) return <Navigate to="/" replace />
 
-  const changeMode = (nextMode) => {
-    setMode(nextMode)
-    setRegistering(false)
-    setError('')
-    setSuccess('')
+  const clearMessages = () => { setError(''); setSuccess('') }
+  const showRegistration = () => {
+    clearMessages()
+    setRegistering(true)
     setPassword('')
+    setConfirmPassword('')
   }
-
-  const resetRegistration = () => {
-    setFirstName('')
-    setLastName('')
-    setApplicantType('military')
-    setIsAmicaliste('')
-    setEmail('')
+  const showLogin = () => {
+    clearMessages()
+    setRegistering(false)
+    setPassword('')
+    setConfirmPassword('')
   }
 
   const submit = async (event) => {
     event.preventDefault()
-    setError('')
-    setSuccess('')
+    clearMessages()
     setBusy(true)
 
     try {
       if (registering) {
-        const normalizedFirstName = firstName.trim()
-        const normalizedLastName = lastName.trim()
-        const fullName = `${normalizedFirstName} ${normalizedLastName}`.trim()
+        if (password.length < 10 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+          throw new Error('Le mot de passe doit contenir au moins 10 caractères, avec au moins une lettre et un chiffre.')
+        }
+        if (password !== confirmPassword) throw new Error('Les deux mots de passe ne correspondent pas.')
 
-        const { error: requestError } = await supabase.from('membership_requests').insert({
-          full_name: fullName,
-          first_name: normalizedFirstName,
-          last_name: normalizedLastName,
-          applicant_type: applicantType,
-          is_amicaliste: isAmicaliste === 'yes',
-          requested_access: 'amicaliste',
-          email: email.trim().toLowerCase(),
+        await requestMembership({
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          applicantType,
+          email,
+          password,
         })
 
-        if (requestError) {
-          if (requestError.code === '23505') throw new Error('Une demande est déjà en attente pour cette adresse e-mail.')
-          throw requestError
-        }
-
-        setSuccess('Votre demande d’accès a bien été transmise. Après validation par un administrateur, vous pourrez vous connecter simplement avec votre adresse e-mail.')
-        resetRegistration()
+        setSuccess('Votre demande est enregistrée. Conservez votre mot de passe : dès que l’administrateur approuve votre compte, vous pourrez vous connecter directement avec cette adresse e-mail et ce mot de passe.')
         setRegistering(false)
-      } else if (mode === 'admin') {
-        await signInAdmin(email, password)
+        setFirstName('')
+        setLastName('')
+        setApplicantType('military')
+        setPassword('')
+        setConfirmPassword('')
       } else {
-        await requestMemberLogin(email)
-        setSuccess('Si cette adresse correspond à un compte validé, un lien de connexion sécurisé vient de vous être envoyé par e-mail.')
+        await signIn(email, password)
       }
     } catch (err) {
-      setError(err.message === 'Invalid login credentials' ? 'Identifiants administrateur incorrects.' : err.message)
+      const message = String(err?.message || '')
+      if (/invalid login credentials/i.test(message)) setError('Adresse e-mail ou mot de passe incorrect.')
+      else if (/email not confirmed/i.test(message)) setError('Cette adresse e-mail n’est pas encore utilisable. Contactez un administrateur.')
+      else setError(message || 'Connexion impossible.')
     } finally {
       setBusy(false)
     }
   }
 
-  return (
-    <div className="login-page">
-      <section className="login-visual">
-        <div className="login-overlay">
-          <div className="brand brand-light">
-            <img src="/danz/Insigne%20CND%20-%20ANTILLES.png" alt="Insigne DANZ Antilles" style={{width:64,height:64,objectFit:'contain',borderRadius:'14px'}} />
-            <div><strong>Amicale DANZ</strong><span>Antilles</span></div>
-          </div>
-          <div className="welcome-copy">
-            <span className="eyebrow">Amicale DANZ Antilles</span>
-            <h1>Espace privé<br />DANZ Antilles</h1>
-            <p>Membres : connectez-vous simplement avec votre adresse e-mail. Le site reconnaît automatiquement votre profil et vos accès.</p>
-          </div>
+  return <div className="login-page">
+    <section className="login-visual">
+      <div className="login-overlay">
+        <div className="brand brand-light">
+          <img src="/danz/Insigne%20CND%20-%20ANTILLES.png" alt="Insigne DANZ Antilles" style={{width:64,height:64,objectFit:'contain',borderRadius:'14px'}} />
+          <div><strong>Amicale DANZ</strong><span>Antilles</span></div>
         </div>
-      </section>
-
-      <section className="login-panel">
-        <form className="login-card" onSubmit={submit}>
-          <div className="mobile-logo">
-            <img src="/danz/Insigne%20CND%20-%20ANTILLES.png" alt="Insigne DANZ Antilles" style={{width:72,height:72,objectFit:'contain'}} />
-          </div>
+        <div className="welcome-copy">
           <span className="eyebrow">Amicale DANZ Antilles</span>
-          <h2>{registering ? 'Demander un accès' : 'Connexion'}</h2>
+          <h1>Espace privé<br />DANZ Antilles</h1>
+          <p>Une seule connexion pour tous : membre ou administrateur, utilisez votre adresse e-mail et votre mot de passe. Les droits sont appliqués automatiquement après identification.</p>
+        </div>
+      </div>
+    </section>
 
-          {!registering && <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'.65rem',margin:'1rem 0 1.25rem'}}>
-            <button type="button" className={mode === 'standard' ? 'primary-button' : 'ghost-button'} style={{marginTop:0}} onClick={() => changeMode('standard')}>Connexion standard</button>
-            <button type="button" className={mode === 'admin' ? 'primary-button' : 'ghost-button'} style={{marginTop:0}} onClick={() => changeMode('admin')}>Connexion admin</button>
-          </div>}
+    <section className="login-panel">
+      <form className="login-card" onSubmit={submit}>
+        <div className="mobile-logo"><img src="/danz/Insigne%20CND%20-%20ANTILLES.png" alt="Insigne DANZ Antilles" style={{width:72,height:72,objectFit:'contain'}} /></div>
+        <span className="eyebrow">Amicale DANZ Antilles</span>
+        <h2>{registering ? 'Demander un accès' : 'Connexion'}</h2>
 
-          {!configured && <div className="alert warning"><strong>Configuration nécessaire.</strong><br />Les variables Supabase doivent être ajoutées avant la première connexion.</div>}
-          {error && <div className="alert error">{error}</div>}
-          {success && <div className="alert">{success}</div>}
+        {!configured && <div className="alert warning"><strong>Configuration nécessaire.</strong><br />Le service d’authentification n’est pas configuré.</div>}
+        {error && <div className="alert error">{error}</div>}
+        {success && <div className="alert">{success}</div>}
 
-          {registering ? (
-            <>
-              <p className="muted">Un seul formulaire suffit. Après validation, le site saura automatiquement si vous êtes militaire, conjoint(e), amicaliste ou non.</p>
+        {registering ? <>
+          <p className="muted">Créez vos identifiants une seule fois. Le compte reste bloqué jusqu’à validation par un administrateur ; après approbation, aucune nouvelle démarche n’est nécessaire.</p>
 
-              <label>Nom
-                <input type="text" required minLength="2" maxLength="80" autoComplete="family-name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
-              </label>
-              <label>Prénom
-                <input type="text" required minLength="2" maxLength="80" autoComplete="given-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-              </label>
-              <label>Situation
-                <select required value={applicantType} onChange={(e) => setApplicantType(e.target.value)}>
-                  <option value="military">Militaire DANZ</option>
-                  <option value="spouse">Conjoint(e)</option>
-                </select>
-              </label>
-              <label>Êtes-vous amicaliste ?
-                <select required value={isAmicaliste} onChange={(e) => setIsAmicaliste(e.target.value)}>
-                  <option value="" disabled>Choisir</option>
-                  <option value="yes">Oui</option>
-                  <option value="no">Non</option>
-                </select>
-              </label>
-              <label>Adresse e-mail
-                <input type="email" required autoComplete="email" placeholder="prenom.nom@exemple.fr" value={email} onChange={(e) => setEmail(e.target.value)} />
-              </label>
+          <label>Nom<input type="text" required minLength="2" maxLength="80" autoComplete="family-name" value={lastName} onChange={(e) => setLastName(e.target.value)} /></label>
+          <label>Prénom<input type="text" required minLength="2" maxLength="80" autoComplete="given-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} /></label>
+          <label>Situation<select required value={applicantType} onChange={(e) => setApplicantType(e.target.value)}><option value="military">Militaire DANZ</option><option value="spouse">Conjoint(e)</option></select></label>
+          <label>Adresse e-mail<input type="email" required autoComplete="email" placeholder="prenom.nom@exemple.fr" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+          <label>Mot de passe<input type="password" required minLength="10" autoComplete="new-password" placeholder="10 caractères minimum" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+          <label>Confirmer le mot de passe<input type="password" required minLength="10" autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} /></label>
+          <p className="login-help">Le statut « amicaliste / non-amicaliste » n’est pas demandé ici : il est géré séparément par les administrateurs. Les informations d’inscription servent uniquement à contrôler l’accès à l’espace privé. <Link to="/confidentialite">Politique de confidentialité</Link>.</p>
+          <button className="primary-button" disabled={busy || !configured}>{busy ? 'Création…' : 'Envoyer ma demande'}</button>
+          <button type="button" className="ghost-button" onClick={showLogin}>J’ai déjà un compte</button>
+        </> : <>
+          <p className="muted">Utilisez les mêmes identifiants quel que soit votre rôle. Si votre compte est administrateur, l’espace Administration apparaîtra automatiquement.</p>
+          <label>Adresse e-mail<input type="email" required autoComplete="email" placeholder="prenom.nom@exemple.fr" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+          <label>Mot de passe<input type="password" required autoComplete="current-password" placeholder="••••••••••" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+          <button className="primary-button" disabled={busy || !configured}>{busy ? 'Connexion…' : 'Se connecter'}</button>
 
-              <p className="login-help">Les informations de ce formulaire servent uniquement à vérifier et gérer votre accès à l’espace privé. <Link to="/confidentialite">Consulter la politique de confidentialité</Link>.</p>
-              <button className="primary-button" disabled={busy || !configured}>{busy ? 'Envoi…' : 'Envoyer ma demande'}</button>
-              <button type="button" className="ghost-button" onClick={() => { setRegistering(false); setMode('standard'); setError(''); setSuccess('') }}>J’ai déjà un compte</button>
-            </>
-          ) : mode === 'admin' ? (
-            <>
-              <h3>Administrateur</h3>
-              <p className="muted">Accès réservé aux administrateurs déjà enregistrés. Connexion avec adresse e-mail et mot de passe.</p>
+          <div style={{marginTop:'1.4rem',paddingTop:'1.2rem',borderTop:'1px solid #dce5e2'}}>
+            <strong style={{display:'block',marginBottom:'.3rem'}}>Première visite ?</strong>
+            <p className="muted" style={{marginBottom:'.7rem'}}>Créez votre compte et choisissez votre mot de passe. L’accès sera ouvert dès validation par un administrateur.</p>
+            <button type="button" className="secondary-button" onClick={showRegistration}>Demander un accès</button>
+          </div>
+        </>}
 
-              <label>Adresse e-mail
-                <input type="email" required autoComplete="email" placeholder="prenom.nom@exemple.fr" value={email} onChange={(e) => setEmail(e.target.value)} />
-              </label>
-              <label>Mot de passe
-                <input type="password" required autoComplete="current-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
-              </label>
-
-              <button className="primary-button" disabled={busy || !configured}>{busy ? 'Connexion…' : 'Se connecter comme admin'}</button>
-              <p className="login-help">Les droits administrateur ne sont pas demandés depuis cette page : ils sont attribués par un administrateur existant.</p>
-            </>
-          ) : (
-            <>
-              <h3>Membre</h3>
-              <p className="muted">Saisissez uniquement votre adresse e-mail. Si votre compte a été validé, vous recevrez un lien sécurisé de connexion.</p>
-
-              <label>Adresse e-mail
-                <input type="email" required autoComplete="email" placeholder="prenom.nom@exemple.fr" value={email} onChange={(e) => setEmail(e.target.value)} />
-              </label>
-
-              <button className="primary-button" disabled={busy || !configured}>{busy ? 'Envoi…' : 'Recevoir mon lien de connexion'}</button>
-
-              <div style={{marginTop:'1.4rem',paddingTop:'1.2rem',borderTop:'1px solid #dce5e2'}}>
-                <strong style={{display:'block',marginBottom:'.3rem'}}>Première visite ?</strong>
-                <p className="muted" style={{marginBottom:'.7rem'}}>Demandez votre accès une seule fois. Un administrateur validera ensuite votre compte.</p>
-                <button type="button" className="secondary-button" onClick={() => { setRegistering(true); setError(''); setSuccess(''); setEmail('') }}>Demander un accès</button>
-              </div>
-            </>
-          )}
-
-          <p className="login-help" style={{textAlign:'center',marginTop:'1.2rem'}}><Link to="/confidentialite">Confidentialité et données personnelles</Link></p>
-        </form>
-      </section>
-    </div>
-  )
+        <p className="login-help" style={{textAlign:'center',marginTop:'1.2rem'}}><Link to="/confidentialite">Confidentialité et données personnelles</Link></p>
+      </form>
+    </section>
+  </div>
 }
