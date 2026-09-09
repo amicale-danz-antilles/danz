@@ -54,8 +54,9 @@ export default function AdminRequests() {
 
   const tools = [
     ['/administration/utilisateurs', '🛡️', 'Utilisateurs & RGPD', 'Activer, suspendre ou supprimer un compte et consulter le journal des accès.'],
+    ['/administration/sauvegardes', '💾', 'Sauvegardes & exports', 'Télécharger une sauvegarde de reprise et des exports CSV de contrôle.'],
     ['/administration/contenus', '✍️', 'Publications', 'Créer, modifier ou supprimer une actualité ou un événement.'],
-    ['/administration/galerie', '🖼️', 'Albums & médias', 'Ajouter des photos ou vidéos à n’importe quel événement, même ancien.'],
+    ['/administration/galerie', '🖼️', 'Albums & téléchargements', 'Une miniature par événement et un lien WeTransfer pour les albums volumineux.'],
     ['/administration/bons-plans', '⭐', 'Bons plans', 'Valider les propositions, ajouter, corriger ou retirer une fiche.'],
     ['/administration/sondages', '✓', 'Sondages', 'Créer, clôturer ou supprimer les sondages.'],
     ['/administration/bureau', '👥', 'Bureau', 'Renseigner ou modifier les membres du bureau.'],
@@ -63,7 +64,7 @@ export default function AdminRequests() {
   ]
 
   return <div className="admin-hub">
-    <PageTitle eyebrow="Espace réservé" title="Administration" text="Toutes les créations, validations, modifications et décisions d’accès du site sont regroupées ici afin de garder les pages membres propres, traçables et de limiter les fausses manipulations." />
+    <PageTitle eyebrow="Espace réservé" title="Administration" text="Toutes les créations, validations, modifications, sauvegardes et décisions d’accès du site sont regroupées ici afin de garder les pages membres propres, traçables et de limiter les fausses manipulations." />
 
     <section>
       <div className="admin-section-heading"><div><span className="eyebrow">Gestion du site</span><h2>Que voulez-vous administrer ?</h2></div></div>
