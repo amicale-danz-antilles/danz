@@ -3,7 +3,7 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { clearOfflineData, readOfflineData, saveOfflineData } from '../lib/offlineCache.js'
 
 const AuthContext = createContext(null)
-const PROFILE_FIELDS = 'id, full_name, email, role, active, access_type, applicant_type, is_amicaliste'
+const PROFILE_FIELDS = '*'
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
