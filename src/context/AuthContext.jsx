@@ -95,7 +95,7 @@ export function AuthProvider({ children }) {
       setProfile(accountProfile)
       setSession(data.session)
     },
-    requestMembership: async ({ firstName, lastName, applicantType, isAmicaliste, email, password }) => {
+    requestMembership: async ({ firstName, lastName, applicantType, email, password }) => {
       if (!supabase) throw new Error('Supabase n’est pas encore configuré.')
       const normalizedEmail = email.trim().toLowerCase()
       const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
@@ -116,8 +116,8 @@ export function AuthProvider({ children }) {
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         applicant_type: applicantType === 'spouse' ? 'spouse' : 'military',
-        is_amicaliste: isAmicaliste === true,
-        requested_access: applicantType === 'spouse' ? 'amicaliste' : 'personnel_danz',
+        is_amicaliste: false,
+        requested_access: 'member',
         email: normalizedEmail,
         status: 'pending',
       })
