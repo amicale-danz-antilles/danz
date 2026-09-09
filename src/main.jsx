@@ -6,6 +6,7 @@ import AppErrorBoundary from './components/AppErrorBoundary.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import './styles.css'
 import './quality.css'
+import './home-app.css'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
