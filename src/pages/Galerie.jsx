@@ -40,10 +40,7 @@ export default function Galerie(){
     if(eventsResult.error)setError(eventsResult.error.message)
     const rows = albumsResult.data || []
     const urls = await resolvePrivateMediaBatch(rows,{entity:'album',fallbackBucket:'gallery'})
-    setAlbums(rows)
-    setEvents(eventsResult.data || [])
-    setCoverUrls(urls)
-    setLoading(false)
+    setAlbums(rows); setEvents(eventsResult.data || []); setCoverUrls(urls); setLoading(false)
   }
 
   useEffect(()=>{load()},[adminMode])
@@ -85,36 +82,20 @@ export default function Galerie(){
         updated_at: new Date().toISOString(),
       }
       if(!editingAlbum)payload.created_by=user.id
-
       if(coverFile){
         const optimized = await optimizeImageFile(coverFile,{maxDimension:1280,quality:.8})
         uploaded = await uploadPrivateMedia(optimized,{scope:'gallery',parentId:editEventId,fallbackBucket:'gallery'})
-        Object.assign(payload,{
-          storage_provider:uploaded.storage_provider,
-          storage_path:uploaded.storage_path,
-          image_url:null,
-          mime_type:optimized.type,
-          file_size:optimized.size,
-          source_gallery_id:null,
-        })
+        Object.assign(payload,{storage_provider:uploaded.storage_provider,storage_path:uploaded.storage_path,image_url:null,mime_type:optimized.type,file_size:optimized.size,source_gallery_id:null})
       }
-
       const {error:upsertError} = await supabase.from('event_albums').upsert(payload,{onConflict:'event_id'})
       if(upsertError)throw upsertError
-
-      if(coverFile && editingAlbum?.storage_path && editingAlbum.source_gallery_id == null){
-        await removePrivateMedia(editingAlbum,{fallbackBucket:'gallery'})
-      }
-
+      if(coverFile && editingAlbum?.storage_path && editingAlbum.source_gallery_id == null)await removePrivateMedia(editingAlbum,{fallbackBucket:'gallery'})
       setCoverFile(null)
       const input=document.getElementById('album-cover-file'); if(input)input.value=''
       setSuccess('Album enregistré. Le site ne stocke que sa miniature ; le téléchargement complet reste externe.')
       setSearchParams({event:editEventId})
       await load()
-    }catch(err){
-      if(uploaded)await removePrivateMedia(uploaded,{fallbackBucket:'gallery'})
-      setError(err.message||'Impossible d’enregistrer cet album.')
-    }finally{setSaving(false)}
+    }catch(err){if(uploaded)await removePrivateMedia(uploaded,{fallbackBucket:'gallery'});setError(err.message||'Impossible d’enregistrer cet album.')}finally{setSaving(false)}
   }
 
   const deleteAlbum = async album => {
@@ -136,12 +117,7 @@ export default function Galerie(){
     {adminMode&&<>
       <div style={{marginBottom:'1rem'}}><Link className="ghost-button" to="/administration">← Administration</Link></div>
       <section className="gallery-upload-panel light-album-admin">
-        <div>
-          <span className="eyebrow">Administration</span><h2>Album léger</h2>
-          <p>1. Créez votre transfert complet sur WeTransfer. 2. Copiez le lien. 3. Ajoutez ici uniquement une miniature et ce lien.</p>
-          <div className="privacy-note"><strong>Photos privées :</strong> protégez de préférence le transfert par mot de passe ou restriction d’e-mail et transmettez le mot de passe séparément. Ne l’enregistrez pas dans le site.</div>
-          <a className="secondary-button external-album-link" href="https://wetransfer.com/" target="_blank" rel="noopener noreferrer">Ouvrir WeTransfer ↗</a>
-        </div>
+        <div><span className="eyebrow">Administration</span><h2>Album léger</h2><p>1. Créez votre transfert complet sur WeTransfer. 2. Copiez le lien. 3. Ajoutez ici uniquement une miniature et ce lien.</p><div className="privacy-note"><strong>Expiration :</strong> à la date indiquée, le bouton de téléchargement disparaît automatiquement pour les membres. Seule la miniature reste consultable jusqu’à ce que vous remplaciez ou supprimiez l’album.</div><a className="secondary-button external-album-link" href="https://wetransfer.com/" target="_blank" rel="noopener noreferrer">Ouvrir WeTransfer ↗</a></div>
         <form onSubmit={saveAlbum}>
           <label>Événement<select required value={editEventId} onChange={e=>setEditEventId(e.target.value)}><option value="">Choisir un événement…</option>{events.map(item=><option key={item.id} value={item.id}>{formatDate(item.starts_at)} — {item.title}</option>)}</select></label>
           <label>Miniature {editingAlbum?'(laisser vide pour conserver l’actuelle)':'(obligatoire)'}<input id="album-cover-file" type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>setCoverFile(e.target.files?.[0]||null)}/></label>
@@ -162,11 +138,10 @@ export default function Galerie(){
       <button type="button" className="secondary-button" onClick={()=>setSearchParams({})}>← Tous les albums</button>
       <div className="light-album-hero">
         <div className="light-album-cover">{coverFor(selectedAlbum)?<img src={coverFor(selectedAlbum)} alt=""/>:<span>📷</span>}</div>
-        <div className="light-album-copy"><span className="eyebrow">Album événement</span><h2>{selectedAlbum.event?.title||'Album'}</h2>{selectedAlbum.event?.starts_at&&<p>📅 {formatDate(selectedAlbum.event.starts_at)}</p>}{selectedAlbum.event?.location&&<p>📍 {selectedAlbum.event.location}</p>}{selectedAlbum.item_count!=null&&<p>📷 {selectedAlbum.item_count} média{selectedAlbum.item_count>1?'s':''}</p>}{selectedAlbum.event?.description&&<p className="gallery-album-description">{selectedAlbum.event.description}</p>}
-          {selectedAlbum.download_note&&<div className="privacy-note">{selectedAlbum.download_note}</div>}
-          {selectedAlbum.transfer_url ? isExpired(selectedAlbum) ? <div className="alert warning"><strong>Lien arrivé à expiration.</strong><br/>L’administrateur doit renouveler le transfert avant le téléchargement.</div> : <><a className="primary-button album-download-button" href={selectedAlbum.transfer_url} target="_blank" rel="noopener noreferrer">Télécharger l’album complet ↗</a>{selectedAlbum.transfer_expires_at&&<small className="album-expiry">Disponible jusqu’au {formatDate(selectedAlbum.transfer_expires_at)}</small>}</> : <div className="empty-state compact-empty">Le téléchargement complet de cet album n’est pas encore publié.</div>}
+        <div className="light-album-copy">
+          {isExpired(selectedAlbum)?<><span className="eyebrow">Album expiré</span><h2>{selectedAlbum.event?.title||'Album'}</h2>{selectedAlbum.event?.starts_at&&<p>📅 {formatDate(selectedAlbum.event.starts_at)}</p>}<div className="alert warning"><strong>Lien expiré.</strong><br/>Le contenu complet n’est plus accessible. La miniature reste visible jusqu’au renouvellement éventuel du transfert.</div></>:<><span className="eyebrow">Album événement</span><h2>{selectedAlbum.event?.title||'Album'}</h2>{selectedAlbum.event?.starts_at&&<p>📅 {formatDate(selectedAlbum.event.starts_at)}</p>}{selectedAlbum.event?.location&&<p>📍 {selectedAlbum.event.location}</p>}{selectedAlbum.item_count!=null&&<p>📷 {selectedAlbum.item_count} média{selectedAlbum.item_count>1?'s':''}</p>}{selectedAlbum.event?.description&&<p className="gallery-album-description">{selectedAlbum.event.description}</p>}{selectedAlbum.download_note&&<div className="privacy-note">{selectedAlbum.download_note}</div>}{selectedAlbum.transfer_url?<><a className="primary-button album-download-button" href={selectedAlbum.transfer_url} target="_blank" rel="noopener noreferrer">Télécharger l’album complet ↗</a>{selectedAlbum.transfer_expires_at&&<small className="album-expiry">Disponible jusqu’au {formatDate(selectedAlbum.transfer_expires_at)}</small>}</>:<div className="empty-state compact-empty">Le téléchargement complet de cet album n’est pas encore publié.</div>}</>}
         </div>
       </div>
-    </section>:albums.length?<div className="gallery-album-grid">{albums.map(album=><button type="button" className="gallery-album-card" key={album.id} onClick={()=>setSearchParams({event:album.event_id})}><div className="gallery-album-cover">{coverFor(album)?<img src={coverFor(album)} alt="" loading="lazy" decoding="async"/>:<span>📷</span>}<div className="gallery-album-count">{album.item_count!=null?`${album.item_count} média${album.item_count>1?'s':''}`:'Album'}</div>{album.transfer_url&&isExpired(album)&&<div className="album-expired-badge">Lien expiré</div>}</div><div className="gallery-album-info"><strong>{album.event?.title||'Album'}</strong>{album.event?.starts_at&&<span>{formatDate(album.event.starts_at)}</span>}<small>{album.transfer_url&&!isExpired(album)?'Téléchargement disponible →':'Voir l’album →'}</small></div></button>)}</div>:<div className="empty-state">Aucun album partagé pour votre profil.</div>}
+    </section>:albums.length?<div className="gallery-album-grid">{albums.map(album=>{const expired=isExpired(album);return <button type="button" className="gallery-album-card" key={album.id} onClick={()=>setSearchParams({event:album.event_id})}><div className="gallery-album-cover">{coverFor(album)?<img src={coverFor(album)} alt="" loading="lazy" decoding="async"/>:<span>📷</span>}<div className="gallery-album-count">{album.item_count!=null?`${album.item_count} média${album.item_count>1?'s':''}`:'Album'}</div>{expired&&<div className="album-expired-badge">Lien expiré</div>}</div><div className="gallery-album-info"><strong>{album.event?.title||'Album'}</strong>{album.event?.starts_at&&<span>{formatDate(album.event.starts_at)}</span>}<small>{expired?'Lien expiré':album.transfer_url?'Téléchargement disponible →':'Voir l’album →'}</small></div></button>})}</div>:<div className="empty-state">Aucun album partagé pour votre profil.</div>}
   </>
 }
