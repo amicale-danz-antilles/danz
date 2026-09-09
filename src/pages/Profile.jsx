@@ -107,8 +107,9 @@ export default function Profile() {
 
   const roleLabel = isAdmin ? 'Administrateur' : 'Membre'
   const memberTags = []
-  if (profile?.applicant_type === 'military') memberTags.push('Militaire DANZ')
-  if (profile?.applicant_type === 'spouse') memberTags.push('Conjoint(e)')
+  if (profile?.applicant_type === 'spouse') memberTags.push('Conjoint(e) militaire DANZ')
+  else if (profile?.applicant_type === 'military' && profile?.military_reference === 'other') memberTags.push('Militaire hors DANZ')
+  else if (profile?.applicant_type === 'military') memberTags.push('Militaire DANZ')
   if (profile?.is_amicaliste === true) memberTags.push('Amicaliste')
   else if (profile?.is_amicaliste === false) memberTags.push('Non-amicaliste')
 
