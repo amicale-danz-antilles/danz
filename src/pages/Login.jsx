@@ -10,7 +10,7 @@ export default function Login() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
-  const [applicantType, setApplicantType] = useState('military')
+  const [applicantType, setApplicantType] = useState('danz_military')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [busy, setBusy] = useState(false)
@@ -55,7 +55,7 @@ export default function Login() {
         setRegistering(false)
         setFirstName('')
         setLastName('')
-        setApplicantType('military')
+        setApplicantType('danz_military')
         setPassword('')
         setConfirmPassword('')
       } else {
@@ -101,11 +101,11 @@ export default function Login() {
 
           <label>Nom<input type="text" required minLength="2" maxLength="80" autoComplete="family-name" value={lastName} onChange={(e) => setLastName(e.target.value)} /></label>
           <label>Prénom<input type="text" required minLength="2" maxLength="80" autoComplete="given-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} /></label>
-          <label>Situation<select required value={applicantType} onChange={(e) => setApplicantType(e.target.value)}><option value="military">Militaire DANZ</option><option value="spouse">Conjoint(e)</option></select></label>
+          <label>Situation<select required value={applicantType} onChange={(e) => setApplicantType(e.target.value)}><option value="danz_military">Militaire de la DANZ</option><option value="military_other">Militaire hors DANZ</option><option value="spouse">Conjoint(e) d’un militaire de la DANZ</option></select></label>
           <label>Adresse e-mail<input type="email" required autoComplete="email" placeholder="prenom.nom@exemple.fr" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
           <label>Mot de passe<input type="password" required minLength="10" autoComplete="new-password" placeholder="10 caractères minimum" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
           <label>Confirmer le mot de passe<input type="password" required minLength="10" autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} /></label>
-          <p className="login-help">Le statut « amicaliste / non-amicaliste » n’est pas demandé ici : il est géré séparément par les administrateurs. Les informations d’inscription servent uniquement à contrôler l’accès à l’espace privé. <Link to="/confidentialite">Politique de confidentialité</Link>.</p>
+          <p className="login-help">Le statut « amicaliste / non-amicaliste » et le suivi de cotisation sont gérés séparément par les administrateurs. La situation déclarée sert à identifier correctement le demandeur. <Link to="/confidentialite">Politique de confidentialité</Link>.</p>
           <button className="primary-button" disabled={busy || !configured}>{busy ? 'Création…' : 'Envoyer ma demande'}</button>
           <button type="button" className="ghost-button" onClick={showLogin}>J’ai déjà un compte</button>
         </> : <>
