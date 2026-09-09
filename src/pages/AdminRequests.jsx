@@ -53,6 +53,7 @@ export default function AdminRequests() {
   }
 
   const tools = [
+    ['/administration/systeme', '◉', 'État du système', 'Vérifier les services, volumes de données, sauvegardes et synchronisation hors ligne.'],
     ['/administration/utilisateurs', '🛡️', 'Utilisateurs & RGPD', 'Activer, suspendre ou supprimer un compte et consulter le journal des accès.'],
     ['/administration/sauvegardes', '💾', 'Sauvegardes & exports', 'Télécharger une sauvegarde de reprise et des exports CSV de contrôle.'],
     ['/administration/contenus', '✍️', 'Publications', 'Créer, modifier ou supprimer une actualité ou un événement.'],
