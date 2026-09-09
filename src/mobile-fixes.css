@@ -1,0 +1,61 @@
+html,body,#root{width:100%;max-width:100%;overflow-x:hidden}.app-shell,.main-column,.page,.public-surface,.admin-surface{min-width:0;max-width:100%}img,video,canvas,svg,iframe{max-width:100%}input,select,textarea,button{min-width:0;max-width:100%}.page>*{min-width:0}.card-grid>* ,.gallery-album-grid>* ,.home-editorial-grid>* ,.home-spotlight-grid>* ,.admin-hub-grid>* ,.admin-user-stats>*{min-width:0}
+
+@media(max-width:900px){
+ .sidebar{width:min(86vw,300px);padding:20px 16px;z-index:100;box-shadow:18px 0 45px rgba(7,31,38,.22)}
+ .sidebar nav{margin-top:24px;gap:4px;overflow-y:auto;overscroll-behavior:contain}
+ .sidebar nav a{padding:11px 12px}
+ .sidebar-footer{padding-top:14px}
+ .backdrop{z-index:90;background:rgba(8,28,34,.46)}
+ .topbar{height:64px;padding:0 14px}
+ .topbar>div{min-width:0;overflow:hidden}
+ .topbar strong,.topbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .page{width:100%;max-width:760px;padding:22px 16px 48px}
+ .main-column footer{padding:16px 16px 24px}
+ .page-title{margin-bottom:24px}
+ .page-title h1{font-size:clamp(32px,9vw,40px);line-height:1.05}
+ .page-title p{font-size:14px;line-height:1.55}
+ .text-panel,.profile-card,.content-card,.article-card,.timeline-card{max-width:100%}
+}
+
+@media(max-width:620px){
+ .page{padding:18px 12px 42px}
+ .topbar{padding:0 10px}
+ .menu-button{margin-right:9px;font-size:22px}
+ .home-app-header{gap:12px;padding:16px 14px!important;border-radius:18px!important}
+ .home-app-header h1{font-size:26px!important;max-width:none!important}
+ .home-app-header p{max-width:none!important}
+ .home-app-mark{width:50px!important;height:50px!important;flex:0 0 50px}
+ .home-app-actions{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important}
+ .home-app-actions a{display:flex!important;justify-content:flex-start!important;text-align:left!important;min-height:58px!important;padding:9px 10px!important}
+ .home-app-actions strong{font-size:11px!important}
+ .home-spotlight-grid,.home-editorial-grid,.compact-grid{grid-template-columns:1fr!important}
+ .home-app-dashboard .home-spotlight-grid .home-editorial-card,.home-app-dashboard .compact-grid .home-editorial-card{grid-template-columns:34% minmax(0,1fr)!important;width:100%;min-height:118px!important}
+ .home-app-dashboard .home-spotlight-grid .home-tile-body,.home-app-dashboard .compact-grid .home-tile-body{min-width:0;padding:9px 10px!important}
+ .home-tile-body h3,.home-app-dashboard .home-spotlight-grid .home-tile-body h3,.home-app-dashboard .compact-grid .home-tile-body h3{overflow-wrap:anywhere;font-size:15px!important}
+ .home-tile-body p{overflow-wrap:anywhere}
+ .home-detail-backdrop,.gallery-viewer-backdrop{padding:0!important}
+ .home-detail-modal,.gallery-viewer{width:100%!important;max-width:100%!important}
+ .gallery-upload-panel{grid-template-columns:1fr!important;padding:14px!important}
+ .gallery-album-grid{grid-template-columns:1fr!important}
+ .admin-hub-grid,.admin-user-stats,.backup-grid{grid-template-columns:1fr!important}
+ .admin-user-edit{grid-template-columns:1fr!important}
+ .timeline-item{grid-template-columns:52px minmax(0,1fr)!important;gap:8px!important}
+ .timeline-card{padding:16px!important;min-width:0}
+ .timeline-date strong{font-size:27px}
+ .event-cover-image{width:calc(100% + 32px)!important;margin:-16px -16px 16px!important}
+ .calendar-quick-add{flex-wrap:wrap}
+ .document-row{grid-template-columns:1fr!important}
+ .document-row .file-icon{display:none}
+ .primary-button,.secondary-button,.ghost-button{overflow-wrap:anywhere}
+ form{min-width:0}
+ label{min-width:0}
+ input,select,textarea{width:100%!important}
+}
+
+@media(max-width:360px){
+ .page{padding-left:10px;padding-right:10px}
+ .home-app-header{padding:14px 12px!important}
+ .home-app-mark{width:44px!important;height:44px!important;flex-basis:44px}
+ .home-app-status-row span{white-space:normal}
+ .home-app-dashboard .home-spotlight-grid .home-editorial-card,.home-app-dashboard .compact-grid .home-editorial-card{grid-template-columns:31% minmax(0,1fr)!important}
+}
