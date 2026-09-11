@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { readOfflineEntry } from '../../lib/offlineCache.js'
@@ -6,18 +6,55 @@ import { PageTitle } from '../Actualites.jsx'
 import '../../home-refactor.css'
 import '../../offline-v2.css'
 
+const PRIVATE_MEDIA_CACHE = 'danz-private-thumbs-v2'
 const formatDate = (value) => value ? new Date(value).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
 const trimText = (value, max = 150) => { const text = String(value || '').trim(); return text.length > max ? `${text.slice(0, max).trim()}…` : text }
 
 export default function OfflineDashboard() {
   const { user, profile } = useAuth()
-  const entry = readOfflineEntry(user?.id, 'dashboard-rich') || readOfflineEntry(user?.id, 'dashboard')
+  const entry = useMemo(() => readOfflineEntry(user?.id, 'dashboard-rich') || readOfflineEntry(user?.id, 'dashboard'), [user?.id])
+  const albumsEntry = useMemo(() => readOfflineEntry(user?.id, 'albums'), [user?.id])
   const data = entry?.data || { news: [], events: [], bureau: [] }
   const [detail, setDetail] = useState(null)
+  const [newsCoverMap, setNewsCoverMap] = useState({})
+
+  const albumByEvent = useMemo(() => new Map((albumsEntry?.data || []).map((album) => [album.event_id, album])), [albumsEntry])
+  const events = useMemo(() => (data.events || []).map((event) => {
+    const localAlbum = albumByEvent.get(event.id)
+    return {
+      ...event,
+      cover: event.cover || localAlbum?.offline_thumb || null,
+      album: event.album || (localAlbum ? { id: localAlbum.id, event_id: localAlbum.event_id, item_count: localAlbum.item_count, transfer_expires_at: localAlbum.transfer_expires_at } : null),
+    }
+  }), [data.events, albumByEvent])
+  const news = useMemo(() => (data.news || []).slice(0, 6).map((item) => ({ ...item, cover: item.cover || newsCoverMap[item.id] || null })), [data.news, newsCoverMap])
+
+  useEffect(() => {
+    if (!user?.id || !('caches' in window)) return undefined
+    let cancelled = false
+    const restoreCachedNewsCovers = async () => {
+      try {
+        const cache = await caches.open(PRIVATE_MEDIA_CACHE)
+        const requests = await cache.keys()
+        const restored = {}
+        for (const item of data.news || []) {
+          if (item.cover) continue
+          const coverAsset = (item.assets || []).find((asset) => asset.is_cover)
+          if (!coverAsset) continue
+          const prefix = `/danz/offline-media/${encodeURIComponent(user.id)}/news/${encodeURIComponent(coverAsset.id)}-`
+          const request = requests.find((candidate) => new URL(candidate.url).pathname.startsWith(prefix))
+          if (request) restored[item.id] = new URL(request.url).pathname
+        }
+        if (!cancelled) setNewsCoverMap(restored)
+      } catch {}
+    }
+    restoreCachedNewsCovers()
+    return () => { cancelled = true }
+  }, [user?.id, data.news])
+
   const now = Date.now()
-  const future = useMemo(() => (data.events || []).filter((event) => new Date(event.starts_at).getTime() >= now).slice(0, 4), [data.events])
-  const recent = useMemo(() => (data.events || []).filter((event) => new Date(event.starts_at).getTime() < now).sort((a, b) => new Date(b.starts_at) - new Date(a.starts_at)).slice(0, 4), [data.events])
-  const news = (data.news || []).slice(0, 6)
+  const future = useMemo(() => events.filter((event) => new Date(event.starts_at).getTime() >= now).slice(0, 4), [events, now])
+  const recent = useMemo(() => events.filter((event) => new Date(event.starts_at).getTime() < now).sort((a, b) => new Date(b.starts_at) - new Date(a.starts_at)).slice(0, 4), [events, now])
 
   return <div className="home-dashboard home-dashboard-compact">
     <PageTitle eyebrow="Mode hors ligne" title={profile?.full_name ? `Bonjour ${profile.full_name}` : 'Accueil'} text="Les dernières informations synchronisées restent consultables sans réseau." />
