@@ -34,9 +34,8 @@ async function syncRecord(record, userId) {
       status: 'pending',
     }
     const result = await supabase.from('good_deal_submissions').insert(payload)
-    // La clé primaire UUID de la file est réutilisée côté serveur : si la première
-    // requête a réussi mais que sa réponse s'est perdue, un doublon signifie que
-    // la proposition est déjà enregistrée et peut être considérée comme synchronisée.
+    // Même UUID côté client et côté serveur : une réponse perdue après insertion
+    // ne peut pas créer de doublon lors de la tentative suivante.
     if (result.error?.code === '23505') return { data: null, error: null }
     return result
   }
@@ -61,11 +60,6 @@ export default function OfflineMutationSync({ userId }) {
 
       for (const record of records) {
         if (cancelled) return
-        if (record.status === 'error' && Number(record.attempts || 0) >= 3) {
-          failed += 1
-          continue
-        }
-
         try {
           const result = await syncRecord(record, userId)
           if (!result?.error) {
