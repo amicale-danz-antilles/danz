@@ -1,0 +1,19 @@
+/* Correctif desktop : empêcher le média des cartes de forcer la largeur de la grille. */
+@media (min-width: 681px) {
+  .home-app-dashboard .home-spotlight-grid .home-editorial-card {
+    grid-template-columns: minmax(0, 38%) minmax(0, 1fr);
+    min-height: 172px;
+  }
+
+  .home-app-dashboard .home-spotlight-grid .home-tile-media {
+    aspect-ratio: auto;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+  }
+
+  .home-app-dashboard .home-spotlight-grid .home-tile-body {
+    min-width: 0;
+    overflow: hidden;
+  }
+}
