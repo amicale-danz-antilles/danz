@@ -12,6 +12,8 @@ import Galerie from './pages/Galerie.jsx'
 import BonsPlans from './pages/BonsPlans.jsx'
 import Sondages from './pages/Sondages.jsx'
 import Profile from './pages/Profile.jsx'
+import OfflineDashboard from './pages/offline/OfflineDashboard.jsx'
+import OfflineAgenda from './pages/offline/OfflineAgenda.jsx'
 import OfflineGalerie from './pages/offline/OfflineGalerie.jsx'
 import OfflineBonsPlans from './pages/offline/OfflineBonsPlans.jsx'
 import OfflineSondages from './pages/offline/OfflineSondages.jsx'
@@ -60,8 +62,8 @@ export default function App() {
     <Route path="/connexion" element={<Login />} />
     <Route path="/confidentialite" element={<Privacy />} />
     <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-      <Route index element={<Dashboard />} />
-      <Route path="agenda" element={<Agenda />} />
+      <Route index element={<OfflineAware online={Dashboard} offline={OfflineDashboard} />} />
+      <Route path="agenda" element={<OfflineAware online={Agenda} offline={OfflineAgenda} />} />
       <Route path="sondages" element={<OfflineAware online={Sondages} offline={OfflineSondages} />} />
       <Route path="galerie" element={<OfflineAware online={Galerie} offline={OfflineGalerie} />} />
       <Route path="bons-plans" element={<OfflineAware online={BonsPlans} offline={OfflineBonsPlans} />} />
