@@ -1,0 +1,32 @@
+name: Vérifications qualité et sécurité
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 22
+      - name: Installer les dépendances
+        run: npm install --no-fund --no-audit
+      - name: Construire l'application
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://axewfeanyfxkzercafen.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_MknXpC-LmMbjHfv2ALiVag_km2DNMMw
+      - name: Audit des dépendances
+        run: npm audit --audit-level=high
