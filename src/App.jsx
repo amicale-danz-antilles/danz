@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
@@ -12,15 +12,22 @@ import Galerie from './pages/Galerie.jsx'
 import BonsPlans from './pages/BonsPlans.jsx'
 import Sondages from './pages/Sondages.jsx'
 import Profile from './pages/Profile.jsx'
-import Amicale from './pages/Amicale.jsx'
-import AdminRequests from './pages/AdminRequests.jsx'
-import AdminContent from './pages/AdminContent.jsx'
-import AdminUsers from './pages/AdminUsers.jsx'
-import AdminBackup from './pages/AdminBackup.jsx'
-import AdminSystemStatus from './pages/AdminSystemStatus.jsx'
 import OfflineGalerie from './pages/offline/OfflineGalerie.jsx'
 import OfflineBonsPlans from './pages/offline/OfflineBonsPlans.jsx'
 import OfflineSondages from './pages/offline/OfflineSondages.jsx'
+
+// Les écrans membre sont inclus dans le shell PWA pour rester ouvrables hors ligne.
+// Les écrans d'administration, volontairement online-only, restent découpés à la demande.
+const Amicale = lazy(() => import('./pages/Amicale.jsx'))
+const AdminRequests = lazy(() => import('./pages/AdminRequests.jsx'))
+const AdminContent = lazy(() => import('./pages/AdminContent.jsx'))
+const AdminUsers = lazy(() => import('./pages/AdminUsers.jsx'))
+const AdminBackup = lazy(() => import('./pages/AdminBackup.jsx'))
+const AdminSystemStatus = lazy(() => import('./pages/AdminSystemStatus.jsx'))
+
+function PageLoader() {
+  return <div className="route-loader" role="status" aria-live="polite"><span className="route-loader-spinner" /><span>Chargement…</span></div>
+}
 
 function OfflineAware({ online: OnlineComponent, offline: OfflineComponent }) {
   const online = useOnlineStatus()
@@ -46,7 +53,7 @@ function AdminOnly({ children }) {
   return isAdmin ? children : <Navigate to="/" replace />
 }
 
-const adminOnline = (element) => <AdminOnly><OnlineOnly>{element}</OnlineOnly></AdminOnly>
+const adminOnline = (element) => <AdminOnly><OnlineOnly><Suspense fallback={<PageLoader />}>{element}</Suspense></OnlineOnly></AdminOnly>
 
 export default function App() {
   return <Routes>
