@@ -1,15 +1,10 @@
-const CACHE_NAME = 'danz-shell-v12'
+const CACHE_NAME = 'danz-shell-v13'
 const THUMB_CACHE = 'danz-private-thumbs-v2'
 const APP_ROOT = '/danz/'
+const ORIGINAL_ICON = '/danz/amicale-danz-icon.png?v=original-20260911'
 const STATIC_URLS = [
-  '/danz/manifest.webmanifest',
-  '/danz/favicon-v6.png',
-  '/danz/apple-touch-icon-v6.png',
-  '/danz/icon-192-v6.png',
-  '/danz/icon-512-v6.png',
-  '/danz/icon-maskable-192-v6.png',
-  '/danz/icon-maskable-512-v6.png',
-  '/danz/amicale-danz-icon.png',
+  '/danz/manifest.webmanifest?v=original-20260911',
+  ORIGINAL_ICON,
 ]
 
 async function precacheAppShell() {
@@ -114,8 +109,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'Amicale DANZ Antilles'
   const options = {
     body: data.body || 'Nouvelle information disponible.',
-    icon: '/danz/icon-192-v6.png',
-    badge: '/danz/icon-192-v6.png',
+    icon: ORIGINAL_ICON,
+    badge: ORIGINAL_ICON,
     tag: data.type ? `danz-${data.type}` : 'danz-notification',
     data: { url: data.url || '/danz/#/' },
   }
