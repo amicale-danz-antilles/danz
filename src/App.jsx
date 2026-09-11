@@ -75,7 +75,7 @@ export default function App() {
       <Route path="administration/sauvegardes" element={adminOnline(<AdminBackup />)} />
       <Route path="administration/systeme" element={adminOnline(<AdminSystemStatus />)} />
       <Route path="administration/contenus" element={adminOnline(<AdminContent />)} />
-      <Route path="administration/galerie" element={adminOnline(<Galerie />)} />
+      <Route path="administration/galerie" element={<Navigate to="/administration/contenus?type=albums" replace />} />
       <Route path="administration/bons-plans" element={adminOnline(<BonsPlans />)} />
       <Route path="administration/sondages" element={adminOnline(<Sondages />)} />
       <Route path="administration/bureau" element={adminOnline(<Amicale />)} />
