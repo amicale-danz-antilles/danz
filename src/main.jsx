@@ -10,6 +10,7 @@ import './home-app.css'
 import './mobile-fixes.css'
 import './quality-v2.css'
 import './offline-hardening.css'
+import './desktop-home-fix.css'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
