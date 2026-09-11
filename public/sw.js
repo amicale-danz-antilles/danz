@@ -1,4 +1,4 @@
-const CACHE_NAME='danz-shell-v8'
+const CACHE_NAME='danz-shell-v9'
 const THUMB_CACHE='danz-private-thumbs-v2'
 const STATIC_URLS=[
   '/danz/',
@@ -36,8 +36,8 @@ self.addEventListener('fetch',(event)=>{
   if(request.mode==='navigate'){
     event.respondWith((async()=>{
       try{
-        const response=await fetch(request)
-        if(response.ok){const cache=await caches.open(CACHE_NAME);cache.put('/danz/',response.clone())}
+        const response=await fetch(request,{cache:'no-store'})
+        if(response.ok){const cache=await caches.open(CACHE_NAME);await cache.put('/danz/',response.clone())}
         return response
       }catch(_){
         return (await caches.match('/danz/'))||Response.error()
@@ -46,16 +46,33 @@ self.addEventListener('fetch',(event)=>{
     return
   }
 
-  const cacheable=['script','style','font','image','manifest'].includes(request.destination)||url.pathname.startsWith('/danz/assets/')
+  const isCode=request.destination==='script'||request.destination==='style'||url.pathname.startsWith('/danz/assets/')
+  if(isCode){
+    event.respondWith((async()=>{
+      try{
+        const response=await fetch(request,{cache:'no-store'})
+        if(response.ok){const cache=await caches.open(CACHE_NAME);await cache.put(request,response.clone())}
+        return response
+      }catch(_){
+        return (await caches.match(request))||Response.error()
+      }
+    })())
+    return
+  }
+
+  const cacheable=['font','image','manifest'].includes(request.destination)
   if(!cacheable)return
 
   event.respondWith((async()=>{
     const cached=await caches.match(request)
-    const network=fetch(request).then(async response=>{
+    if(cached)return cached
+    try{
+      const response=await fetch(request)
       if(response.ok){const cache=await caches.open(CACHE_NAME);await cache.put(request,response.clone())}
       return response
-    }).catch(()=>null)
-    return cached||(await network)||Response.error()
+    }catch(_){
+      return Response.error()
+    }
   })())
 })
 
