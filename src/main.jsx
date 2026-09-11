@@ -9,6 +9,7 @@ import './quality.css'
 import './home-app.css'
 import './mobile-fixes.css'
 import './quality-v2.css'
+import './offline-hardening.css'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
