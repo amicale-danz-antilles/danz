@@ -9,28 +9,10 @@
   "theme_color": "#0b5165",
   "icons": [
     {
-      "src": "/danz/icon-192-v6.png",
-      "sizes": "192x192",
+      "src": "/danz/amicale-danz-icon.png?v=original-20260911",
+      "sizes": "any",
       "type": "image/png",
       "purpose": "any"
-    },
-    {
-      "src": "/danz/icon-512-v6.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/danz/icon-maskable-192-v6.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "/danz/icon-maskable-512-v6.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
     }
   ]
 }
