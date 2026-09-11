@@ -4,14 +4,18 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { PageTitle } from './Actualites.jsx'
 
 const VAPID_PUBLIC_KEY = 'BB0cZFeJlrnRo6sF9JN3pNwNhpkgaZJdxlKj0nO6XZ53r01WLCcPwkwPP42uUCFqsp7yLY50Le1X_dBw2RFcOUQ'
-
-const preferenceLabels = { news: 'Actualités', events: 'Événements', gallery: 'Photos / Galerie' }
+const preferenceLabels = { news: 'Actualités', events: 'Événements', gallery: 'Albums / Galerie' }
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
   const rawData = window.atob(base64)
   return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)))
+}
+
+const subscriptionPayload=(subscription,userId)=>{
+  const json=subscription.toJSON()
+  return { user_id:userId, endpoint:subscription.endpoint, p256dh:json.keys?.p256dh, auth:json.keys?.auth }
 }
 
 export default function Profile() {
@@ -45,12 +49,28 @@ export default function Profile() {
       try {
         const registration = await navigator.serviceWorker.getRegistration('/danz/')
         const subscription = await registration?.pushManager.getSubscription()
-        setPushStatus(subscription ? 'enabled' : 'disabled')
+        if(!subscription){setPushStatus('disabled');return}
+        const { error: syncError } = await supabase.from('push_subscriptions').upsert(subscriptionPayload(subscription,user.id), { onConflict: 'endpoint' })
+        if(syncError){setPushStatus('disabled');setError((current)=>current||'La notification de cet appareil doit être réactivée pour être rattachée correctement à votre compte.');return}
+        setPushStatus('enabled')
       } catch (_) { setPushStatus('disabled') }
     }
     load()
     return () => { cancelled = true }
   }, [user.id])
+
+  const subscribeCurrentDevice=async(registration)=>{
+    let subscription = await registration.pushManager.getSubscription()
+    if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) })
+    let { error: saveError } = await supabase.from('push_subscriptions').upsert(subscriptionPayload(subscription,user.id), { onConflict: 'endpoint' })
+    if(saveError){
+      await subscription.unsubscribe().catch(()=>{})
+      subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) })
+      const retry = await supabase.from('push_subscriptions').upsert(subscriptionPayload(subscription,user.id), { onConflict: 'endpoint' })
+      saveError=retry.error
+    }
+    if(saveError)throw saveError
+  }
 
   const enableNotifications = async () => {
     setError(''); setMessage(''); setPushBusy(true)
@@ -63,13 +83,9 @@ export default function Profile() {
       }
       const registration = await navigator.serviceWorker.register('/danz/sw.js')
       await navigator.serviceWorker.ready
-      let subscription = await registration.pushManager.getSubscription()
-      if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) })
-      const json = subscription.toJSON()
-      const { error: saveError } = await supabase.from('push_subscriptions').upsert({ user_id: user.id, endpoint: subscription.endpoint, p256dh: json.keys?.p256dh, auth: json.keys?.auth }, { onConflict: 'endpoint' })
-      if (saveError) throw saveError
-      setPushStatus('enabled'); setMessage('Notifications activées sur cet appareil.')
-    } catch (err) { setError(err.message) } finally { setPushBusy(false) }
+      await subscribeCurrentDevice(registration)
+      setPushStatus('enabled'); setMessage('Notifications activées et rattachées à votre compte sur cet appareil.')
+    } catch (err) { setError(err.message||'Impossible d’activer les notifications sur cet appareil.') } finally { setPushBusy(false) }
   }
 
   const disableNotifications = async () => {
@@ -89,9 +105,10 @@ export default function Profile() {
   const togglePreference = async (key) => {
     const previous = preferences
     const next = { ...preferences, [key]: !preferences[key] }
-    setPreferences(next); setError('')
+    setPreferences(next); setError('');setMessage('')
     const { error: updateError } = await supabase.from('notification_preferences').upsert({ user_id: user.id, ...next }, { onConflict: 'user_id' })
     if (updateError) { setPreferences(previous); setError('Impossible d’enregistrer cette préférence.') }
+    else setMessage('Préférences de notifications enregistrées pour votre compte.')
   }
 
   const updatePassword = async (event) => {
@@ -119,12 +136,12 @@ export default function Profile() {
 
     {error && <div className="alert error">{error}</div>}{message && <div className="alert">{message}</div>}
 
-    <div className="text-panel"><h2>Notifications sur cet appareil</h2><p>Activez les notifications pour être averti même lorsque l’application n’est pas ouverte au premier plan.</p>
+    <div className="text-panel"><h2>Notifications sur cet appareil</h2><p>L’activation push est propre à chaque téléphone ou ordinateur. La souscription est automatiquement rattachée au compte actuellement connecté.</p>
       {pushStatus === 'enabled' ? <button className="ghost-button" disabled={pushBusy} onClick={disableNotifications}>{pushBusy ? 'Traitement…' : 'Désactiver les notifications sur cet appareil'}</button> : pushStatus === 'denied' ? <div className="alert warning">Les notifications sont bloquées dans les réglages de cet appareil. Autorisez-les pour l’application Amicale DANZ puis revenez ici.</div> : pushStatus === 'unsupported' ? <div className="alert warning">Ce navigateur ne permet pas les notifications push. Sur iPhone/iPad, utilisez l’application ajoutée à l’écran d’accueil.</div> : <button className="primary-button" disabled={pushBusy || pushStatus === 'checking'} onClick={enableNotifications}>{pushBusy ? 'Activation…' : pushStatus === 'checking' ? 'Vérification…' : 'Activer les notifications'}</button>}
-      {isAdmin && <p className="login-help">En tant qu’administrateur, toute nouvelle demande d’inscription vous sera notifiée dès que les notifications sont activées sur cet appareil.</p>}
+      {isAdmin && <p className="login-help">En tant qu’administrateur, les nouvelles demandes d’inscription peuvent également vous être notifiées si cette catégorie est autorisée dans l’administration.</p>}
     </div>
 
-    <div className="text-panel"><h2>Publications à notifier</h2><p>Choisissez les catégories pour lesquelles vous souhaitez recevoir une notification.</p><div className="profile-preferences">{Object.entries(preferenceLabels).map(([key, label]) => <label key={key}><span><strong>{label}</strong></span><input type="checkbox" checked={preferences[key]} onChange={() => togglePreference(key)} /></label>)}</div></div>
+    <div className="text-panel"><h2>Publications à notifier</h2><p>Ces choix sont liés à votre compte et s’appliquent à tous vos appareils. L’administration peut autoriser ou suspendre globalement une catégorie, mais ne remplace pas vos choix personnels.</p><div className="profile-preferences">{Object.entries(preferenceLabels).map(([key, label]) => <label key={key}><span><strong>{label}</strong></span><input type="checkbox" checked={preferences[key]} onChange={() => togglePreference(key)} /></label>)}</div></div>
 
     <div className="text-panel"><h2>Mot de passe</h2><p>Membres et administrateurs utilisent le même mode de connexion : adresse e-mail + mot de passe. Vous pouvez modifier votre mot de passe ici sans changer vos droits ni votre statut amicaliste.</p><form className="profile-password-form" onSubmit={updatePassword}><label>Nouveau mot de passe<input type="password" minLength="10" maxLength="128" required autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} /></label><label>Confirmer le mot de passe<input type="password" minLength="10" maxLength="128" required autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} /></label><button className="primary-button" disabled={busy}>{busy ? 'Enregistrement…' : 'Enregistrer le mot de passe'}</button></form></div>
   </>

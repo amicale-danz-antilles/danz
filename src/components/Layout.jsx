@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
+import { supabase } from '../lib/supabase.js'
 import OfflineDataSync from './OfflineDataSync.jsx'
 import OfflineMutationSync from './OfflineMutationSync.jsx'
 import { clearOfflineMutations, listOfflineMutations } from '../lib/offlineMutations.js'
@@ -81,9 +82,23 @@ export default function Layout() {
     }
   }, [open])
 
+  const detachPushSubscription = async () => {
+    if (!user?.id || !('serviceWorker' in navigator) || !('PushManager' in window)) return
+    try {
+      const registration = await navigator.serviceWorker.getRegistration('/danz/')
+      const subscription = await registration?.pushManager.getSubscription()
+      if (!subscription) return
+      await supabase.from('push_subscriptions').delete().eq('user_id', user.id).eq('endpoint', subscription.endpoint)
+      await subscription.unsubscribe().catch(() => {})
+    } catch (_) {
+      // Une souscription navigateur invalide sera nettoyée automatiquement par le service push à sa prochaine tentative.
+    }
+  }
+
   const logout = async () => {
     if (queueState.total > 0 && !window.confirm(`${queueState.total} modification${queueState.total > 1 ? 's sont' : ' est'} encore en attente de synchronisation. Se déconnecter les supprimera de cet appareil. Continuer ?`)) return
     if (user?.id) await clearOfflineMutations(user.id).catch(() => {})
+    await detachPushSubscription()
     await signOut()
     navigate('/connexion')
   }
