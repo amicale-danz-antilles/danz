@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { supabase } from '../lib/supabase.js'
 import OfflineDataSync from './OfflineDataSync.jsx'
 import OfflineMutationSync from './OfflineMutationSync.jsx'
+import { clearOfflineData } from '../lib/offlineCache.js'
 import { clearOfflineMutations, listOfflineMutations } from '../lib/offlineMutations.js'
 import '../admin-central.css'
 
@@ -97,7 +98,10 @@ export default function Layout() {
 
   const logout = async () => {
     if (queueState.total > 0 && !window.confirm(`${queueState.total} modification${queueState.total > 1 ? 's sont' : ' est'} encore en attente de synchronisation. Se déconnecter les supprimera de cet appareil. Continuer ?`)) return
-    if (user?.id) await clearOfflineMutations(user.id).catch(() => {})
+    if (user?.id) {
+      await clearOfflineMutations(user.id).catch(() => {})
+      clearOfflineData(user.id)
+    }
     await detachPushSubscription()
     await signOut()
     navigate('/connexion')
@@ -136,7 +140,7 @@ export default function Layout() {
     <div className="main-column">
       <header className="topbar"><button className="menu-button" aria-label={open ? 'Fermer le menu' : 'Ouvrir le menu'} aria-expanded={open} onClick={() => setOpen(!open)}>☰</button><div><strong>{spaceTitle}</strong><span>{spaceSubtitle}</span></div></header>
       {updateReady && <div className="app-update-banner" role="status"><span>Une nouvelle version de l’application est prête.</span><button type="button" onClick={() => window.location.reload()}>Mettre à jour</button></div>}
-      {!online && <div className="offline-banner" role="status">Mode hors ligne · Les dernières copies restent disponibles. Les votes et propositions de bons plans sont enregistrés sur cet appareil puis synchronisés automatiquement. L’administration et les téléchargements restent en ligne uniquement.</div>}
+      {!online && <div className="offline-banner" role="status">Mode hors ligne · Accueil, agenda, albums, bons plans et sondages utilisent la dernière copie synchronisée. Les votes et propositions de bons plans restent enregistrables et seront synchronisés automatiquement. L’administration et les téléchargements complets restent en ligne uniquement.</div>}
       {queueState.total > 0 && <div className={`offline-queue-banner ${queueState.failed ? 'has-error' : ''}`} role="status"><strong>{queueState.total} modification{queueState.total > 1 ? 's' : ''} en attente</strong><span>{online ? 'Synchronisation automatique en cours ou au prochain rafraîchissement.' : 'Elles restent stockées sur cet appareil jusqu’au retour d’Internet.'}{queueState.failed ? ` ${queueState.failed} action${queueState.failed > 1 ? 's ont' : ' a'} rencontré une erreur serveur et sera retentée.` : ''}</span></div>}
       {syncNotice && online && <div className="offline-sync-success" role="status"><span>{syncNotice}</span><button type="button" aria-label="Masquer" onClick={() => setSyncNotice('')}>×</button></div>}
       <main className={`page ${inAdministration ? 'admin-surface' : 'public-surface'}`}><Outlet /></main>

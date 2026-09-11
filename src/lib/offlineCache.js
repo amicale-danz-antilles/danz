@@ -1,7 +1,10 @@
 const PREFIX='danz-offline-v2'
 const LEGACY_PREFIXES=['danz-offline-v1:']
-const THUMB_CACHE='danz-private-thumbs-v2'
-export const OFFLINE_TTL_MS=12*60*60*1000
+const PRIVATE_MEDIA_CACHE='danz-private-thumbs-v2'
+
+// Les copies textuelles restent disponibles trois semaines. Elles sont remplacées
+// dès qu'une synchronisation plus récente réussit et supprimées à la déconnexion.
+export const OFFLINE_TTL_MS=21*24*60*60*1000
 
 const storage=()=>{try{return window.localStorage}catch{return null}}
 const key=(userId,name)=>`${PREFIX}:${userId}:${name}`
@@ -46,10 +49,14 @@ export function clearOfflineData(userId){
   }catch{}
  }
  if('caches' in window&&userId){
-  caches.open(THUMB_CACHE).then(async cache=>{
+  caches.open(PRIVATE_MEDIA_CACHE).then(async cache=>{
    const requests=await cache.keys()
-   const marker=`/danz/offline-thumb/${encodeURIComponent(userId)}/`
-   await Promise.all(requests.filter(request=>new URL(request.url).pathname.startsWith(marker)).map(request=>cache.delete(request)))
+   const mediaMarker=`/danz/offline-media/${encodeURIComponent(userId)}/`
+   const legacyMarker=`/danz/offline-thumb/${encodeURIComponent(userId)}/`
+   await Promise.all(requests.filter(request=>{
+    const path=new URL(request.url).pathname
+    return path.startsWith(mediaMarker)||path.startsWith(legacyMarker)
+   }).map(request=>cache.delete(request)))
   }).catch(()=>{})
  }
 }
