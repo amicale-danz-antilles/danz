@@ -17,20 +17,25 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version: 22
-      - run: npm install
-      - run: npm run build
+      - name: Installer les dépendances
+        run: npm install --no-fund --no-audit
+      - name: Bloquer un déploiement avec vulnérabilité haute
+        run: npm audit --audit-level=high
+      - name: Construire l'application
+        run: npm run build
         env:
           VITE_SUPABASE_URL: https://axewfeanyfxkzercafen.supabase.co
           VITE_SUPABASE_ANON_KEY: sb_publishable_MknXpC-LmMbjHfv2ALiVag_km2DNMMw
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6.0.0
         with:
           enablement: true
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5.0.0
         with:
           path: ./dist
   deploy:
@@ -39,7 +44,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
+    timeout-minutes: 10
     steps:
       - name: Déployer
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5.0.1
