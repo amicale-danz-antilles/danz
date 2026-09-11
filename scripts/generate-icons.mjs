@@ -14,34 +14,52 @@ try {
 await mkdir(publicDir, { recursive: true })
 
 const background = { r: 247, g: 250, b: 251, alpha: 1 }
+const white = { r: 255, g: 255, b: 255, alpha: 1 }
+
+async function trimOuterWhitespace(input) {
+  return sharp(input)
+    .rotate()
+    .flatten({ background: white })
+    .trim({ background: white, threshold: 18 })
+    .ensureAlpha()
+    .png()
+    .toBuffer()
+}
 
 async function removeSideBars(input) {
-  const { data, info } = await sharp(input).rotate().ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  const firstTrim = await trimOuterWhitespace(input)
+  const { data, info } = await sharp(firstTrim).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   const { width, height, channels } = info
 
-  const removableColumn = (x) => {
-    let removable = 0
+  const darkColumn = (x) => {
+    let dark = 0
+    let visible = 0
     for (let y = 0; y < height; y += 1) {
       const i = (y * width + x) * channels
       const r = data[i]
       const g = data[i + 1]
       const b = data[i + 2]
       const a = data[i + 3]
-      if (a < 20 || (r < 30 && g < 30 && b < 30)) removable += 1
+      if (a < 20) continue
+      visible += 1
+      if (r < 42 && g < 42 && b < 42) dark += 1
     }
-    return removable / height > 0.92
+    return visible > 0 && dark / visible > 0.58
   }
 
   let left = 0
   let right = width - 1
-  while (left < right && removableColumn(left)) left += 1
-  while (right > left && removableColumn(right)) right -= 1
+  while (left < right && darkColumn(left)) left += 1
+  while (right > left && darkColumn(right)) right -= 1
 
   const cropWidth = Math.max(1, right - left + 1)
-  return sharp(data, { raw: info })
+  const withoutBars = await sharp(data, { raw: info })
     .extract({ left, top: 0, width: cropWidth, height })
     .png()
     .toBuffer()
+
+  // Une fois les bandes noires retirées, supprimer le blanc qui les séparait du blason.
+  return trimOuterWhitespace(withoutBars)
 }
 
 const cleanedSource = await removeSideBars(source)
@@ -64,12 +82,12 @@ async function makeIcon(size, filename, paddingRatio) {
 }
 
 await Promise.all([
-  makeIcon(64, 'favicon-v5.png', 0.04),
-  makeIcon(180, 'apple-touch-icon-v5.png', 0.08),
-  makeIcon(192, 'icon-192-v5.png', 0.08),
-  makeIcon(512, 'icon-512-v5.png', 0.08),
-  makeIcon(192, 'icon-maskable-192-v5.png', 0.18),
-  makeIcon(512, 'icon-maskable-512-v5.png', 0.18),
+  makeIcon(64, 'favicon-v6.png', 0.04),
+  makeIcon(180, 'apple-touch-icon-v6.png', 0.08),
+  makeIcon(192, 'icon-192-v6.png', 0.08),
+  makeIcon(512, 'icon-512-v6.png', 0.08),
+  makeIcon(192, 'icon-maskable-192-v6.png', 0.18),
+  makeIcon(512, 'icon-maskable-512-v6.png', 0.18),
 ])
 
-console.log('Icônes PWA V5 générées depuis public/amicale-danz-icon.png, sans bandes latérales et avec variantes maskable.')
+console.log('Icônes PWA V6 générées depuis public/amicale-danz-icon.png après suppression du blanc extérieur et des bandes noires latérales.')
