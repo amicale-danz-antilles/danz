@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { readOfflineEntry } from '../../lib/offlineCache.js'
@@ -13,11 +14,19 @@ const isAlbumExpired = (album) => Boolean(album?.transfer_expires_at && new Date
 export default function OfflineAgenda() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const entry = readOfflineEntry(user?.id, 'agenda-rich') || readOfflineEntry(user?.id, 'agenda')
+  const entry = useMemo(() => readOfflineEntry(user?.id, 'agenda-rich') || readOfflineEntry(user?.id, 'agenda'), [user?.id])
+  const albumsEntry = useMemo(() => readOfflineEntry(user?.id, 'albums'), [user?.id])
   const data = entry?.data || { items: [], albums: {}, covers: {} }
   const items = data.items || []
-  const albums = data.albums || {}
-  const covers = data.covers || {}
+  const localAlbumByEvent = useMemo(() => new Map((albumsEntry?.data || []).map((album) => [album.event_id, album])), [albumsEntry])
+
+  const albumFor = (eventId) => {
+    const existing = data.albums?.[eventId]
+    if (existing) return existing
+    const local = localAlbumByEvent.get(eventId)
+    return local ? { id: local.id, event_id: local.event_id, item_count: local.item_count, transfer_expires_at: local.transfer_expires_at } : null
+  }
+  const coverFor = (eventId) => data.covers?.[eventId] || localAlbumByEvent.get(eventId)?.offline_thumb || null
 
   const addCalendar = (event) => {
     const start = new Date(event.starts_at)
@@ -44,10 +53,11 @@ export default function OfflineAgenda() {
     <div className="offline-v2-notice"><strong>Agenda disponible hors ligne</strong><span>{entry?.savedAt ? `Copie synchronisée le ${new Date(entry.savedAt).toLocaleString('fr-FR')}. ` : ''}Vous pouvez aussi générer un fichier calendrier local sans connexion.</span></div>
     {!entry ? <div className="empty-state">Aucune copie de l’agenda n’est encore disponible. Reconnectez l’appareil une fois pour la préparer automatiquement.</div> : <div className="timeline">{items.length ? items.map((event) => {
       const date = new Date(event.starts_at)
-      const album = albums[event.id]
+      const album = albumFor(event.id)
+      const cover = coverFor(event.id)
       const expired = isAlbumExpired(album)
       return <article className="timeline-item" key={event.id}><div className="timeline-date"><strong>{date.getDate()}</strong><span>{date.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })}</span></div><div className="timeline-card">
-        {covers[event.id] && <img className="event-cover-image" src={covers[event.id]} alt="" loading="lazy" />}
+        {cover && <img className="event-cover-image" src={cover} alt="" loading="lazy" />}
         <div className="event-card-heading"><div><span className="event-time">{date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span><h2>{event.title}</h2></div></div>
         {event.location && <p><strong>Lieu :</strong> 📍 {event.location}</p>}
         {event.description && <p>{event.description}</p>}
