@@ -1,14 +1,14 @@
-const CACHE_NAME = 'danz-shell-v11'
+const CACHE_NAME = 'danz-shell-v12'
 const THUMB_CACHE = 'danz-private-thumbs-v2'
 const APP_ROOT = '/danz/'
 const STATIC_URLS = [
   '/danz/manifest.webmanifest',
-  '/danz/favicon-v5.png',
-  '/danz/apple-touch-icon-v5.png',
-  '/danz/icon-192-v5.png',
-  '/danz/icon-512-v5.png',
-  '/danz/icon-maskable-192-v5.png',
-  '/danz/icon-maskable-512-v5.png',
+  '/danz/favicon-v6.png',
+  '/danz/apple-touch-icon-v6.png',
+  '/danz/icon-192-v6.png',
+  '/danz/icon-512-v6.png',
+  '/danz/icon-maskable-192-v6.png',
+  '/danz/icon-maskable-512-v6.png',
   '/danz/amicale-danz-icon.png',
 ]
 
@@ -114,8 +114,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'Amicale DANZ Antilles'
   const options = {
     body: data.body || 'Nouvelle information disponible.',
-    icon: '/danz/icon-192-v5.png',
-    badge: '/danz/icon-192-v5.png',
+    icon: '/danz/icon-192-v6.png',
+    badge: '/danz/icon-192-v6.png',
     tag: data.type ? `danz-${data.type}` : 'danz-notification',
     data: { url: data.url || '/danz/#/' },
   }
