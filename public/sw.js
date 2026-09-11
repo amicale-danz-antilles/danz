@@ -1,5 +1,5 @@
-const CACHE_NAME = 'danz-shell-v13'
-const THUMB_CACHE = 'danz-private-thumbs-v2'
+const CACHE_NAME = 'danz-shell-v14'
+const PRIVATE_MEDIA_CACHE = 'danz-private-thumbs-v2'
 const APP_ROOT = '/danz/'
 const ORIGINAL_ICON = '/danz/amicale-danz-icon.png?v=original-20260911'
 const STATIC_URLS = [
@@ -46,8 +46,8 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return
   if (!url.pathname.startsWith('/danz/')) return
 
-  if (url.pathname.startsWith('/danz/offline-thumb/')) {
-    event.respondWith(caches.open(THUMB_CACHE).then((cache) => cache.match(request)).then((hit) => hit || new Response('', { status: 404 })))
+  if (url.pathname.startsWith('/danz/offline-media/') || url.pathname.startsWith('/danz/offline-thumb/')) {
+    event.respondWith(caches.open(PRIVATE_MEDIA_CACHE).then((cache) => cache.match(request)).then((hit) => hit || new Response('', { status: 404, headers: { 'Cache-Control': 'no-store' } })))
     return
   }
 
