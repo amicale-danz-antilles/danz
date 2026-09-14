@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { resolvePrivateMediaBatch } from '../lib/mediaStorage.js'
 import { readOfflineData, saveOfflineData } from '../lib/offlineCache.js'
+import HomeOpenPolls from '../components/HomeOpenPolls.jsx'
 import '../extra.css'
 import '../home-refactor.css'
 import '../polls-bureau.css'
@@ -144,7 +145,9 @@ export default function Dashboard() {
   return <div className="home-dashboard home-dashboard-compact home-app-dashboard">
     <section className="home-app-header"><div className="home-app-header-copy"><span className="home-app-date">{todayLabel}</span><span className="eyebrow">Amicale DANZ Antilles</span><h1>{fullName ? `Bonjour ${fullName}` : 'Bienvenue'}</h1><p>Publications, rendez-vous et souvenirs de l’Amicale.</p><div className="home-app-status-row">{nextEvent && <span>📅 Prochain rendez-vous : {eventSchedule(nextEvent, true)}</span>}{publications.length > 0 && <span>● Informations à jour</span>}</div></div><img className="home-app-mark" src="/danz/amicale-danz-icon.png" alt="Insigne DANZ Antilles" /></section>
 
-    <nav className="home-app-actions" aria-label="Raccourcis"><Link to="/agenda"><span>📅</span><strong>Agenda</strong></Link><Link to="/sondages"><span>✓</span><strong>Sondages</strong></Link><Link to="/bons-plans"><span>★</span><strong>Bons plans</strong></Link><Link to="/galerie"><span>▦</span><strong>Albums</strong></Link></nav>
+    <nav className="home-app-actions" aria-label="Raccourcis"><Link to="/agenda"><span>📅</span><strong>Agenda</strong></Link><Link to="/bons-plans"><span>★</span><strong>Bons plans</strong></Link><Link to="/galerie"><span>▦</span><strong>Albums</strong></Link></nav>
+
+    <HomeOpenPolls />
 
     {error && <div className={`alert ${error.startsWith('Mode hors ligne') ? 'warning' : 'error'}`}>{error}</div>}
 
