@@ -8,6 +8,7 @@ import '../home-polls.css'
 
 const isOpen = (poll) => poll?.active === true && (!poll.closes_at || new Date(poll.closes_at).getTime() > Date.now())
 const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key)
+const sortPolls = (rows = []) => [...rows].sort((a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured)) || new Date(b.created_at) - new Date(a.created_at))
 
 function groupOptions(rows = []) {
   const grouped = {}
@@ -20,6 +21,29 @@ function groupOptions(rows = []) {
 
 function groupVotes(rows = []) {
   return Object.fromEntries(rows.map((vote) => [vote.poll_id, vote.option_id]))
+}
+
+async function attachLinkedPublications(polls) {
+  const newsIds = [...new Set(polls.map((poll) => poll.linked_news_id).filter(Boolean))]
+  const eventIds = [...new Set(polls.map((poll) => poll.linked_event_id).filter(Boolean))]
+  const [newsResult, eventResult] = await Promise.all([
+    newsIds.length
+      ? supabase.from('news').select('id,title,publish_at,published_at').in('id', newsIds)
+      : Promise.resolve({ data: [], error: null }),
+    eventIds.length
+      ? supabase.from('events').select('id,title,starts_at,ends_at,location').in('id', eventIds)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+  const newsMap = new Map((newsResult.data || []).map((item) => [item.id, item]))
+  const eventMap = new Map((eventResult.data || []).map((item) => [item.id, item]))
+  return polls.map((poll) => ({
+    ...poll,
+    linked_publication: poll.linked_event_id
+      ? (eventMap.get(poll.linked_event_id) ? { kind: 'event', ...eventMap.get(poll.linked_event_id) } : null)
+      : poll.linked_news_id
+        ? (newsMap.get(poll.linked_news_id) ? { kind: 'news', ...newsMap.get(poll.linked_news_id) } : null)
+        : null,
+  }))
 }
 
 export default function HomeOpenPolls() {
@@ -41,7 +65,7 @@ export default function HomeOpenPolls() {
       return false
     }
     const snapshot = entry.data
-    setPolls((snapshot.polls || []).filter(isOpen).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)))
+    setPolls(sortPolls((snapshot.polls || []).filter(isOpen)))
     setOptions(groupOptions(snapshot.options || []))
     setVotes(groupVotes(snapshot.votes || []))
     return true
@@ -71,7 +95,7 @@ export default function HomeOpenPolls() {
     const now = new Date().toISOString()
     const { data: pollData, error: pollError } = await supabase
       .from('polls')
-      .select('id,title,description,closes_at,active,created_at')
+      .select('id,title,description,closes_at,active,created_at,featured,linked_news_id,linked_event_id')
       .eq('active', true)
       .order('created_at', { ascending: false })
       .limit(12)
@@ -82,7 +106,8 @@ export default function HomeOpenPolls() {
       return
     }
 
-    const openPolls = (pollData || []).filter((poll) => !poll.closes_at || poll.closes_at > now)
+    const openBase = (pollData || []).filter((poll) => !poll.closes_at || poll.closes_at > now)
+    const openPolls = sortPolls(await attachLinkedPublications(openBase))
     setPolls(openPolls)
     if (!openPolls.length) {
       setOptions({}); setVotes({}); setLoading(false)
@@ -123,6 +148,7 @@ export default function HomeOpenPolls() {
   }, [user?.id])
 
   const selectedVotes = useMemo(() => ({ ...votes, ...queuedVotes }), [votes, queuedVotes])
+  const featuredCount = useMemo(() => polls.filter((poll) => poll.featured).length, [polls])
 
   const vote = async (pollId, optionId) => {
     if (!user?.id) return
@@ -190,7 +216,7 @@ export default function HomeOpenPolls() {
   if (!polls.length) return null
 
   return <section className="home-polls-section" aria-labelledby="home-polls-title">
-    <div className="home-section-title"><div><span className="eyebrow">Votre avis compte</span><h2 id="home-polls-title">Sondages ouverts</h2></div><span className="home-polls-count">{polls.length} ouvert{polls.length > 1 ? 's' : ''}</span></div>
+    <div className="home-section-title"><div><span className="eyebrow">Votre avis compte</span><h2 id="home-polls-title">Sondages ouverts</h2></div><span className="home-polls-count">{featuredCount ? `${featuredCount} à la une · ` : ''}{polls.length} ouvert{polls.length > 1 ? 's' : ''}</span></div>
     {!online && <div className="offline-v2-notice compact"><strong>Hors ligne</strong><span>Votre dernier choix est conservé sur cet appareil puis synchronisé automatiquement.</span></div>}
     {error && <div className="alert error">{error}</div>}
     {message && <div className="alert success">{message}</div>}
@@ -205,9 +231,10 @@ function HomePollCard({ poll, options, storedVote, selectedVote, queuedVote, has
   let effectiveTotal = baseTotal
   if (hasQueuedVote && storedVote && queuedVote === null) effectiveTotal = Math.max(0, baseTotal - 1)
   else if (hasQueuedVote && !storedVote && queuedVote) effectiveTotal = baseTotal + 1
+  const linked = poll.linked_publication
 
-  return <article className="poll-card home-poll-card">
-    <div className="poll-card-head"><div><span className="poll-status open">Vote ouvert</span><h3>{poll.title}</h3>{poll.description && <p>{poll.description}</p>}<small>{poll.closes_at ? `Clôture : ${new Date(poll.closes_at).toLocaleString('fr-FR')}` : 'Sans date de clôture'}</small>{hasQueuedVote && <span className="offline-pending-badge">⏳ Modification en attente de synchronisation</span>}</div></div>
+  return <article className={`poll-card home-poll-card ${poll.featured ? 'home-poll-featured' : ''}`}>
+    <div className="poll-card-head"><div><div className="poll-status-row"><span className="poll-status open">Vote ouvert</span>{poll.featured && <span className="poll-featured-badge">📌 À la une</span>}</div><h3>{poll.title}</h3>{poll.description && <p>{poll.description}</p>}{linked && <div className="home-poll-linked-publication"><span>{linked.kind === 'event' ? 'Événement associé' : 'Publication associée'}</span><strong>{linked.title}</strong>{linked.kind === 'event' && linked.starts_at && <small>{new Date(linked.starts_at).toLocaleString('fr-FR')}{linked.location ? ` · ${linked.location}` : ''}</small>}</div>}<small>{poll.closes_at ? `Clôture : ${new Date(poll.closes_at).toLocaleString('fr-FR')}` : 'Sans date de clôture'}</small>{hasQueuedVote && <span className="offline-pending-badge">⏳ Modification en attente de synchronisation</span>}</div></div>
     <div className="poll-options">
       {options.map((option) => {
         let count = Number(option.vote_count || 0)
