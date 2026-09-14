@@ -1,17 +1,17 @@
-const CACHE_NAME = 'danz-shell-v16'
+const CACHE_NAME = 'danz-shell-v17'
 const PRIVATE_MEDIA_CACHE = 'danz-private-thumbs-v2'
 const APP_ROOT = '/danz/'
-const OFFICIAL_LOGO = '/danz/image001.png?v=official-20260914'
-const NOTIFICATION_ICON = '/danz/icon-192-v7.png?v=official-20260914'
+const OFFICIAL_LOGO = '/danz/image001-1.png?v=official-image001-1-20260914'
+const NOTIFICATION_ICON = '/danz/icon-192-v8.png?v=official-image001-1-20260914'
 const STATIC_URLS = [
-  '/danz/manifest.webmanifest?v=official-20260914',
+  '/danz/manifest.webmanifest?v=official-image001-1-20260914',
   OFFICIAL_LOGO,
-  '/danz/favicon-v7.png?v=official-20260914',
-  '/danz/apple-touch-icon-v7.png?v=official-20260914',
-  '/danz/icon-192-v7.png?v=official-20260914',
-  '/danz/icon-512-v7.png?v=official-20260914',
-  '/danz/icon-maskable-192-v7.png?v=official-20260914',
-  '/danz/icon-maskable-512-v7.png?v=official-20260914',
+  '/danz/favicon-v8.png?v=official-image001-1-20260914',
+  '/danz/apple-touch-icon-v8.png?v=official-image001-1-20260914',
+  '/danz/icon-192-v8.png?v=official-image001-1-20260914',
+  '/danz/icon-512-v8.png?v=official-image001-1-20260914',
+  '/danz/icon-maskable-192-v8.png?v=official-image001-1-20260914',
+  '/danz/icon-maskable-512-v8.png?v=official-image001-1-20260914',
 ]
 
 async function precacheAppShell() {
