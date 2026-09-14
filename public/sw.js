@@ -1,4 +1,4 @@
-const CACHE_NAME = 'danz-shell-v19'
+const CACHE_NAME = 'danz-shell-v20'
 const PRIVATE_MEDIA_CACHE = 'danz-private-thumbs-v2'
 const APP_ROOT = '/danz/'
 const OFFICIAL_LOGO = '/danz/image001-1.png?v=official-image001-1-20260914'
