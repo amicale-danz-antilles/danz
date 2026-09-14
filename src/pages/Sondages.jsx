@@ -16,11 +16,13 @@ export default function Sondages() {
   const [loading, setLoading] = useState(true)
   const [busyPoll, setBusyPoll] = useState(null)
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [closesAt, setClosesAt] = useState('')
   const [choices, setChoices] = useState(['', ''])
+  const [notifyOnPublish, setNotifyOnPublish] = useState(true)
   const [creating, setCreating] = useState(false)
 
   const load = async () => {
@@ -88,25 +90,16 @@ export default function Sondages() {
   const createPoll = async (event) => {
     event.preventDefault()
     const cleaned = choices.map((choice) => choice.trim()).filter(Boolean)
-    if (cleaned.length < 2) {
-      setError('Ajoutez au moins deux propositions.')
-      return
-    }
-    if (new Set(cleaned.map((choice) => choice.toLocaleLowerCase('fr-FR'))).size !== cleaned.length) {
-      setError('Deux propositions sont identiques. Modifiez-les avant de publier le sondage.')
-      return
-    }
-    if (closesAt && new Date(closesAt).getTime() <= Date.now()) {
-      setError('La date de clôture doit être située dans le futur.')
-      return
-    }
+    if (cleaned.length < 2) return setError('Ajoutez au moins deux propositions.')
+    if (new Set(cleaned.map((choice) => choice.toLocaleLowerCase('fr-FR'))).size !== cleaned.length) return setError('Deux propositions sont identiques. Modifiez-les avant de publier le sondage.')
+    if (closesAt && new Date(closesAt).getTime() <= Date.now()) return setError('La date de clôture doit être située dans le futur.')
 
-    setCreating(true)
-    setError('')
+    setCreating(true); setError(''); setMessage('')
     const { data: poll, error: pollError } = await supabase.from('polls').insert({
       title: title.trim(),
       description: description.trim() || null,
       closes_at: closesAt ? new Date(closesAt).toISOString() : null,
+      notify_on_publish: notifyOnPublish,
       created_by: user.id,
     }).select().single()
     if (pollError) {
@@ -124,11 +117,8 @@ export default function Sondages() {
       await supabase.from('polls').delete().eq('id', poll.id)
       setError(optionError.message)
     } else {
-      setTitle('')
-      setDescription('')
-      setClosesAt('')
-      setChoices(['', ''])
-      setShowCreate(false)
+      setTitle(''); setDescription(''); setClosesAt(''); setChoices(['', '']); setNotifyOnPublish(true); setShowCreate(false)
+      setMessage(notifyOnPublish ? 'Sondage publié. La notification sera traitée automatiquement.' : 'Sondage publié sans notification.')
       await load()
     }
     setCreating(false)
@@ -141,6 +131,15 @@ export default function Sondages() {
     else await load()
   }
 
+  const resendNotification = async (poll) => {
+    if (!isOpen(poll) || !window.confirm(`Renvoyer une notification pour « ${poll.title} » ?`)) return
+    setBusyPoll(poll.id); setError(''); setMessage('')
+    const { error: updateError } = await supabase.from('polls').update({ notify_on_publish: true, notified_at: null, updated_at: new Date().toISOString() }).eq('id', poll.id)
+    if (updateError) setError(updateError.message || 'Impossible de remettre la notification en file d’attente.')
+    else { setMessage('Notification du sondage remise en file d’attente.'); await load() }
+    setBusyPoll(null)
+  }
+
   const removePoll = async (poll) => {
     if (!window.confirm(`Supprimer définitivement « ${poll.title} » et tous ses votes ?`)) return
     const { error: deleteError } = await supabase.from('polls').delete().eq('id', poll.id)
@@ -149,10 +148,10 @@ export default function Sondages() {
   }
 
   return <>
-    <PageTitle eyebrow={adminMode ? 'Administration' : 'Votre avis compte'} title={adminMode ? 'Gestion des sondages' : 'Sondages'} text={adminMode ? 'Créez, clôturez ou supprimez les sondages depuis cet espace réservé.' : 'Votez pour les futures activités de l’Amicale et suivez les préférences des membres.'} />
+    <PageTitle eyebrow={adminMode ? 'Administration' : 'Votre avis compte'} title={adminMode ? 'Gestion des sondages' : 'Sondages'} text={adminMode ? 'Créez, clôturez, renotifiez ou supprimez les sondages depuis cet espace réservé.' : 'Votez pour les futures activités de l’Amicale et suivez les préférences des membres.'} />
 
     {adminMode && <div className="poll-admin-bar">
-      <div><strong>Gestion des sondages</strong><span>Créez un vote pour choisir une prochaine activité ou recueillir l’avis des membres.</span></div>
+      <div><strong>Gestion des sondages</strong><span>Les sondages les plus récents sont affichés en premier. Une notification peut être envoyée à leur publication.</span></div>
       <button className="secondary-button" onClick={() => setShowCreate(!showCreate)}>{showCreate ? 'Fermer' : '＋ Nouveau sondage'}</button>
     </div>}
 
@@ -170,31 +169,34 @@ export default function Sondages() {
           </div>)}
           <button type="button" className="ghost-button" onClick={() => setChoices([...choices, ''])}>＋ Ajouter une proposition</button>
         </div>
+        <label className="admin-notification-toggle"><span><strong>Notifier les utilisateurs</strong><small>Respecte le réglage global “Sondages” et la préférence de chaque utilisateur.</small></span><input type="checkbox" checked={notifyOnPublish} onChange={(e) => setNotifyOnPublish(e.target.checked)} /></label>
         <button className="primary-button" disabled={creating}>{creating ? 'Création…' : 'Publier le sondage'}</button>
       </form>
     </section>}
 
-    {error && <div className="alert error" style={{marginBottom:'1rem'}}>{error}</div>}
+    {error && <div className="alert error" style={{ marginBottom: '1rem' }}>{error}</div>}
+    {message && <div className="alert success" style={{ marginBottom: '1rem' }}>{message}</div>}
 
     {loading ? <div className="skeleton-card tall" /> : <>
-      <PollSection title="Sondages ouverts" empty="Aucun sondage ouvert pour le moment." polls={activePolls} options={options} votes={votes} busyPoll={busyPoll} isAdmin={adminMode} onVote={vote} onClose={closePoll} onRemove={removePoll} />
-      {closedPolls.length > 0 && <PollSection title="Sondages clôturés" polls={closedPolls} options={options} votes={votes} busyPoll={busyPoll} isAdmin={adminMode} onVote={vote} onClose={closePoll} onRemove={removePoll} />}
+      <PollSection title="Sondages ouverts" empty="Aucun sondage ouvert pour le moment." polls={activePolls} options={options} votes={votes} busyPoll={busyPoll} isAdmin={adminMode} onVote={vote} onClose={closePoll} onRemove={removePoll} onResend={resendNotification} />
+      {closedPolls.length > 0 && <PollSection title="Sondages clôturés" polls={closedPolls} options={options} votes={votes} busyPoll={busyPoll} isAdmin={adminMode} onVote={vote} onClose={closePoll} onRemove={removePoll} onResend={resendNotification} />}
     </>}
   </>
 }
 
-function PollSection({ title, empty, polls, options, votes, busyPoll, isAdmin, onVote, onClose, onRemove }) {
+function PollSection({ title, empty, polls, options, votes, busyPoll, isAdmin, onVote, onClose, onRemove, onResend }) {
   return <section className="poll-section">
     <div className="section-heading"><div><span className="eyebrow">Activités à venir</span><h2>{title}</h2></div></div>
     <div className="poll-list">
-      {polls.length ? polls.map((poll) => <PollCard key={poll.id} poll={poll} options={options[poll.id] || []} vote={votes[poll.id]} busy={busyPoll === poll.id} isAdmin={isAdmin} onVote={onVote} onClose={onClose} onRemove={onRemove} />) : <div className="empty-state">{empty}</div>}
+      {polls.length ? polls.map((poll) => <PollCard key={poll.id} poll={poll} options={options[poll.id] || []} vote={votes[poll.id]} busy={busyPoll === poll.id} isAdmin={isAdmin} onVote={onVote} onClose={onClose} onRemove={onRemove} onResend={onResend} />) : <div className="empty-state">{empty}</div>}
     </div>
   </section>
 }
 
-function PollCard({ poll, options, vote, busy, isAdmin, onVote, onClose, onRemove }) {
+function PollCard({ poll, options, vote, busy, isAdmin, onVote, onClose, onRemove, onResend }) {
   const open = isOpen(poll)
   const total = options.reduce((sum, option) => sum + Number(option.vote_count || 0), 0)
+  const notificationLabel = poll.notify_on_publish === false ? 'Sans notification' : poll.notified_at ? 'Notification envoyée' : 'Notification en attente'
 
   return <article className="poll-card">
     <div className="poll-card-head">
@@ -203,9 +205,11 @@ function PollCard({ poll, options, vote, busy, isAdmin, onVote, onClose, onRemov
         <h3>{poll.title}</h3>
         {poll.description && <p>{poll.description}</p>}
         <small>{poll.closes_at ? `${open ? 'Clôture' : 'Date de clôture'} : ${new Date(poll.closes_at).toLocaleString('fr-FR')}` : 'Sans date de clôture'}</small>
+        {isAdmin && <small className="admin-inline-note"> · {notificationLabel}</small>}
       </div>
       {isAdmin && <div className="poll-admin-actions">
         {open && <button type="button" className="ghost-button" onClick={() => onClose(poll)}>Clôturer</button>}
+        {open && poll.notified_at && <button type="button" className="ghost-button" disabled={busy} onClick={() => onResend(poll)}>Renvoyer notification</button>}
         <button type="button" className="ghost-button" onClick={() => onRemove(poll)}>Supprimer</button>
       </div>}
     </div>
@@ -215,15 +219,9 @@ function PollCard({ poll, options, vote, busy, isAdmin, onVote, onClose, onRemov
         const count = Number(option.vote_count || 0)
         const percent = total ? Math.round((count / total) * 100) : 0
         const selected = vote === option.id
-        return <button
-          key={option.id}
-          type="button"
-          className={`poll-option ${selected ? 'selected' : ''}`}
-          disabled={!open || busy}
-          onClick={() => onVote(poll.id, option.id)}
-        >
+        return <button key={option.id} type="button" className={`poll-option ${selected ? 'selected' : ''}`} disabled={!open || busy} onClick={() => onVote(poll.id, option.id)}>
           <div className="poll-option-top"><span>{selected ? '✓ ' : ''}{option.label}</span><strong>{count} voix · {percent}%</strong></div>
-          <span className="poll-result-bar"><span style={{width:`${percent}%`}} /></span>
+          <span className="poll-result-bar"><span style={{ width: `${percent}%` }} /></span>
         </button>
       })}
     </div>
