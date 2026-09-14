@@ -50,8 +50,16 @@ async function syncPollVote(record, userId) {
   return supabase.from('poll_votes').upsert(payload, { onConflict: 'poll_id,user_id' })
 }
 
+async function syncPollQuestionnaire(record) {
+  const pollId = record.payload?.poll_id
+  const answers = record.payload?.answers
+  if (!pollId || !Array.isArray(answers) || !answers.length) return { error: new Error('Recensement hors ligne incomplet.') }
+  return supabase.rpc('submit_poll_questionnaire', { p_poll_id: pollId, p_answers: answers })
+}
+
 async function syncRecord(record, userId) {
   if (record.type === 'poll_vote') return syncPollVote(record, userId)
+  if (record.type === 'poll_questionnaire') return syncPollQuestionnaire(record)
 
   if (record.type === 'good_deal_submission') {
     const payload = {
@@ -61,8 +69,6 @@ async function syncRecord(record, userId) {
       status: 'pending',
     }
     const result = await supabase.from('good_deal_submissions').insert(payload)
-    // Même UUID côté client et côté serveur : une réponse perdue après insertion
-    // ne peut pas créer de doublon lors de la tentative suivante.
     if (result.error?.code === '23505') return { data: null, error: null }
     return result
   }
