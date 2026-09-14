@@ -21,10 +21,12 @@ const normalizedOptions = (question) => Array.isArray(question?.settings?.option
   ? question.settings.options.map((value) => String(value)).filter(Boolean)
   : []
 
+const defaultQuestionValue = (question) => question.question_type === 'quantity' ? Number(question.settings?.min ?? 0) : undefined
+
 const questionPayload = (question, value) => {
   const base = { question_id: question.id }
   if (question.question_type === 'yes_no') return { ...base, answer_boolean: Boolean(value) }
-  if (question.question_type === 'quantity') return { ...base, answer_number: Number(value || 0) }
+  if (question.question_type === 'quantity') return { ...base, answer_number: Number(value ?? question.settings?.min ?? 0) }
   return { ...base, answer_text: String(value ?? '').trim() }
 }
 
@@ -56,7 +58,7 @@ export default function QuestionnaireCard({ poll, questions = [], answers = [], 
       const value = values[question.id]
       if (!question.required) continue
       if (question.question_type === 'yes_no' && typeof value !== 'boolean') throw new Error(`Répondez à : ${question.prompt}`)
-      if (question.question_type === 'quantity' && (value === '' || value === null || value === undefined || Number.isNaN(Number(value)))) throw new Error(`Indiquez une quantité pour : ${question.prompt}`)
+      if (question.question_type === 'quantity') continue
       if ((question.question_type === 'single_choice' || question.question_type === 'text') && !String(value ?? '').trim()) throw new Error(`Répondez à : ${question.prompt}`)
     }
   }
@@ -66,6 +68,10 @@ export default function QuestionnaireCard({ poll, questions = [], answers = [], 
     if (values[attendance.id] === false) return rows
     for (const question of followups) {
       const value = values[question.id]
+      if (question.question_type === 'quantity') {
+        rows.push(questionPayload(question, value ?? defaultQuestionValue(question)))
+        continue
+      }
       if (value === undefined || value === null || (typeof value === 'string' && !value.trim() && !question.required)) continue
       rows.push(questionPayload(question, value))
     }
