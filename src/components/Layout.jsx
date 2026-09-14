@@ -74,14 +74,9 @@ export default function Layout() {
 
   useEffect(() => {
     if (!open) return undefined
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
     const onKeyDown = (event) => { if (event.key === 'Escape') setOpen(false) }
     window.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.body.style.overflow = previous
-      window.removeEventListener('keydown', onKeyDown)
-    }
+    return () => window.removeEventListener('keydown', onKeyDown)
   }, [open])
 
   const detachPushSubscription = async () => {
