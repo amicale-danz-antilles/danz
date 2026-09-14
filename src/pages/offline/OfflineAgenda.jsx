@@ -11,6 +11,14 @@ const escapeIcs = (value = '') => String(value).replace(/\\/g, '\\\\').replace(/
 const icsDate = (value) => new Date(value).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
 const isAlbumExpired = (album) => Boolean(album?.transfer_expires_at && new Date(album.transfer_expires_at).getTime() < Date.now())
 const newestFirst = (rows = []) => [...rows].sort((a, b) => new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime())
+const formatEnd = (event) => {
+  if (!event.ends_at) return null
+  const start = new Date(event.starts_at)
+  const end = new Date(event.ends_at)
+  return start.toDateString() === end.toDateString()
+    ? end.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    : end.toLocaleString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
 
 export default function OfflineAgenda() {
   const { user } = useAuth()
@@ -50,16 +58,17 @@ export default function OfflineAgenda() {
   }
 
   return <>
-    <PageTitle eyebrow="Mode hors ligne" title="Agenda" text="Les rendez-vous synchronisés sont affichés du plus récent au plus ancien, avec leurs informations principales et certaines miniatures." />
+    <PageTitle eyebrow="Mode hors ligne" title="Agenda" text="Les rendez-vous synchronisés sont affichés du plus récent au plus ancien, avec leurs dates précises ou plages de dates." />
     <div className="offline-v2-notice"><strong>Agenda disponible hors ligne</strong><span>{entry?.savedAt ? `Copie synchronisée le ${new Date(entry.savedAt).toLocaleString('fr-FR')}. ` : ''}Vous pouvez aussi générer un fichier calendrier local sans connexion.</span></div>
     {!entry ? <div className="empty-state">Aucune copie de l’agenda n’est encore disponible. Reconnectez l’appareil une fois pour la préparer automatiquement.</div> : <div className="timeline">{items.length ? items.map((event) => {
       const date = new Date(event.starts_at)
+      const endLabel = formatEnd(event)
       const album = albumFor(event.id)
       const cover = coverFor(event.id)
       const expired = isAlbumExpired(album)
       return <article className="timeline-item" key={event.id}><div className="timeline-date"><strong>{date.getDate()}</strong><span>{date.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })}</span></div><div className="timeline-card">
         {cover && <img className="event-cover-image" src={cover} alt="" loading="lazy" />}
-        <div className="event-card-heading"><div><span className="event-time">{date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span><h2>{event.title}</h2></div></div>
+        <div className="event-card-heading"><div><span className="event-time">{date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}{endLabel ? ` → ${endLabel}` : ''}</span><h2>{event.title}</h2></div></div>
         {event.location && <p><strong>Lieu :</strong> 📍 {event.location}</p>}
         {event.description && <p>{event.description}</p>}
         <div className="calendar-quick-add"><span>Ajouter au calendrier</span><button type="button" className="secondary-button" onClick={() => addCalendar(event)}>Télécharger .ics</button></div>
