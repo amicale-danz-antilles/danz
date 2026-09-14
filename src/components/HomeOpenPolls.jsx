@@ -3,19 +3,27 @@ import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { readOfflineEntry } from '../lib/offlineCache.js'
 import { listOfflineMutations, queueOfflineMutation } from '../lib/offlineMutations.js'
+import QuestionnaireCard from './QuestionnaireCard.jsx'
 import '../polls-bureau.css'
 import '../home-polls.css'
+import '../questionnaires.css'
 
-const isOpen = (poll) => poll?.active === true && (!poll.closes_at || new Date(poll.closes_at).getTime() > Date.now())
+const isOpen = (poll) => poll?.published !== false && poll?.active === true && (!poll.closes_at || new Date(poll.closes_at).getTime() > Date.now())
 const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key)
 const sortPolls = (rows = []) => [...rows].sort((a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured)) || new Date(b.created_at) - new Date(a.created_at))
 
-function groupOptions(rows = []) {
+function groupByPoll(rows = []) {
   const grouped = {}
-  for (const option of rows) {
-    if (!grouped[option.poll_id]) grouped[option.poll_id] = []
-    grouped[option.poll_id].push(option)
+  for (const row of rows) {
+    if (!grouped[row.poll_id]) grouped[row.poll_id] = []
+    grouped[row.poll_id].push(row)
   }
+  return grouped
+}
+
+function groupOptions(rows = []) {
+  const grouped = groupByPoll(rows)
+  for (const pollId of Object.keys(grouped)) grouped[pollId].sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
   return grouped
 }
 
@@ -27,12 +35,8 @@ async function attachLinkedPublications(polls) {
   const newsIds = [...new Set(polls.map((poll) => poll.linked_news_id).filter(Boolean))]
   const eventIds = [...new Set(polls.map((poll) => poll.linked_event_id).filter(Boolean))]
   const [newsResult, eventResult] = await Promise.all([
-    newsIds.length
-      ? supabase.from('news').select('id,title,publish_at,published_at').in('id', newsIds)
-      : Promise.resolve({ data: [], error: null }),
-    eventIds.length
-      ? supabase.from('events').select('id,title,starts_at,ends_at,location').in('id', eventIds)
-      : Promise.resolve({ data: [], error: null }),
+    newsIds.length ? supabase.from('news').select('id,title,publish_at,published_at').in('id', newsIds) : Promise.resolve({ data: [], error: null }),
+    eventIds.length ? supabase.from('events').select('id,title,starts_at,ends_at,location').in('id', eventIds) : Promise.resolve({ data: [], error: null }),
   ])
   const newsMap = new Map((newsResult.data || []).map((item) => [item.id, item]))
   const eventMap = new Map((eventResult.data || []).map((item) => [item.id, item]))
@@ -51,7 +55,10 @@ export default function HomeOpenPolls() {
   const [polls, setPolls] = useState([])
   const [options, setOptions] = useState({})
   const [votes, setVotes] = useState({})
+  const [questions, setQuestions] = useState({})
+  const [questionAnswers, setQuestionAnswers] = useState({})
   const [queuedVotes, setQueuedVotes] = useState({})
+  const [queuedQuestionnaires, setQueuedQuestionnaires] = useState({})
   const [loading, setLoading] = useState(true)
   const [busyPoll, setBusyPoll] = useState(null)
   const [message, setMessage] = useState('')
@@ -61,26 +68,35 @@ export default function HomeOpenPolls() {
   const loadCached = () => {
     const entry = readOfflineEntry(user?.id, 'polls')
     if (!entry?.data) {
-      setPolls([]); setOptions({}); setVotes({})
+      setPolls([]); setOptions({}); setVotes({}); setQuestions({}); setQuestionAnswers({})
       return false
     }
     const snapshot = entry.data
     setPolls(sortPolls((snapshot.polls || []).filter(isOpen)))
     setOptions(groupOptions(snapshot.options || []))
     setVotes(groupVotes(snapshot.votes || []))
+    setQuestions(groupByPoll(snapshot.questions || []))
+    setQuestionAnswers(groupByPoll(snapshot.questionAnswers || []))
     return true
   }
 
   const refreshQueue = async () => {
-    if (!user?.id) return setQueuedVotes({})
+    if (!user?.id) {
+      setQueuedVotes({}); setQueuedQuestionnaires({}); return
+    }
     const rows = await listOfflineMutations(user.id).catch(() => [])
-    const next = {}
+    const nextVotes = {}
+    const nextQuestionnaires = {}
     for (const row of rows) {
       if (row.type === 'poll_vote' && row.payload?.poll_id && Object.prototype.hasOwnProperty.call(row.payload, 'option_id')) {
-        next[row.payload.poll_id] = row.payload.option_id || null
+        nextVotes[row.payload.poll_id] = row.payload.option_id || null
+      }
+      if (row.type === 'poll_questionnaire' && row.payload?.poll_id && Array.isArray(row.payload.answers)) {
+        nextQuestionnaires[row.payload.poll_id] = row.payload.answers
       }
     }
-    setQueuedVotes(next)
+    setQueuedVotes(nextVotes)
+    setQueuedQuestionnaires(nextQuestionnaires)
   }
 
   const load = async () => {
@@ -95,10 +111,11 @@ export default function HomeOpenPolls() {
     const now = new Date().toISOString()
     const { data: pollData, error: pollError } = await supabase
       .from('polls')
-      .select('id,title,description,closes_at,active,created_at,featured,linked_news_id,linked_event_id')
+      .select('id,title,description,closes_at,active,created_at,featured,linked_news_id,linked_event_id,poll_type,published')
       .eq('active', true)
+      .eq('published', true)
       .order('created_at', { ascending: false })
-      .limit(12)
+      .limit(20)
 
     if (pollError) {
       if (!loadCached()) setError('Impossible de charger les sondages pour le moment.')
@@ -110,21 +127,26 @@ export default function HomeOpenPolls() {
     const openPolls = sortPolls(await attachLinkedPublications(openBase))
     setPolls(openPolls)
     if (!openPolls.length) {
-      setOptions({}); setVotes({}); setLoading(false)
+      setOptions({}); setVotes({}); setQuestions({}); setQuestionAnswers({}); setLoading(false)
       return
     }
 
-    const ids = openPolls.map((poll) => poll.id)
-    const [{ data: optionData, error: optionError }, { data: voteData, error: voteError }] = await Promise.all([
-      supabase.from('poll_options').select('id,poll_id,label,sort_order,vote_count').in('poll_id', ids).order('sort_order'),
-      supabase.from('poll_votes').select('poll_id,option_id').eq('user_id', user.id).in('poll_id', ids),
+    const simpleIds = openPolls.filter((poll) => poll.poll_type !== 'questionnaire').map((poll) => poll.id)
+    const questionnaireIds = openPolls.filter((poll) => poll.poll_type === 'questionnaire').map((poll) => poll.id)
+    const [optionResult, voteResult, questionResult, answerResult] = await Promise.all([
+      simpleIds.length ? supabase.from('poll_options').select('id,poll_id,label,sort_order,vote_count').in('poll_id', simpleIds).order('sort_order') : Promise.resolve({ data: [], error: null }),
+      simpleIds.length ? supabase.from('poll_votes').select('poll_id,option_id').eq('user_id', user.id).in('poll_id', simpleIds) : Promise.resolve({ data: [], error: null }),
+      questionnaireIds.length ? supabase.from('poll_questions').select('id,poll_id,prompt,question_type,sort_order,required,attendance_gate,settings').in('poll_id', questionnaireIds).order('sort_order') : Promise.resolve({ data: [], error: null }),
+      questionnaireIds.length ? supabase.from('poll_question_answers').select('poll_id,question_id,answer_boolean,answer_number,answer_text').eq('user_id', user.id).in('poll_id', questionnaireIds) : Promise.resolve({ data: [], error: null }),
     ])
 
-    if (optionError || voteError) {
-      setError('Les sondages sont disponibles, mais certains résultats n’ont pas pu être actualisés.')
+    if (optionResult.error || voteResult.error || questionResult.error || answerResult.error) {
+      setError('Les sondages sont disponibles, mais certaines réponses n’ont pas pu être actualisées.')
     }
-    setOptions(groupOptions(optionData || []))
-    setVotes(groupVotes(voteData || []))
+    setOptions(groupOptions(optionResult.data || []))
+    setVotes(groupVotes(voteResult.data || []))
+    setQuestions(groupByPoll(questionResult.data || []))
+    setQuestionAnswers(groupByPoll(answerResult.data || []))
     setLoading(false)
   }
 
@@ -217,11 +239,16 @@ export default function HomeOpenPolls() {
 
   return <section className="home-polls-section" aria-labelledby="home-polls-title">
     <div className="home-section-title"><div><span className="eyebrow">Votre avis compte</span><h2 id="home-polls-title">Sondages ouverts</h2></div><span className="home-polls-count">{featuredCount ? `${featuredCount} à la une · ` : ''}{polls.length} ouvert{polls.length > 1 ? 's' : ''}</span></div>
-    {!online && <div className="offline-v2-notice compact"><strong>Hors ligne</strong><span>Votre dernier choix est conservé sur cet appareil puis synchronisé automatiquement.</span></div>}
+    {!online && <div className="offline-v2-notice compact"><strong>Hors ligne</strong><span>Vos réponses sont conservées sur cet appareil puis synchronisées automatiquement.</span></div>}
     {error && <div className="alert error">{error}</div>}
     {message && <div className="alert success">{message}</div>}
     <div className="home-polls-list">
-      {polls.map((poll) => <HomePollCard key={poll.id} poll={poll} options={options[poll.id] || []} storedVote={votes[poll.id]} selectedVote={selectedVotes[poll.id]} queuedVote={queuedVotes[poll.id]} hasQueuedVote={hasOwn(queuedVotes, poll.id)} busy={busyPoll === poll.id} onVote={vote} />)}
+      {polls.map((poll) => poll.poll_type === 'questionnaire'
+        ? <article key={poll.id} className={`poll-card home-poll-card questionnaire-card ${poll.featured ? 'home-poll-featured' : ''}`}>
+            <div className="poll-card-head"><div><div className="poll-status-row"><span className="poll-status open">Recensement ouvert</span>{poll.featured && <span className="poll-featured-badge">📌 À la une</span>}</div><h3>{poll.title}</h3>{poll.description && <p>{poll.description}</p>}<small>{poll.closes_at ? `Clôture : ${new Date(poll.closes_at).toLocaleString('fr-FR')}` : 'Sans date de clôture'}</small></div></div>
+            <QuestionnaireCard poll={poll} questions={questions[poll.id] || []} answers={questionAnswers[poll.id] || []} pendingAnswers={queuedQuestionnaires[poll.id] || null} linkedPublication={poll.linked_publication} onSaved={async () => { await load(); await refreshQueue() }} />
+          </article>
+        : <HomePollCard key={poll.id} poll={poll} options={options[poll.id] || []} storedVote={votes[poll.id]} selectedVote={selectedVotes[poll.id]} queuedVote={queuedVotes[poll.id]} hasQueuedVote={hasOwn(queuedVotes, poll.id)} busy={busyPoll === poll.id} onVote={vote} />)}
     </div>
   </section>
 }
