@@ -1,0 +1,54 @@
+/* Compatibilité de défilement tactile Android / MIUI.
+   Sur mobile, le document reste toujours défilable verticalement, même si un ancien
+   verrou overflow est encore présent pendant la transition d'un menu ou d'une modale. */
+@media (max-width: 900px) {
+  html,
+  body {
+    overflow-y: auto !important;
+    overscroll-behavior-y: auto !important;
+    touch-action: pan-y pinch-zoom !important;
+  }
+
+  body {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body.modal-scroll-lock,
+  body:has(.gallery-viewer-backdrop),
+  body:has(.home-detail-backdrop) {
+    overflow-y: auto !important;
+  }
+
+  .app-shell,
+  .main-column,
+  .page,
+  .public-surface,
+  .admin-surface {
+    touch-action: pan-y pinch-zoom;
+  }
+
+  .home-detail-modal,
+  .gallery-viewer,
+  .sidebar,
+  .sidebar nav {
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+
+  .home-detail-modal,
+  .gallery-viewer,
+  .sidebar nav {
+    overscroll-behavior: contain;
+  }
+
+  /* Certains WebView/Chrome MIUI gèrent mal content-visibility:auto lors du calcul
+     de la hauteur de page. On privilégie ici un scroll fiable à cette optimisation. */
+  @supports (content-visibility: auto) {
+    .home-dashboard-compact > .home-live-section,
+    .home-dashboard-compact > .home-amicale-section,
+    .home-dashboard-compact > section {
+      content-visibility: visible !important;
+      contain-intrinsic-size: auto !important;
+    }
+  }
+}
