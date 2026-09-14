@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { readOfflineEntry } from '../../lib/offlineCache.js'
 import { PageTitle } from '../Actualites.jsx'
+import HomeOpenPolls from '../../components/HomeOpenPolls.jsx'
 import '../../home-refactor.css'
 import '../../offline-v2.css'
 
@@ -67,14 +68,15 @@ export default function OfflineDashboard() {
 
   return <div className="home-dashboard home-dashboard-compact">
     <PageTitle eyebrow="Mode hors ligne" title={profile?.full_name ? `Bonjour ${profile.full_name}` : 'Accueil'} text="Les dernières publications synchronisées restent consultables sans réseau." />
-    <div className="offline-v2-notice"><strong>Consultation hors ligne</strong><span>{entry?.savedAt ? `Copie synchronisée le ${new Date(entry.savedAt).toLocaleString('fr-FR')}. ` : ''}Publications, agenda, albums, bons plans et sondages restent accessibles depuis les raccourcis ci-dessous.</span></div>
+    <div className="offline-v2-notice"><strong>Consultation hors ligne</strong><span>{entry?.savedAt ? `Copie synchronisée le ${new Date(entry.savedAt).toLocaleString('fr-FR')}. ` : ''}Publications, agenda, albums, bons plans et sondages ouverts restent accessibles directement depuis l’accueil.</span></div>
 
     <nav className="home-app-actions" aria-label="Raccourcis hors ligne">
       <Link to="/agenda"><span>📅</span><strong>Agenda</strong></Link>
-      <Link to="/sondages"><span>✓</span><strong>Sondages</strong></Link>
       <Link to="/bons-plans"><span>★</span><strong>Bons plans</strong></Link>
       <Link to="/galerie"><span>▦</span><strong>Albums</strong></Link>
     </nav>
+
+    <HomeOpenPolls />
 
     {!entry ? <div className="empty-state">Aucune copie de l’accueil n’est encore disponible. Reconnectez l’appareil une fois pour préparer automatiquement le mode hors ligne.</div> : <>
       <section className="home-live-section"><div className="home-section-title"><div><span className="eyebrow">À la une</span><h2>Publications récentes</h2></div><Link className="home-more" to="/agenda">Agenda →</Link></div>{publications.length ? <div className="home-editorial-grid compact-grid">{publications.map((item) => <OfflineTile key={`${item._kind}-${item.id}`} item={item} onOpen={() => setDetail({ kind: item._kind, item })} />)}</div> : <div className="empty-state">Aucune publication enregistrée.</div>}</section>

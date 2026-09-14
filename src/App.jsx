@@ -17,7 +17,6 @@ import OfflineDashboard from './pages/offline/OfflineDashboard.jsx'
 import OfflineAgenda from './pages/offline/OfflineAgenda.jsx'
 import OfflineGalerie from './pages/offline/OfflineGalerie.jsx'
 import OfflineBonsPlans from './pages/offline/OfflineBonsPlans.jsx'
-import OfflineSondages from './pages/offline/OfflineSondages.jsx'
 
 // Les écrans membre sont inclus dans le shell PWA pour rester ouvrables hors ligne.
 // Les écrans d'administration, volontairement online-only, restent découpés à la demande.
@@ -65,7 +64,7 @@ export default function App() {
     <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
       <Route index element={<OfflineAware online={Dashboard} offline={OfflineDashboard} />} />
       <Route path="agenda" element={<OfflineAware online={Agenda} offline={OfflineAgenda} />} />
-      <Route path="sondages" element={<OfflineAware online={Sondages} offline={OfflineSondages} />} />
+      <Route path="sondages" element={<Navigate to="/" replace />} />
       <Route path="galerie" element={<OfflineAware online={Galerie} offline={OfflineGalerie} />} />
       <Route path="bons-plans" element={<OfflineAware online={BonsPlans} offline={OfflineBonsPlans} />} />
       <Route path="notifications" element={<Notifications />} />
