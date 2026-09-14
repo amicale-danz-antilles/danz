@@ -14,25 +14,44 @@ function safeError(error) {
   return message.slice(0, 280)
 }
 
-async function syncRecord(record, userId) {
-  if (record.type === 'poll_vote') {
-    const pollId = record.payload?.poll_id
-    const hasOption = Object.prototype.hasOwnProperty.call(record.payload || {}, 'option_id')
-    if (!pollId || !hasOption) return { error: new Error('Vote hors ligne incomplet.') }
+async function syncPollVote(record, userId) {
+  const pollId = record.payload?.poll_id
+  const hasOption = Object.prototype.hasOwnProperty.call(record.payload || {}, 'option_id')
+  if (!pollId || !hasOption) return { error: new Error('Vote hors ligne incomplet.') }
 
-    if (record.payload.option_id === null) {
-      return supabase.from('poll_votes').delete().eq('poll_id', pollId).eq('user_id', userId)
-    }
+  if (record.payload.option_id === null) {
+    const result = await supabase
+      .from('poll_votes')
+      .delete()
+      .eq('poll_id', pollId)
+      .eq('user_id', userId)
+      .select('poll_id')
+    if (result.error) return result
+    if (result.data?.length) return result
 
-    const payload = {
-      poll_id: pollId,
-      option_id: record.payload.option_id,
-      user_id: userId,
-      updated_at: new Date().toISOString(),
-    }
-    if (!payload.option_id) return { error: new Error('Vote hors ligne incomplet.') }
-    return supabase.from('poll_votes').upsert(payload, { onConflict: 'poll_id,user_id' })
+    const remaining = await supabase
+      .from('poll_votes')
+      .select('poll_id')
+      .eq('poll_id', pollId)
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (remaining.error) return remaining
+    if (remaining.data) return { error: new Error('Le sondage a été clôturé avant la synchronisation : le vote ne peut plus être retiré.') }
+    return { data: [], error: null }
   }
+
+  const payload = {
+    poll_id: pollId,
+    option_id: record.payload.option_id,
+    user_id: userId,
+    updated_at: new Date().toISOString(),
+  }
+  if (!payload.option_id) return { error: new Error('Vote hors ligne incomplet.') }
+  return supabase.from('poll_votes').upsert(payload, { onConflict: 'poll_id,user_id' })
+}
+
+async function syncRecord(record, userId) {
+  if (record.type === 'poll_vote') return syncPollVote(record, userId)
 
   if (record.type === 'good_deal_submission') {
     const payload = {
