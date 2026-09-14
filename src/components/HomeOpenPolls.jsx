@@ -7,6 +7,7 @@ import '../polls-bureau.css'
 import '../home-polls.css'
 
 const isOpen = (poll) => poll?.active === true && (!poll.closes_at || new Date(poll.closes_at).getTime() > Date.now())
+const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key)
 
 function groupOptions(rows = []) {
   const grouped = {}
@@ -51,7 +52,9 @@ export default function HomeOpenPolls() {
     const rows = await listOfflineMutations(user.id).catch(() => [])
     const next = {}
     for (const row of rows) {
-      if (row.type === 'poll_vote' && row.payload?.poll_id && row.payload?.option_id) next[row.payload.poll_id] = row.payload.option_id
+      if (row.type === 'poll_vote' && row.payload?.poll_id && Object.prototype.hasOwnProperty.call(row.payload, 'option_id')) {
+        next[row.payload.poll_id] = row.payload.option_id || null
+      }
     }
     setQueuedVotes(next)
   }
@@ -123,8 +126,10 @@ export default function HomeOpenPolls() {
 
   const vote = async (pollId, optionId) => {
     if (!user?.id) return
-    const previous = selectedVotes[pollId]
-    if (previous === optionId) return
+    const queued = hasOwn(queuedVotes, pollId)
+    const previous = queued ? queuedVotes[pollId] : (votes[pollId] || null)
+    const nextOptionId = previous === optionId ? null : optionId
+
     setBusyPoll(pollId); setError(''); setMessage('')
     try {
       if (!navigator.onLine) {
@@ -132,19 +137,28 @@ export default function HomeOpenPolls() {
           userId: user.id,
           type: 'poll_vote',
           dedupeKey: `poll-vote:${pollId}`,
-          payload: { poll_id: pollId, option_id: optionId },
+          payload: { poll_id: pollId, option_id: nextOptionId },
         })
-        setQueuedVotes((current) => ({ ...current, [pollId]: optionId }))
-        setMessage('Nouveau choix enregistré sur cet appareil. Il sera synchronisé au retour d’Internet.')
+        setQueuedVotes((current) => ({ ...current, [pollId]: nextOptionId }))
+        setMessage(nextOptionId
+          ? (previous ? 'Votre nouveau choix est enregistré sur cet appareil. Il sera synchronisé au retour d’Internet.' : 'Votre choix est enregistré sur cet appareil. Il sera synchronisé au retour d’Internet.')
+          : 'Le retrait de votre vote est enregistré sur cet appareil. Il sera synchronisé au retour d’Internet.')
+      } else if (nextOptionId === null) {
+        const { error: deleteError } = await supabase.from('poll_votes').delete().eq('poll_id', pollId).eq('user_id', user.id)
+        if (deleteError) throw deleteError
+        setVotes((current) => { const next = { ...current }; delete next[pollId]; return next })
+        setQueuedVotes((current) => { const next = { ...current }; delete next[pollId]; return next })
+        setMessage('Votre vote a bien été retiré.')
+        await load()
       } else {
         const { error: voteError } = await supabase.from('poll_votes').upsert({
           poll_id: pollId,
           user_id: user.id,
-          option_id: optionId,
+          option_id: nextOptionId,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'poll_id,user_id' })
         if (voteError) throw voteError
-        setVotes((current) => ({ ...current, [pollId]: optionId }))
+        setVotes((current) => ({ ...current, [pollId]: nextOptionId }))
         setQueuedVotes((current) => { const next = { ...current }; delete next[pollId]; return next })
         setMessage(previous ? 'Votre vote a bien été modifié.' : 'Votre vote a bien été enregistré.')
         await load()
@@ -165,25 +179,25 @@ export default function HomeOpenPolls() {
     {error && <div className="alert error">{error}</div>}
     {message && <div className="alert success">{message}</div>}
     <div className="home-polls-list">
-      {polls.map((poll) => <HomePollCard key={poll.id} poll={poll} options={options[poll.id] || []} storedVote={votes[poll.id]} selectedVote={selectedVotes[poll.id]} queuedVote={queuedVotes[poll.id]} busy={busyPoll === poll.id} onVote={vote} />)}
+      {polls.map((poll) => <HomePollCard key={poll.id} poll={poll} options={options[poll.id] || []} storedVote={votes[poll.id]} selectedVote={selectedVotes[poll.id]} queuedVote={queuedVotes[poll.id]} hasQueuedVote={hasOwn(queuedVotes, poll.id)} busy={busyPoll === poll.id} onVote={vote} />)}
     </div>
   </section>
 }
 
-function HomePollCard({ poll, options, storedVote, selectedVote, queuedVote, busy, onVote }) {
-  const voteChangedOffline = Boolean(queuedVote && queuedVote !== storedVote)
+function HomePollCard({ poll, options, storedVote, selectedVote, queuedVote, hasQueuedVote, busy, onVote }) {
   const baseTotal = options.reduce((sum, option) => sum + Number(option.vote_count || 0), 0)
-  const effectiveTotal = baseTotal + (queuedVote && !storedVote ? 1 : 0)
+  let effectiveTotal = baseTotal
+  if (hasQueuedVote && storedVote && queuedVote === null) effectiveTotal = Math.max(0, baseTotal - 1)
+  else if (hasQueuedVote && !storedVote && queuedVote) effectiveTotal = baseTotal + 1
 
   return <article className="poll-card home-poll-card">
-    <div className="poll-card-head"><div><span className="poll-status open">Vote ouvert</span><h3>{poll.title}</h3>{poll.description && <p>{poll.description}</p>}<small>{poll.closes_at ? `Clôture : ${new Date(poll.closes_at).toLocaleString('fr-FR')}` : 'Sans date de clôture'}</small>{queuedVote && <span className="offline-pending-badge">⏳ Choix en attente de synchronisation</span>}</div></div>
+    <div className="poll-card-head"><div><span className="poll-status open">Vote ouvert</span><h3>{poll.title}</h3>{poll.description && <p>{poll.description}</p>}<small>{poll.closes_at ? `Clôture : ${new Date(poll.closes_at).toLocaleString('fr-FR')}` : 'Sans date de clôture'}</small>{hasQueuedVote && <span className="offline-pending-badge">⏳ Modification en attente de synchronisation</span>}</div></div>
     <div className="poll-options">
       {options.map((option) => {
         let count = Number(option.vote_count || 0)
-        if (voteChangedOffline && option.id === storedVote) count = Math.max(0, count - 1)
-        if (queuedVote && option.id === queuedVote && queuedVote !== storedVote) count += 1
-        const total = queuedVote ? effectiveTotal : baseTotal
-        const percent = total ? Math.round((count / total) * 100) : 0
+        if (hasQueuedVote && storedVote && option.id === storedVote && queuedVote !== storedVote) count = Math.max(0, count - 1)
+        if (hasQueuedVote && queuedVote && option.id === queuedVote && queuedVote !== storedVote) count += 1
+        const percent = effectiveTotal ? Math.round((count / effectiveTotal) * 100) : 0
         const selected = selectedVote === option.id
         return <button key={option.id} type="button" className={`poll-option ${selected ? 'selected' : ''}`} disabled={busy} onClick={() => onVote(poll.id, option.id)}>
           <div className="poll-option-top"><span>{selected ? '✓ ' : ''}{option.label}</span><strong>{count} voix · {percent}%</strong></div>
@@ -191,6 +205,6 @@ function HomePollCard({ poll, options, storedVote, selectedVote, queuedVote, bus
         </button>
       })}
     </div>
-    <small className="poll-total">{(queuedVote ? effectiveTotal : baseTotal)} vote{(queuedVote ? effectiveTotal : baseTotal) > 1 ? 's' : ''} · Votre réponse n’est pas définitive : sélectionnez simplement une autre proposition pour modifier votre vote tant que le sondage reste ouvert.</small>
+    <small className="poll-total">{effectiveTotal} vote{effectiveTotal > 1 ? 's' : ''} · Touchez une autre réponse pour modifier votre vote, ou touchez à nouveau votre réponse cochée pour retirer votre vote.</small>
   </article>
 }
