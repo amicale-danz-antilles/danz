@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "node scripts/generate-icons.mjs && vite build",
+    "verify:production": "node scripts/verify-production-build.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
