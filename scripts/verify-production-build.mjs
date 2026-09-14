@@ -42,7 +42,7 @@ for (const icon of manifest.icons || []) {
   await assertFile(pathname)
 }
 
-if (!serviceWorker.includes("const CACHE_NAME = 'danz-shell-v19'")) throw new Error('La version attendue du cache PWA v19 est absente.')
+if (!serviceWorker.includes("const CACHE_NAME = 'danz-shell-v20'")) throw new Error('La version attendue du cache PWA v20 est absente.')
 if (!serviceWorker.includes('/danz/image001-1.png')) throw new Error('Le logo officiel n’est pas précaché par le service worker.')
 
 const assetRefs = [...html.matchAll(/(?:src|href)=["']\/danz\/assets\/([^"'?]+)[^"']*["']/g)].map((match) => `assets/${match[1]}`)
