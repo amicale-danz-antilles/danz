@@ -12,7 +12,7 @@ const formatDate = (value) => new Date(value).toLocaleDateString('fr-FR', { day:
 const trimText = (value, max = 120) => { const text = String(value || '').trim(); return text.length > max ? `${text.slice(0, max).trim()}…` : text }
 const isAlbumExpired = (album) => Boolean(album?.transfer_expires_at && new Date(album.transfer_expires_at).getTime() < Date.now())
 const offlineAlbum = (album) => album ? { id: album.id, event_id: album.event_id, item_count: album.item_count, transfer_expires_at: album.transfer_expires_at, expired: isAlbumExpired(album) } : null
-const publicationTime = (item) => new Date(item.publish_at || item.published_at || item.created_at || item.starts_at).getTime() || 0
+const publicationTime = (item) => new Date(item?._kind === 'event' ? (item.starts_at || item.created_at || item.publish_at) : (item.publish_at || item.published_at || item.created_at)).getTime() || 0
 
 const eventSchedule = (event, compact = false) => {
   const start = new Date(event.starts_at)
@@ -48,7 +48,7 @@ export default function Dashboard() {
     const since = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString()
     const [newsResult, eventResult, bureauResult] = await Promise.all([
       supabase.from('news').select('*').eq('published', true).order('publish_at', { ascending: false }).limit(10),
-      supabase.from('events').select('*').gte('starts_at', since).order('publish_at', { ascending: false }).limit(20),
+      supabase.from('events').select('*').gte('starts_at', since).order('starts_at', { ascending: false }).limit(20),
       supabase.from('bureau_members').select('role_key,role_label,full_name,sort_order').order('sort_order'),
     ])
 
@@ -104,11 +104,9 @@ export default function Dashboard() {
   useEffect(() => { const timer = window.setInterval(() => setClock(Date.now()), 60000); return () => window.clearInterval(timer) }, [])
   useEffect(() => {
     if (!detail) return undefined
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
     const onKey = (event) => { if (event.key === 'Escape') setDetail(null) }
     window.addEventListener('keydown', onKey)
-    return () => { document.body.style.overflow = previous; window.removeEventListener('keydown', onKey) }
+    return () => window.removeEventListener('keydown', onKey)
   }, [detail])
 
   const publications = useMemo(() => [

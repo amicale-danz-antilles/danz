@@ -9,7 +9,7 @@ import '../../offline-v2.css'
 const PRIVATE_MEDIA_CACHE = 'danz-private-thumbs-v2'
 const formatDate = (value) => value ? new Date(value).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
 const trimText = (value, max = 150) => { const text = String(value || '').trim(); return text.length > max ? `${text.slice(0, max).trim()}…` : text }
-const publicationTime = (item) => new Date(item.publish_at || item.published_at || item.created_at || item.starts_at).getTime() || 0
+const publicationTime = (item) => new Date(item?._kind === 'event' ? (item.starts_at || item.created_at || item.publish_at) : (item.publish_at || item.published_at || item.created_at)).getTime() || 0
 const eventSchedule = (event) => {
   const start = new Date(event.starts_at)
   if (!event.ends_at) return `${formatDate(start)} · ${start.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
