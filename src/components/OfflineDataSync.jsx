@@ -88,7 +88,7 @@ export default function OfflineDataSync({ userId }) {
         const since = new Date(Date.now() - EVENT_HISTORY_DAYS * 24 * 60 * 60 * 1000).toISOString()
         const [dealsResult, pollsResult, albumsResult, eventsResult, newsResult, bureauResult] = await Promise.all([
           supabase.from('good_deals').select('id,title,category,description,offer_text,address,municipality,latitude,longitude,map_verified,phone,email,website_url,valid_until,audience,created_at').order('created_at', { ascending: false }).limit(80),
-          supabase.from('polls').select('id,title,description,closes_at,active,created_at').order('created_at', { ascending: false }).limit(20),
+          supabase.from('polls').select('id,title,description,closes_at,active,created_at,featured,linked_news_id,linked_event_id').order('created_at', { ascending: false }).limit(20),
           supabase.from('event_albums').select('id,event_id,storage_provider,storage_path,image_url,mime_type,file_size,transfer_expires_at,item_count,download_note,updated_at,event:events(id,title,description,location,starts_at,ends_at,audience)').order('updated_at', { ascending: false }).limit(24),
           supabase.from('events').select('id,title,description,location,starts_at,ends_at,audience,publish_at').gte('starts_at', since).order('starts_at', { ascending: true }).limit(60),
           supabase.from('news').select('id,title,summary,content,audience,publish_at,published_at,created_at').eq('published', true).order('publish_at', { ascending: false }).limit(8),
