@@ -16,13 +16,21 @@ function safeError(error) {
 
 async function syncRecord(record, userId) {
   if (record.type === 'poll_vote') {
+    const pollId = record.payload?.poll_id
+    const hasOption = Object.prototype.hasOwnProperty.call(record.payload || {}, 'option_id')
+    if (!pollId || !hasOption) return { error: new Error('Vote hors ligne incomplet.') }
+
+    if (record.payload.option_id === null) {
+      return supabase.from('poll_votes').delete().eq('poll_id', pollId).eq('user_id', userId)
+    }
+
     const payload = {
-      poll_id: record.payload?.poll_id,
-      option_id: record.payload?.option_id,
+      poll_id: pollId,
+      option_id: record.payload.option_id,
       user_id: userId,
       updated_at: new Date().toISOString(),
     }
-    if (!payload.poll_id || !payload.option_id) return { error: new Error('Vote hors ligne incomplet.') }
+    if (!payload.option_id) return { error: new Error('Vote hors ligne incomplet.') }
     return supabase.from('poll_votes').upsert(payload, { onConflict: 'poll_id,user_id' })
   }
 
