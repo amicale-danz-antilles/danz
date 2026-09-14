@@ -11,6 +11,7 @@ import './mobile-fixes.css'
 import './quality-v2.css'
 import './offline-hardening.css'
 import './desktop-home-fix.css'
+import './mobile-scroll-fix.css'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -23,6 +24,19 @@ createRoot(document.getElementById('root')).render(
     </AppErrorBoundary>
   </StrictMode>,
 )
+
+const releaseStaleScrollLock = () => {
+  const blockingLayer = document.querySelector('.home-detail-backdrop, .gallery-viewer-backdrop, .sidebar.open')
+  if (blockingLayer) return
+  document.body.style.removeProperty('overflow')
+  document.documentElement.style.removeProperty('overflow')
+}
+
+window.addEventListener('pageshow', releaseStaleScrollLock)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') window.requestAnimationFrame(releaseStaleScrollLock)
+})
+window.requestAnimationFrame(releaseStaleScrollLock)
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
