@@ -88,7 +88,7 @@ export default function OfflineDataSync({ userId }) {
         const since = new Date(Date.now() - EVENT_HISTORY_DAYS * 24 * 60 * 60 * 1000).toISOString()
         const [dealsResult, pollsResult, albumsResult, eventsResult, newsResult, bureauResult] = await Promise.all([
           supabase.from('good_deals').select('id,title,category,description,offer_text,address,municipality,latitude,longitude,map_verified,phone,email,website_url,valid_until,audience,created_at').order('created_at', { ascending: false }).limit(80),
-          supabase.from('polls').select('id,title,description,closes_at,active,created_at,featured,linked_news_id,linked_event_id').order('created_at', { ascending: false }).limit(20),
+          supabase.from('polls').select('id,title,description,closes_at,active,created_at,featured,linked_news_id,linked_event_id,poll_type,published').order('created_at', { ascending: false }).limit(20),
           supabase.from('event_albums').select('id,event_id,storage_provider,storage_path,image_url,mime_type,file_size,transfer_expires_at,item_count,download_note,updated_at,event:events(id,title,description,location,starts_at,ends_at,audience)').order('updated_at', { ascending: false }).limit(24),
           supabase.from('events').select('id,title,description,location,starts_at,ends_at,audience,publish_at').gte('starts_at', since).order('starts_at', { ascending: true }).limit(60),
           supabase.from('news').select('id,title,summary,content,audience,publish_at,published_at,created_at').eq('published', true).order('publish_at', { ascending: false }).limit(8),
@@ -102,15 +102,28 @@ export default function OfflineDataSync({ userId }) {
         const polls = pollsResult.data || []
         if (!pollsResult.error && polls.length) {
           const ids = polls.map((item) => item.id)
-          const [optionsResult, votesResult] = await Promise.all([
+          const questionnaireIds = polls.filter((item) => item.poll_type === 'questionnaire').map((item) => item.id)
+          const [optionsResult, votesResult, questionsResult, questionnaireAnswersResult] = await Promise.all([
             supabase.from('poll_options').select('id,poll_id,label,sort_order,vote_count').in('poll_id', ids).order('sort_order'),
             supabase.from('poll_votes').select('poll_id,option_id').eq('user_id', userId),
+            questionnaireIds.length
+              ? supabase.from('poll_questions').select('id,poll_id,prompt,question_type,sort_order,required,attendance_gate,settings').in('poll_id', questionnaireIds).order('sort_order')
+              : Promise.resolve({ data: [], error: null }),
+            questionnaireIds.length
+              ? supabase.from('poll_question_answers').select('poll_id,question_id,answer_boolean,answer_number,answer_text').eq('user_id', userId).in('poll_id', questionnaireIds)
+              : Promise.resolve({ data: [], error: null }),
           ])
-          if (!optionsResult.error && !votesResult.error) {
-            saveOfflineData(userId, 'polls', { polls, options: optionsResult.data || [], votes: votesResult.data || [] })
+          if (!optionsResult.error && !votesResult.error && !questionsResult.error && !questionnaireAnswersResult.error) {
+            saveOfflineData(userId, 'polls', {
+              polls,
+              options: optionsResult.data || [],
+              votes: votesResult.data || [],
+              questions: questionsResult.data || [],
+              questionAnswers: questionnaireAnswersResult.data || [],
+            })
           }
         } else if (!pollsResult.error) {
-          saveOfflineData(userId, 'polls', { polls: [], options: [], votes: [] })
+          saveOfflineData(userId, 'polls', { polls: [], options: [], votes: [], questions: [], questionAnswers: [] })
         }
 
         const albums = albumsResult.data || []
