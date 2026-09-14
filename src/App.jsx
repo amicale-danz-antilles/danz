@@ -12,6 +12,7 @@ import Galerie from './pages/Galerie.jsx'
 import BonsPlans from './pages/BonsPlans.jsx'
 import Sondages from './pages/Sondages.jsx'
 import Profile from './pages/Profile.jsx'
+import Notifications from './pages/Notifications.jsx'
 import OfflineDashboard from './pages/offline/OfflineDashboard.jsx'
 import OfflineAgenda from './pages/offline/OfflineAgenda.jsx'
 import OfflineGalerie from './pages/offline/OfflineGalerie.jsx'
@@ -67,6 +68,7 @@ export default function App() {
       <Route path="sondages" element={<OfflineAware online={Sondages} offline={OfflineSondages} />} />
       <Route path="galerie" element={<OfflineAware online={Galerie} offline={OfflineGalerie} />} />
       <Route path="bons-plans" element={<OfflineAware online={BonsPlans} offline={OfflineBonsPlans} />} />
+      <Route path="notifications" element={<Notifications />} />
       <Route path="profil" element={<Profile />} />
       <Route path="actualites" element={<Navigate to="/" replace />} />
       <Route path="documents" element={<Navigate to="/" replace />} />
@@ -78,6 +80,7 @@ export default function App() {
       <Route path="administration/systeme" element={adminOnline(<AdminSystemStatus />)} />
       <Route path="administration/contenus" element={adminOnline(<AdminContent />)} />
       <Route path="administration/galerie" element={<Navigate to="/administration/contenus?type=albums" replace />} />
+      <Route path="administration/notifications" element={<Navigate to="/notifications" replace />} />
       <Route path="administration/bons-plans" element={adminOnline(<BonsPlans />)} />
       <Route path="administration/sondages" element={adminOnline(<Sondages />)} />
       <Route path="administration/bureau" element={adminOnline(<Amicale />)} />

@@ -10,6 +10,7 @@ import '../../offline-v2.css'
 const escapeIcs = (value = '') => String(value).replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;')
 const icsDate = (value) => new Date(value).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
 const isAlbumExpired = (album) => Boolean(album?.transfer_expires_at && new Date(album.transfer_expires_at).getTime() < Date.now())
+const newestFirst = (rows = []) => [...rows].sort((a, b) => new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime())
 
 export default function OfflineAgenda() {
   const { user } = useAuth()
@@ -17,7 +18,7 @@ export default function OfflineAgenda() {
   const entry = useMemo(() => readOfflineEntry(user?.id, 'agenda-rich') || readOfflineEntry(user?.id, 'agenda'), [user?.id])
   const albumsEntry = useMemo(() => readOfflineEntry(user?.id, 'albums'), [user?.id])
   const data = entry?.data || { items: [], albums: {}, covers: {} }
-  const items = data.items || []
+  const items = useMemo(() => newestFirst(data.items || []), [data.items])
   const localAlbumByEvent = useMemo(() => new Map((albumsEntry?.data || []).map((album) => [album.event_id, album])), [albumsEntry])
 
   const albumFor = (eventId) => {
@@ -49,7 +50,7 @@ export default function OfflineAgenda() {
   }
 
   return <>
-    <PageTitle eyebrow="Mode hors ligne" title="Agenda" text="Les rendez-vous synchronisés restent consultables sans réseau, avec leurs informations principales et certaines miniatures." />
+    <PageTitle eyebrow="Mode hors ligne" title="Agenda" text="Les rendez-vous synchronisés sont affichés du plus récent au plus ancien, avec leurs informations principales et certaines miniatures." />
     <div className="offline-v2-notice"><strong>Agenda disponible hors ligne</strong><span>{entry?.savedAt ? `Copie synchronisée le ${new Date(entry.savedAt).toLocaleString('fr-FR')}. ` : ''}Vous pouvez aussi générer un fichier calendrier local sans connexion.</span></div>
     {!entry ? <div className="empty-state">Aucune copie de l’agenda n’est encore disponible. Reconnectez l’appareil une fois pour la préparer automatiquement.</div> : <div className="timeline">{items.length ? items.map((event) => {
       const date = new Date(event.starts_at)
