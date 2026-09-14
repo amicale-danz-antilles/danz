@@ -121,21 +121,45 @@ export default function Sondages() {
     setError('')
     setMessage('')
 
-    if (nextOptionId === null) {
-      const { error: deleteError } = await supabase.from('poll_votes').delete().eq('poll_id', pollId).eq('user_id', user.id)
-      if (deleteError) setError(deleteError.message)
-      else { setMessage('Votre vote a été retiré.'); await load() }
-    } else {
-      const { error: voteError } = await supabase.from('poll_votes').upsert({
-        poll_id: pollId,
-        user_id: user.id,
-        option_id: nextOptionId,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'poll_id,user_id' })
-      if (voteError) setError(voteError.message)
-      else { setMessage(previous ? 'Votre vote a été modifié.' : 'Votre vote a été enregistré.'); await load() }
+    try {
+      if (nextOptionId === null) {
+        const { data: deletedRows, error: deleteError } = await supabase
+          .from('poll_votes')
+          .delete()
+          .eq('poll_id', pollId)
+          .eq('user_id', user.id)
+          .select('poll_id')
+        if (deleteError) throw deleteError
+
+        if (!deletedRows?.length) {
+          const { data: remaining, error: remainingError } = await supabase
+            .from('poll_votes')
+            .select('poll_id')
+            .eq('poll_id', pollId)
+            .eq('user_id', user.id)
+            .maybeSingle()
+          if (remainingError) throw remainingError
+          if (remaining) throw new Error('Le sondage vient d’être clôturé : votre vote ne peut plus être retiré.')
+        }
+        setMessage('Votre vote a été retiré.')
+        await load()
+      } else {
+        const { error: voteError } = await supabase.from('poll_votes').upsert({
+          poll_id: pollId,
+          user_id: user.id,
+          option_id: nextOptionId,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'poll_id,user_id' })
+        if (voteError) throw voteError
+        setMessage(previous ? 'Votre vote a été modifié.' : 'Votre vote a été enregistré.')
+        await load()
+      }
+    } catch (voteError) {
+      setError(voteError?.message || 'Impossible d’enregistrer cette modification de vote.')
+      await load().catch(() => {})
+    } finally {
+      setBusyPoll(null)
     }
-    setBusyPoll(null)
   }
 
   const createPoll = async (event) => {
