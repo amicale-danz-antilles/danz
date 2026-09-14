@@ -6,6 +6,23 @@ import { PageTitle } from './Actualites.jsx'
 import '../extra.css'
 import '../polls-bureau.css'
 
+const publicationKey = (poll) => poll?.linked_event_id ? `event:${poll.linked_event_id}` : poll?.linked_news_id ? `news:${poll.linked_news_id}` : ''
+const linkPayload = (value) => {
+  const [kind, id] = String(value || '').split(':')
+  return {
+    linked_news_id: kind === 'news' && id ? id : null,
+    linked_event_id: kind === 'event' && id ? id : null,
+  }
+}
+const publicationSortTime = (item) => new Date(item.kind === 'event' ? (item.starts_at || item.publish_at || item.created_at) : (item.publish_at || item.published_at || item.created_at)).getTime() || 0
+const publicationLabel = (item) => {
+  if (item.kind === 'event') {
+    const when = item.starts_at ? new Date(item.starts_at).toLocaleDateString('fr-FR') : ''
+    return `Événement · ${item.title}${when ? ` · ${when}` : ''}`
+  }
+  return `Information · ${item.title}`
+}
+
 export default function Sondages() {
   const { user, isAdmin } = useAuth()
   const location = useLocation()
@@ -14,6 +31,7 @@ export default function Sondages() {
   const [options, setOptions] = useState({})
   const [votes, setVotes] = useState({})
   const [voterDetails, setVoterDetails] = useState({})
+  const [publicationOptions, setPublicationOptions] = useState([])
   const [loading, setLoading] = useState(true)
   const [busyPoll, setBusyPoll] = useState(null)
   const [error, setError] = useState('')
@@ -24,7 +42,26 @@ export default function Sondages() {
   const [closesAt, setClosesAt] = useState('')
   const [choices, setChoices] = useState(['', ''])
   const [notifyOnPublish, setNotifyOnPublish] = useState(true)
+  const [linkedPublication, setLinkedPublication] = useState('')
+  const [featured, setFeatured] = useState(false)
   const [creating, setCreating] = useState(false)
+
+  const loadPublications = async () => {
+    if (!adminMode) return setPublicationOptions([])
+    const now = new Date().toISOString()
+    const [newsResult, eventResult] = await Promise.all([
+      supabase.from('news').select('id,title,publish_at,published_at,created_at').eq('published', true).lte('publish_at', now).order('publish_at', { ascending: false }).limit(80),
+      supabase.from('events').select('id,title,starts_at,ends_at,publish_at,created_at').eq('published', true).lte('publish_at', now).order('starts_at', { ascending: false }).limit(80),
+    ])
+    if (newsResult.error || eventResult.error) {
+      setError('Les sondages restent disponibles, mais la liste des publications associables n’a pas pu être chargée complètement.')
+    }
+    const merged = [
+      ...(newsResult.data || []).map((item) => ({ ...item, kind: 'news' })),
+      ...(eventResult.data || []).map((item) => ({ ...item, kind: 'event' })),
+    ].sort((a, b) => publicationSortTime(b) - publicationSortTime(a))
+    setPublicationOptions(merged)
+  }
 
   const load = async () => {
     setLoading(true)
@@ -110,6 +147,7 @@ export default function Sondages() {
   }
 
   useEffect(() => { load() }, [adminMode, user?.id])
+  useEffect(() => { loadPublications() }, [adminMode])
 
   const activePolls = useMemo(() => polls.filter((poll) => isOpen(poll)), [polls])
   const closedPolls = useMemo(() => polls.filter((poll) => !isOpen(poll)), [polls])
@@ -175,6 +213,8 @@ export default function Sondages() {
       description: description.trim() || null,
       closes_at: closesAt ? new Date(closesAt).toISOString() : null,
       notify_on_publish: notifyOnPublish,
+      featured,
+      ...linkPayload(linkedPublication),
       created_by: user.id,
     }).select().single()
     if (pollError) {
@@ -192,7 +232,7 @@ export default function Sondages() {
       await supabase.from('polls').delete().eq('id', poll.id)
       setError(optionError.message)
     } else {
-      setTitle(''); setDescription(''); setClosesAt(''); setChoices(['', '']); setNotifyOnPublish(true); setShowCreate(false)
+      setTitle(''); setDescription(''); setClosesAt(''); setChoices(['', '']); setNotifyOnPublish(true); setLinkedPublication(''); setFeatured(false); setShowCreate(false)
       setMessage(notifyOnPublish ? 'Sondage publié. La notification sera traitée automatiquement.' : 'Sondage publié sans notification.')
       await load()
     }
@@ -201,7 +241,7 @@ export default function Sondages() {
 
   const closePoll = async (poll) => {
     if (!window.confirm(`Clôturer « ${poll.title} » maintenant ?`)) return
-    const { error: updateError } = await supabase.from('polls').update({ active: false, updated_at: new Date().toISOString() }).eq('id', poll.id)
+    const { error: updateError } = await supabase.from('polls').update({ active: false, featured: false, updated_at: new Date().toISOString() }).eq('id', poll.id)
     if (updateError) setError(updateError.message)
     else await load()
   }
@@ -215,6 +255,23 @@ export default function Sondages() {
     setBusyPoll(null)
   }
 
+  const updatePollLink = async (poll, value) => {
+    setBusyPoll(poll.id); setError(''); setMessage('')
+    const { error: updateError } = await supabase.from('polls').update({ ...linkPayload(value), updated_at: new Date().toISOString() }).eq('id', poll.id)
+    if (updateError) setError(updateError.message || 'Impossible de modifier la publication associée.')
+    else { setMessage(value ? 'Publication associée au sondage.' : 'Association avec la publication supprimée.'); await load() }
+    setBusyPoll(null)
+  }
+
+  const toggleFeatured = async (poll) => {
+    setBusyPoll(poll.id); setError(''); setMessage('')
+    const next = !poll.featured
+    const { error: updateError } = await supabase.from('polls').update({ featured: next, updated_at: new Date().toISOString() }).eq('id', poll.id)
+    if (updateError) setError(updateError.message || 'Impossible de modifier la mise à la une.')
+    else { setMessage(next ? 'Sondage placé à la une de l’accueil.' : 'Sondage retiré de la une.'); await load() }
+    setBusyPoll(null)
+  }
+
   const removePoll = async (poll) => {
     if (!window.confirm(`Supprimer définitivement « ${poll.title} » et tous ses votes ?`)) return
     const { error: deleteError } = await supabase.from('polls').delete().eq('id', poll.id)
@@ -223,10 +280,10 @@ export default function Sondages() {
   }
 
   return <>
-    <PageTitle eyebrow={adminMode ? 'Administration' : 'Votre avis compte'} title={adminMode ? 'Gestion des sondages' : 'Sondages'} text={adminMode ? 'Créez, clôturez, renotifiez ou supprimez les sondages. Les listes nominatives restent visibles avant et après clôture.' : 'Votez pour les futures activités de l’Amicale et suivez les préférences des membres.'} />
+    <PageTitle eyebrow={adminMode ? 'Administration' : 'Votre avis compte'} title={adminMode ? 'Gestion des sondages' : 'Sondages'} text={adminMode ? 'Créez, rattachez à une publication, placez à la une, clôturez ou supprimez les sondages. Les listes nominatives restent visibles avant et après clôture.' : 'Votez pour les futures activités de l’Amicale et suivez les préférences des membres.'} />
 
     {adminMode && <div className="poll-admin-bar">
-      <div><strong>Gestion des sondages</strong><span>Les sondages les plus récents sont affichés en premier. Le nombre de votants et les listes par réponse sont conservés après clôture.</span></div>
+      <div><strong>Gestion des sondages</strong><span>Un sondage peut être lié à une information ou un événement et rester épinglé à la une tant qu’il est ouvert.</span></div>
       <button className="secondary-button" onClick={() => setShowCreate(!showCreate)}>{showCreate ? 'Fermer' : '＋ Nouveau sondage'}</button>
     </div>}
 
@@ -235,6 +292,7 @@ export default function Sondages() {
         <h2>Nouveau sondage</h2>
         <label>Titre<input required maxLength="180" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex. Quelle activité pour le mois prochain ?" /></label>
         <label>Description (facultatif)<textarea rows="3" maxLength="1200" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Précisez le contexte, la période ou les contraintes." /></label>
+        <label>Publication associée (facultatif)<select value={linkedPublication} onChange={(e) => setLinkedPublication(e.target.value)}><option value="">Aucune publication associée</option>{publicationOptions.map((item) => <option key={`${item.kind}-${item.id}`} value={`${item.kind}:${item.id}`}>{publicationLabel(item)}</option>)}</select><small>Le sondage affichera le contexte de cette publication sur l’accueil.</small></label>
         <label>Date et heure de clôture (facultatif)<input type="datetime-local" value={closesAt} onChange={(e) => setClosesAt(e.target.value)} /></label>
         <div className="poll-choice-editor">
           <strong>Propositions</strong>
@@ -244,6 +302,7 @@ export default function Sondages() {
           </div>)}
           <button type="button" className="ghost-button" onClick={() => setChoices([...choices, ''])}>＋ Ajouter une proposition</button>
         </div>
+        <label className="admin-notification-toggle"><span><strong>Épingler à la une sur l’accueil</strong><small>Le sondage sera placé avant les autres sondages ouverts et restera en haut tant qu’il est actif.</small></span><input type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)} /></label>
         <label className="admin-notification-toggle"><span><strong>Notifier les utilisateurs</strong><small>Respecte le réglage global “Sondages” et la préférence de chaque utilisateur.</small></span><input type="checkbox" checked={notifyOnPublish} onChange={(e) => setNotifyOnPublish(e.target.checked)} /></label>
         <button className="primary-button" disabled={creating}>{creating ? 'Création…' : 'Publier le sondage'}</button>
       </form>
@@ -253,33 +312,36 @@ export default function Sondages() {
     {message && <div className="alert success" style={{ marginBottom: '1rem' }}>{message}</div>}
 
     {loading ? <div className="skeleton-card tall" /> : <>
-      <PollSection title="Sondages ouverts" empty="Aucun sondage ouvert pour le moment." polls={activePolls} options={options} votes={votes} voterDetails={voterDetails} busyPoll={busyPoll} isAdmin={adminMode} onVote={vote} onClose={closePoll} onRemove={removePoll} onResend={resendNotification} />
-      {closedPolls.length > 0 && <PollSection title="Sondages clôturés" polls={closedPolls} options={options} votes={votes} voterDetails={voterDetails} busyPoll={busyPoll} isAdmin={adminMode} onVote={vote} onClose={closePoll} onRemove={removePoll} onResend={resendNotification} />}
+      <PollSection title="Sondages ouverts" empty="Aucun sondage ouvert pour le moment." polls={activePolls} options={options} votes={votes} voterDetails={voterDetails} publicationOptions={publicationOptions} busyPoll={busyPoll} isAdmin={adminMode} onVote={vote} onClose={closePoll} onRemove={removePoll} onResend={resendNotification} onLinkChange={updatePollLink} onFeaturedToggle={toggleFeatured} />
+      {closedPolls.length > 0 && <PollSection title="Sondages clôturés" polls={closedPolls} options={options} votes={votes} voterDetails={voterDetails} publicationOptions={publicationOptions} busyPoll={busyPoll} isAdmin={adminMode} onVote={vote} onClose={closePoll} onRemove={removePoll} onResend={resendNotification} onLinkChange={updatePollLink} onFeaturedToggle={toggleFeatured} />}
     </>}
   </>
 }
 
-function PollSection({ title, empty, polls, options, votes, voterDetails, busyPoll, isAdmin, onVote, onClose, onRemove, onResend }) {
+function PollSection({ title, empty, polls, options, votes, voterDetails, publicationOptions, busyPoll, isAdmin, onVote, onClose, onRemove, onResend, onLinkChange, onFeaturedToggle }) {
   return <section className="poll-section">
     <div className="section-heading"><div><span className="eyebrow">Activités à venir</span><h2>{title}</h2></div></div>
     <div className="poll-list">
-      {polls.length ? polls.map((poll) => <PollCard key={poll.id} poll={poll} options={options[poll.id] || []} vote={votes[poll.id]} voterInfo={voterDetails[poll.id]} busy={busyPoll === poll.id} isAdmin={isAdmin} onVote={onVote} onClose={onClose} onRemove={onRemove} onResend={onResend} />) : <div className="empty-state">{empty}</div>}
+      {polls.length ? polls.map((poll) => <PollCard key={poll.id} poll={poll} options={options[poll.id] || []} vote={votes[poll.id]} voterInfo={voterDetails[poll.id]} publicationOptions={publicationOptions} busy={busyPoll === poll.id} isAdmin={isAdmin} onVote={onVote} onClose={onClose} onRemove={onRemove} onResend={onResend} onLinkChange={onLinkChange} onFeaturedToggle={onFeaturedToggle} />) : <div className="empty-state">{empty}</div>}
     </div>
   </section>
 }
 
-function PollCard({ poll, options, vote, voterInfo, busy, isAdmin, onVote, onClose, onRemove, onResend }) {
+function PollCard({ poll, options, vote, voterInfo, publicationOptions, busy, isAdmin, onVote, onClose, onRemove, onResend, onLinkChange, onFeaturedToggle }) {
   const open = isOpen(poll)
   const total = options.reduce((sum, option) => sum + Number(option.vote_count || 0), 0)
   const notificationLabel = poll.notify_on_publish === false ? 'Sans notification' : poll.notified_at ? 'Notification envoyée' : 'Notification en attente'
   const participantCount = isAdmin ? Number(voterInfo?.total || 0) : total
+  const linkedKey = publicationKey(poll)
+  const linkedItem = publicationOptions.find((item) => `${item.kind}:${item.id}` === linkedKey)
 
-  return <article className="poll-card">
+  return <article className={`poll-card ${poll.featured && open ? 'featured-poll-admin' : ''}`}>
     <div className="poll-card-head">
       <div>
-        <span className={`poll-status ${open ? 'open' : 'closed'}`}>{open ? 'Vote ouvert' : 'Vote clôturé'}</span>
+        <div className="poll-status-row"><span className={`poll-status ${open ? 'open' : 'closed'}`}>{open ? 'Vote ouvert' : 'Vote clôturé'}</span>{poll.featured && open && <span className="poll-featured-badge">📌 À la une</span>}</div>
         <h3>{poll.title}</h3>
         {poll.description && <p>{poll.description}</p>}
+        {linkedKey && <div className="poll-linked-publication"><strong>Publication associée</strong><span>{linkedItem ? publicationLabel(linkedItem) : 'Publication associée conservée'}</span></div>}
         <small>{poll.closes_at ? `${open ? 'Clôture' : 'Date de clôture'} : ${new Date(poll.closes_at).toLocaleString('fr-FR')}` : 'Sans date de clôture'}</small>
         {isAdmin && <small className="admin-inline-note"> · {notificationLabel}</small>}
       </div>
@@ -289,6 +351,11 @@ function PollCard({ poll, options, vote, voterInfo, busy, isAdmin, onVote, onClo
         <button type="button" className="ghost-button" onClick={() => onRemove(poll)}>Supprimer</button>
       </div>}
     </div>
+
+    {isAdmin && <div className="poll-placement-controls">
+      <label>Publication associée<select value={linkedKey} disabled={busy} onChange={(e) => onLinkChange(poll, e.target.value)}><option value="">Aucune</option>{publicationOptions.map((item) => <option key={`${item.kind}-${item.id}`} value={`${item.kind}:${item.id}`}>{publicationLabel(item)}</option>)}</select></label>
+      <button type="button" className={`secondary-button poll-featured-button ${poll.featured && open ? 'active' : ''}`} disabled={busy || !open} onClick={() => onFeaturedToggle(poll)}>{poll.featured && open ? 'Retirer de la une' : '📌 Mettre à la une'}</button>
+    </div>}
 
     <div className="poll-options">
       {options.map((option) => {
