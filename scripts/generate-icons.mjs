@@ -3,12 +3,12 @@ import { access, mkdir } from 'node:fs/promises'
 import path from 'node:path'
 
 const publicDir = path.resolve('public')
-const source = path.join(publicDir, 'image001.png')
+const source = path.join(publicDir, 'image001-1.png')
 
 try {
   await access(source)
 } catch {
-  throw new Error('Source du logo officiel introuvable : public/image001.png')
+  throw new Error('Source du logo officiel introuvable : public/image001-1.png')
 }
 
 await mkdir(publicDir, { recursive: true })
@@ -75,12 +75,12 @@ async function makeIcon(size, filename, paddingRatio) {
 }
 
 await Promise.all([
-  makeIcon(64, 'favicon-v7.png', 0.04),
-  makeIcon(180, 'apple-touch-icon-v7.png', 0.07),
-  makeIcon(192, 'icon-192-v7.png', 0.07),
-  makeIcon(512, 'icon-512-v7.png', 0.07),
-  makeIcon(192, 'icon-maskable-192-v7.png', 0.18),
-  makeIcon(512, 'icon-maskable-512-v7.png', 0.18),
+  makeIcon(64, 'favicon-v8.png', 0.04),
+  makeIcon(180, 'apple-touch-icon-v8.png', 0.07),
+  makeIcon(192, 'icon-192-v8.png', 0.07),
+  makeIcon(512, 'icon-512-v8.png', 0.07),
+  makeIcon(192, 'icon-maskable-192-v8.png', 0.18),
+  makeIcon(512, 'icon-maskable-512-v8.png', 0.18),
 ])
 
-console.log('Icônes PWA V7 générées depuis public/image001.png, nouveau logo officiel de l’Amicale DANZ Antilles.')
+console.log('Icônes PWA V8 générées depuis public/image001-1.png, nouveau logo officiel de l’Amicale DANZ Antilles.')
