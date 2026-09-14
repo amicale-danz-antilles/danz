@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { resolvePrivateMediaBatch } from '../lib/mediaStorage.js'
 import { readOfflineData, saveOfflineData } from '../lib/offlineCache.js'
 import HomeOpenPolls from '../components/HomeOpenPolls.jsx'
+import ImageLightbox from '../components/ImageLightbox.jsx'
 import '../extra.css'
 import '../home-refactor.css'
 import '../polls-bureau.css'
@@ -30,6 +31,7 @@ export default function Dashboard() {
   const [bureau, setBureau] = useState([])
   const [loading, setLoading] = useState(true)
   const [detail, setDetail] = useState(null)
+  const [previewCover, setPreviewCover] = useState(null)
   const [error, setError] = useState('')
   const [clock, setClock] = useState(() => Date.now())
 
@@ -119,6 +121,11 @@ export default function Dashboard() {
   const fullName = (profile?.full_name || '').trim()
   const todayLabel = new Date(clock).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 
+  const showCover = (item) => {
+    if (!item?.cover) return
+    setPreviewCover({ src: item.cover, alt: `Couverture · ${item.title || 'Publication'}` })
+  }
+
   const openDetail = async (item) => {
     const kind = item._kind
     const canLoadExtra = navigator.onLine && kind === 'news'
@@ -136,8 +143,8 @@ export default function Dashboard() {
   const PublicationTile = ({ item, priority = false }) => {
     const isEvent = item._kind === 'event'
     const albumLabel = item.album ? (item.album.expired ? '⏱ Expiré' : item.album.item_count != null ? `📷 ${item.album.item_count}` : '📷 Album') : null
-    return <article className="home-editorial-card compact" role="button" tabIndex="0" onClick={() => openDetail(item)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openDetail(item) } }}>
-      <div className="home-tile-media">{item.cover ? <img src={item.cover} alt="" loading={priority ? 'eager' : 'lazy'} decoding="async" fetchPriority={priority ? 'high' : 'auto'} /> : <div className="home-tile-placeholder">{isEvent ? '📅' : '📣'}</div>}{isEvent && albumLabel && <span className="home-album-badge">{albumLabel}</span>}</div>
+    return <article className="home-editorial-card compact" role="button" tabIndex="0" onClick={() => openDetail(item)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openDetail(item) } }}>
+      <div className="home-tile-media">{item.cover ? <button type="button" className="publication-cover-button" aria-label={`Agrandir la couverture de ${item.title}`} onClick={(event) => { event.stopPropagation(); showCover(item) }}><img src={item.cover} alt={`Couverture de ${item.title}`} loading={priority ? 'eager' : 'lazy'} decoding="async" fetchPriority={priority ? 'high' : 'auto'} /></button> : <div className="home-tile-placeholder">{isEvent ? '📅' : '📣'}</div>}{isEvent && albumLabel && <span className="home-album-badge">{albumLabel}</span>}</div>
       <div className="home-tile-body"><span className="role-badge">{isEvent ? 'Événement' : 'Information'}</span><time>{isEvent ? eventSchedule(item, true) : formatDate(item.publish_at || item.published_at)}</time><h3>{item.title}</h3>{isEvent && item.location && <p className="home-tile-location">📍 {item.location}</p>}<p>{trimText(isEvent ? item.description : (item.summary || item.content), 100) || 'Ouvrez la tuile pour consulter les détails.'}</p>{!isEvent && item.assets?.filter((asset) => !asset.is_cover).length > 0 && <span className="home-file-badge">📎 {item.assets.filter((asset) => !asset.is_cover).length}</span>}<span className="home-tile-more">Voir les détails →</span></div>
     </article>
   }
@@ -157,6 +164,7 @@ export default function Dashboard() {
 
     <section className="home-amicale-section"><div className="home-section-title"><div><span className="eyebrow">L’Amicale</span><h2>DANZ Antilles</h2></div></div><div className="text-panel"><p><span className="role-badge">Depuis début 2025 · Association loi 1901</span></p><p>Créée au début de l’année 2025, l’Amicale DANZ Antilles a pour vocation de créer du lien entre les membres, partager les informations utiles et organiser des moments conviviaux, culturels, sportifs, familiaux ou festifs.</p></div><div className="text-panel bureau-panel"><div className="bureau-heading"><div><span className="eyebrow">Organisation</span><h2>Membres du bureau</h2></div></div><div className="bureau-grid">{bureau.map((member) => <article className="bureau-card" key={member.role_key}><span className="bureau-role">{member.role_label}</span><strong>{member.full_name || 'À renseigner'}</strong></article>)}</div></div></section>
 
-    {detail && <div className="home-detail-backdrop" role="presentation" onClick={() => setDetail(null)}><section className="home-detail-modal" role="dialog" aria-modal="true" aria-label={detail.item.title} onClick={(event) => event.stopPropagation()}><button type="button" className="home-detail-close" aria-label="Fermer" onClick={() => setDetail(null)}>×</button>{detail.item.cover && <img className="home-detail-cover" src={detail.item.cover} alt="" decoding="async" />}<div className="home-detail-content"><span className="eyebrow">{detail.kind === 'news' ? 'Information' : 'Événement'}</span><h2>{detail.item.title}</h2>{detail.kind === 'news' ? <><time>{formatDate(detail.item.publish_at || detail.item.published_at)}</time>{detail.item.content && <p className="home-detail-text">{detail.item.content}</p>}{detail.loadingExtra && detail.item.assets?.some((asset) => !asset.is_cover) && <p className="home-detail-loading">Chargement des pièces jointes…</p>}{navigator.onLine && !detail.loadingExtra && detail.item.assets?.filter((asset) => !asset.is_cover && asset.url).length > 0 && <div className="home-detail-files"><strong>Pièces jointes</strong>{detail.item.assets.filter((asset) => !asset.is_cover && asset.url).map((asset) => <a key={asset.id} href={asset.url} target="_blank" rel="noopener noreferrer">📎 {asset.file_name}</a>)}</div>}{detail.extraError && <p className="home-detail-loading">Une ou plusieurs pièces jointes sont temporairement indisponibles.</p>}</> : <><p className="home-detail-meta">{eventSchedule(detail.item)}</p>{detail.item.location && <p className="home-detail-meta">📍 {detail.item.location}</p>}{detail.item.description && <p className="home-detail-text">{detail.item.description}</p>}{detail.item.album && <Link className="secondary-button" to={`/galerie?event=${detail.item.id}`} onClick={() => setDetail(null)}>📷 Ouvrir l’album</Link>}</>}</div></section></div>}
+    {detail && <div className="home-detail-backdrop" role="presentation" onClick={() => setDetail(null)}><section className="home-detail-modal" role="dialog" aria-modal="true" aria-label={detail.item.title} onClick={(event) => event.stopPropagation()}><button type="button" className="home-detail-close" aria-label="Fermer" onClick={() => setDetail(null)}>×</button>{detail.item.cover && <button type="button" className="home-detail-cover-button" aria-label={`Agrandir la couverture de ${detail.item.title}`} onClick={() => showCover(detail.item)}><img className="home-detail-cover" src={detail.item.cover} alt={`Couverture de ${detail.item.title}`} decoding="async" /></button>}<div className="home-detail-content"><span className="eyebrow">{detail.kind === 'news' ? 'Information' : 'Événement'}</span><h2>{detail.item.title}</h2>{detail.kind === 'news' ? <><time>{formatDate(detail.item.publish_at || detail.item.published_at)}</time>{detail.item.content && <p className="home-detail-text">{detail.item.content}</p>}{detail.loadingExtra && detail.item.assets?.some((asset) => !asset.is_cover) && <p className="home-detail-loading">Chargement des pièces jointes…</p>}{navigator.onLine && !detail.loadingExtra && detail.item.assets?.filter((asset) => !asset.is_cover && asset.url).length > 0 && <div className="home-detail-files"><strong>Pièces jointes</strong>{detail.item.assets.filter((asset) => !asset.is_cover && asset.url).map((asset) => <a key={asset.id} href={asset.url} target="_blank" rel="noopener noreferrer">📎 {asset.file_name}</a>)}</div>}{detail.extraError && <p className="home-detail-loading">Une ou plusieurs pièces jointes sont temporairement indisponibles.</p>}</> : <><p className="home-detail-meta">{eventSchedule(detail.item)}</p>{detail.item.location && <p className="home-detail-meta">📍 {detail.item.location}</p>}{detail.item.description && <p className="home-detail-text">{detail.item.description}</p>}{detail.item.album && <Link className="secondary-button" to={`/galerie?event=${detail.item.id}`} onClick={() => setDetail(null)}>📷 Ouvrir l’album</Link>}</>}</div></section></div>}
+    <ImageLightbox src={previewCover?.src} alt={previewCover?.alt} onClose={() => setPreviewCover(null)} />
   </div>
 }
