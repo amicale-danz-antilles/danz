@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { supabase } from '../lib/supabase.js'
 import OfflineDataSync from './OfflineDataSync.jsx'
 import OfflineMutationSync from './OfflineMutationSync.jsx'
+import NotificationOnboarding from './NotificationOnboarding.jsx'
 import { clearOfflineData } from '../lib/offlineCache.js'
 import { clearOfflineMutations, listOfflineMutations } from '../lib/offlineMutations.js'
 import '../admin-central.css'
@@ -11,7 +12,6 @@ import '../admin-central.css'
 const links = [
   ['/', 'Accueil', '⌂'],
   ['/agenda', 'Agenda', '◷'],
-  ['/sondages', 'Sondages', '✓'],
   ['/bons-plans', 'Bons plans', '★'],
   ['/galerie', 'Galerie', '▦'],
   ['/notifications', 'Notifications', '🔔'],
@@ -123,6 +123,7 @@ export default function Layout() {
   return <div className="app-shell">
     <OfflineDataSync userId={user?.id} />
     <OfflineMutationSync userId={user?.id} />
+    <NotificationOnboarding userId={user?.id} />
     <aside className={`sidebar ${open ? 'open' : ''}`} aria-label="Navigation principale">
       <div className="brand"><img src="/danz/Insigne%20CND%20-%20ANTILLES.png" alt="Insigne DANZ Antilles" style={{ width: 52, height: 52, objectFit: 'contain', borderRadius: '12px' }} /><div><strong>Amicale DANZ</strong><span>Antilles</span></div></div>
       <nav>
@@ -141,7 +142,7 @@ export default function Layout() {
     <div className="main-column">
       <header className="topbar"><button className="menu-button" aria-label={open ? 'Fermer le menu' : 'Ouvrir le menu'} aria-expanded={open} onClick={() => setOpen(!open)}>☰</button><div><strong>{spaceTitle}</strong><span>{spaceSubtitle}</span></div></header>
       {updateReady && <div className="app-update-banner" role="status"><span>Une nouvelle version de l’application est prête.</span><button type="button" onClick={() => window.location.reload()}>Mettre à jour</button></div>}
-      {!online && <div className="offline-banner" role="status">Mode hors ligne · Accueil, agenda, albums, bons plans et sondages utilisent la dernière copie synchronisée. Les votes et propositions de bons plans restent enregistrables et seront synchronisés automatiquement. Les réglages de notifications nécessitent Internet. L’administration et les téléchargements complets restent en ligne uniquement.</div>}
+      {!online && <div className="offline-banner" role="status">Mode hors ligne · Accueil, agenda, albums et bons plans utilisent la dernière copie synchronisée. Les sondages ouverts restent visibles sur l’accueil et les votes ou propositions de bons plans seront synchronisés automatiquement. Les réglages de notifications nécessitent Internet. L’administration et les téléchargements complets restent en ligne uniquement.</div>}
       {queueState.total > 0 && <div className={`offline-queue-banner ${queueState.failed ? 'has-error' : ''}`} role="status"><strong>{queueState.total} modification{queueState.total > 1 ? 's' : ''} en attente</strong><span>{online ? 'Synchronisation automatique en cours ou au prochain rafraîchissement.' : 'Elles restent stockées sur cet appareil jusqu’au retour d’Internet.'}{queueState.failed ? ` ${queueState.failed} action${queueState.failed > 1 ? 's ont' : ' a'} rencontré une erreur serveur et sera retentée.` : ''}</span></div>}
       {syncNotice && online && <div className="offline-sync-success" role="status"><span>{syncNotice}</span><button type="button" aria-label="Masquer" onClick={() => setSyncNotice('')}>×</button></div>}
       <main className={`page ${inAdministration ? 'admin-surface' : 'public-surface'}`}><Outlet /></main>
