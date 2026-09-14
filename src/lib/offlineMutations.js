@@ -2,7 +2,7 @@ const DB_NAME = 'danz-offline-mutations-v1'
 const DB_VERSION = 1
 const STORE = 'mutations'
 const MAX_MUTATIONS_PER_USER = 100
-const ALLOWED_TYPES = new Set(['poll_vote', 'good_deal_submission'])
+const ALLOWED_TYPES = new Set(['poll_vote', 'poll_questionnaire', 'good_deal_submission'])
 
 const canUseIndexedDb = () => typeof window !== 'undefined' && 'indexedDB' in window
 const nowIso = () => new Date().toISOString()
