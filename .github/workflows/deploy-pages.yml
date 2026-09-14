@@ -86,7 +86,7 @@ jobs:
 
           grep -q "Amicale DANZ Antilles" /tmp/danz-index.html
           grep -q "icon-192-v8.png" /tmp/danz-manifest.json
-          grep -q "danz-shell-v20" /tmp/danz-sw.js
+          grep -q "danz-shell-v21" /tmp/danz-sw.js
           test -s /tmp/danz-logo.png
           test -s /tmp/danz-favicon.png
           echo "Smoke test production réussi : page, PWA, service worker et identité visuelle sont accessibles."
