@@ -13,6 +13,7 @@ export default function Sondages() {
   const [polls, setPolls] = useState([])
   const [options, setOptions] = useState({})
   const [votes, setVotes] = useState({})
+  const [voterDetails, setVoterDetails] = useState({})
   const [loading, setLoading] = useState(true)
   const [busyPoll, setBusyPoll] = useState(null)
   const [error, setError] = useState('')
@@ -43,14 +44,19 @@ export default function Sondages() {
     if (!list.length) {
       setOptions({})
       setVotes({})
+      setVoterDetails({})
       setLoading(false)
       return
     }
 
     const pollIds = list.map((p) => p.id)
+    const voteQuery = adminMode
+      ? supabase.from('poll_votes').select('poll_id,option_id,user_id,updated_at').in('poll_id', pollIds)
+      : supabase.from('poll_votes').select('poll_id,option_id,user_id').eq('user_id', user.id).in('poll_id', pollIds)
+
     const [{ data: optionData, error: optionError }, { data: voteData, error: voteError }] = await Promise.all([
       supabase.from('poll_options').select('id,poll_id,label,sort_order,vote_count').in('poll_id', pollIds).order('sort_order'),
-      supabase.from('poll_votes').select('poll_id,option_id,user_id').eq('user_id', user.id),
+      voteQuery,
     ])
     if (optionError) setError(optionError.message)
     if (voteError) setError(voteError.message)
@@ -62,28 +68,73 @@ export default function Sondages() {
     }
     setOptions(groupedOptions)
 
+    const allVotes = voteData || []
     const ownVotes = {}
-    for (const vote of voteData || []) ownVotes[vote.poll_id] = vote.option_id
+    for (const vote of allVotes) {
+      if (vote.user_id === user.id) ownVotes[vote.poll_id] = vote.option_id
+    }
     setVotes(ownVotes)
+
+    if (adminMode) {
+      const userIds = [...new Set(allVotes.map((vote) => vote.user_id).filter(Boolean))]
+      let profileMap = new Map()
+      if (userIds.length) {
+        const { data: profileRows, error: profileError } = await supabase
+          .from('profiles')
+          .select('id,full_name,email')
+          .in('id', userIds)
+        if (profileError) setError('Les totaux des sondages sont disponibles, mais certains noms de votants n’ont pas pu être chargés.')
+        profileMap = new Map((profileRows || []).map((profile) => [profile.id, profile]))
+      }
+
+      const details = {}
+      for (const poll of list) details[poll.id] = { total: 0, byOption: {} }
+      for (const vote of allVotes) {
+        if (!details[vote.poll_id]) details[vote.poll_id] = { total: 0, byOption: {} }
+        const target = details[vote.poll_id]
+        target.total += 1
+        if (!target.byOption[vote.option_id]) target.byOption[vote.option_id] = []
+        const profile = profileMap.get(vote.user_id)
+        target.byOption[vote.option_id].push({
+          userId: vote.user_id,
+          name: profile?.full_name || profile?.email || 'Compte utilisateur',
+          email: profile?.full_name && profile?.email ? profile.email : '',
+          updatedAt: vote.updated_at || null,
+        })
+      }
+      setVoterDetails(details)
+    } else {
+      setVoterDetails({})
+    }
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [adminMode, user?.id])
 
   const activePolls = useMemo(() => polls.filter((poll) => isOpen(poll)), [polls])
   const closedPolls = useMemo(() => polls.filter((poll) => !isOpen(poll)), [polls])
 
   const vote = async (pollId, optionId) => {
+    const previous = votes[pollId] || null
+    const nextOptionId = previous === optionId ? null : optionId
     setBusyPoll(pollId)
     setError('')
-    const { error: voteError } = await supabase.from('poll_votes').upsert({
-      poll_id: pollId,
-      user_id: user.id,
-      option_id: optionId,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'poll_id,user_id' })
-    if (voteError) setError(voteError.message)
-    else await load()
+    setMessage('')
+
+    if (nextOptionId === null) {
+      const { error: deleteError } = await supabase.from('poll_votes').delete().eq('poll_id', pollId).eq('user_id', user.id)
+      if (deleteError) setError(deleteError.message)
+      else { setMessage('Votre vote a été retiré.'); await load() }
+    } else {
+      const { error: voteError } = await supabase.from('poll_votes').upsert({
+        poll_id: pollId,
+        user_id: user.id,
+        option_id: nextOptionId,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'poll_id,user_id' })
+      if (voteError) setError(voteError.message)
+      else { setMessage(previous ? 'Votre vote a été modifié.' : 'Votre vote a été enregistré.'); await load() }
+    }
     setBusyPoll(null)
   }
 
@@ -148,10 +199,10 @@ export default function Sondages() {
   }
 
   return <>
-    <PageTitle eyebrow={adminMode ? 'Administration' : 'Votre avis compte'} title={adminMode ? 'Gestion des sondages' : 'Sondages'} text={adminMode ? 'Créez, clôturez, renotifiez ou supprimez les sondages depuis cet espace réservé.' : 'Votez pour les futures activités de l’Amicale et suivez les préférences des membres.'} />
+    <PageTitle eyebrow={adminMode ? 'Administration' : 'Votre avis compte'} title={adminMode ? 'Gestion des sondages' : 'Sondages'} text={adminMode ? 'Créez, clôturez, renotifiez ou supprimez les sondages. Les listes nominatives restent visibles avant et après clôture.' : 'Votez pour les futures activités de l’Amicale et suivez les préférences des membres.'} />
 
     {adminMode && <div className="poll-admin-bar">
-      <div><strong>Gestion des sondages</strong><span>Les sondages les plus récents sont affichés en premier. Une notification peut être envoyée à leur publication.</span></div>
+      <div><strong>Gestion des sondages</strong><span>Les sondages les plus récents sont affichés en premier. Le nombre de votants et les listes par réponse sont conservés après clôture.</span></div>
       <button className="secondary-button" onClick={() => setShowCreate(!showCreate)}>{showCreate ? 'Fermer' : '＋ Nouveau sondage'}</button>
     </div>}
 
@@ -178,25 +229,26 @@ export default function Sondages() {
     {message && <div className="alert success" style={{ marginBottom: '1rem' }}>{message}</div>}
 
     {loading ? <div className="skeleton-card tall" /> : <>
-      <PollSection title="Sondages ouverts" empty="Aucun sondage ouvert pour le moment." polls={activePolls} options={options} votes={votes} busyPoll={busyPoll} isAdmin={adminMode} onVote={vote} onClose={closePoll} onRemove={removePoll} onResend={resendNotification} />
-      {closedPolls.length > 0 && <PollSection title="Sondages clôturés" polls={closedPolls} options={options} votes={votes} busyPoll={busyPoll} isAdmin={adminMode} onVote={vote} onClose={closePoll} onRemove={removePoll} onResend={resendNotification} />}
+      <PollSection title="Sondages ouverts" empty="Aucun sondage ouvert pour le moment." polls={activePolls} options={options} votes={votes} voterDetails={voterDetails} busyPoll={busyPoll} isAdmin={adminMode} onVote={vote} onClose={closePoll} onRemove={removePoll} onResend={resendNotification} />
+      {closedPolls.length > 0 && <PollSection title="Sondages clôturés" polls={closedPolls} options={options} votes={votes} voterDetails={voterDetails} busyPoll={busyPoll} isAdmin={adminMode} onVote={vote} onClose={closePoll} onRemove={removePoll} onResend={resendNotification} />}
     </>}
   </>
 }
 
-function PollSection({ title, empty, polls, options, votes, busyPoll, isAdmin, onVote, onClose, onRemove, onResend }) {
+function PollSection({ title, empty, polls, options, votes, voterDetails, busyPoll, isAdmin, onVote, onClose, onRemove, onResend }) {
   return <section className="poll-section">
     <div className="section-heading"><div><span className="eyebrow">Activités à venir</span><h2>{title}</h2></div></div>
     <div className="poll-list">
-      {polls.length ? polls.map((poll) => <PollCard key={poll.id} poll={poll} options={options[poll.id] || []} vote={votes[poll.id]} busy={busyPoll === poll.id} isAdmin={isAdmin} onVote={onVote} onClose={onClose} onRemove={onRemove} onResend={onResend} />) : <div className="empty-state">{empty}</div>}
+      {polls.length ? polls.map((poll) => <PollCard key={poll.id} poll={poll} options={options[poll.id] || []} vote={votes[poll.id]} voterInfo={voterDetails[poll.id]} busy={busyPoll === poll.id} isAdmin={isAdmin} onVote={onVote} onClose={onClose} onRemove={onRemove} onResend={onResend} />) : <div className="empty-state">{empty}</div>}
     </div>
   </section>
 }
 
-function PollCard({ poll, options, vote, busy, isAdmin, onVote, onClose, onRemove, onResend }) {
+function PollCard({ poll, options, vote, voterInfo, busy, isAdmin, onVote, onClose, onRemove, onResend }) {
   const open = isOpen(poll)
   const total = options.reduce((sum, option) => sum + Number(option.vote_count || 0), 0)
   const notificationLabel = poll.notify_on_publish === false ? 'Sans notification' : poll.notified_at ? 'Notification envoyée' : 'Notification en attente'
+  const participantCount = isAdmin ? Number(voterInfo?.total || 0) : total
 
   return <article className="poll-card">
     <div className="poll-card-head">
@@ -225,7 +277,20 @@ function PollCard({ poll, options, vote, busy, isAdmin, onVote, onClose, onRemov
         </button>
       })}
     </div>
-    <small className="poll-total">{total} vote{total > 1 ? 's' : ''}{open ? ' · Vous pouvez changer votre choix tant que le sondage est ouvert.' : ''}</small>
+    <small className="poll-total">{participantCount} votant{participantCount > 1 ? 's' : ''}{open ? ' · Un membre peut modifier son choix ou retirer son vote tant que le sondage est ouvert.' : ''}</small>
+
+    {isAdmin && <div className="poll-voter-panel">
+      <div className="poll-voter-summary"><strong>{participantCount} personne{participantCount > 1 ? 's' : ''} a{participantCount > 1 ? ' ont' : ''} voté</strong><span>{open ? 'Liste actuelle des réponses' : 'Liste finale après clôture'}</span></div>
+      <div className="poll-voter-groups">
+        {options.map((option) => {
+          const voters = voterInfo?.byOption?.[option.id] || []
+          return <div className="poll-voter-group" key={option.id}>
+            <div className="poll-voter-group-title"><strong>{option.label}</strong><span>{voters.length} votant{voters.length > 1 ? 's' : ''}</span></div>
+            {voters.length ? <ul>{voters.map((voter, index) => <li key={`${voter.userId}-${index}`}><strong>{voter.name}</strong>{voter.email && <small>{voter.email}</small>}</li>)}</ul> : <small className="poll-voter-empty">Aucun vote pour cette réponse.</small>}
+          </div>
+        })}
+      </div>
+    </div>}
   </article>
 }
 
