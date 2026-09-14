@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext.jsx'
 import { readOfflineEntry } from '../../lib/offlineCache.js'
 import { PageTitle } from '../Actualites.jsx'
 import HomeOpenPolls from '../../components/HomeOpenPolls.jsx'
+import ImageLightbox from '../../components/ImageLightbox.jsx'
 import '../../home-refactor.css'
 import '../../offline-v2.css'
 
@@ -25,6 +26,7 @@ export default function OfflineDashboard() {
   const albumsEntry = useMemo(() => readOfflineEntry(user?.id, 'albums'), [user?.id])
   const data = entry?.data || { news: [], events: [], bureau: [] }
   const [detail, setDetail] = useState(null)
+  const [previewCover, setPreviewCover] = useState(null)
   const [newsCoverMap, setNewsCoverMap] = useState({})
 
   const albumByEvent = useMemo(() => new Map((albumsEntry?.data || []).map((album) => [album.event_id, album])), [albumsEntry])
@@ -66,6 +68,11 @@ export default function OfflineDashboard() {
     ...events.map((item) => ({ ...item, _kind: 'event' })),
   ].sort((a, b) => publicationTime(b) - publicationTime(a)).slice(0, 10), [news, events])
 
+  const showCover = (item) => {
+    if (!item?.cover) return
+    setPreviewCover({ src: item.cover, alt: `Couverture · ${item.title || 'Publication'}` })
+  }
+
   return <div className="home-dashboard home-dashboard-compact">
     <PageTitle eyebrow="Mode hors ligne" title={profile?.full_name ? `Bonjour ${profile.full_name}` : 'Accueil'} text="Les dernières publications synchronisées restent consultables sans réseau." />
     <div className="offline-v2-notice"><strong>Consultation hors ligne</strong><span>{entry?.savedAt ? `Copie synchronisée le ${new Date(entry.savedAt).toLocaleString('fr-FR')}. ` : ''}Publications, agenda, albums, bons plans et sondages ouverts restent accessibles directement depuis l’accueil.</span></div>
@@ -79,19 +86,20 @@ export default function OfflineDashboard() {
     <HomeOpenPolls />
 
     {!entry ? <div className="empty-state">Aucune copie de l’accueil n’est encore disponible. Reconnectez l’appareil une fois pour préparer automatiquement le mode hors ligne.</div> : <>
-      <section className="home-live-section"><div className="home-section-title"><div><span className="eyebrow">À la une</span><h2>Publications récentes</h2></div><Link className="home-more" to="/agenda">Agenda →</Link></div>{publications.length ? <div className="home-editorial-grid compact-grid">{publications.map((item) => <OfflineTile key={`${item._kind}-${item.id}`} item={item} onOpen={() => setDetail({ kind: item._kind, item })} />)}</div> : <div className="empty-state">Aucune publication enregistrée.</div>}</section>
+      <section className="home-live-section"><div className="home-section-title"><div><span className="eyebrow">À la une</span><h2>Publications récentes</h2></div><Link className="home-more" to="/agenda">Agenda →</Link></div>{publications.length ? <div className="home-editorial-grid compact-grid">{publications.map((item) => <OfflineTile key={`${item._kind}-${item.id}`} item={item} onOpen={() => setDetail({ kind: item._kind, item })} onCover={() => showCover(item)} />)}</div> : <div className="empty-state">Aucune publication enregistrée.</div>}</section>
 
       {(data.bureau || []).length > 0 && <section className="text-panel bureau-panel"><div className="bureau-heading"><div><span className="eyebrow">Organisation</span><h2>Membres du bureau</h2></div></div><div className="bureau-grid">{data.bureau.map((member) => <article className="bureau-card" key={member.role_key}><span className="bureau-role">{member.role_label}</span><strong>{member.full_name || 'À renseigner'}</strong></article>)}</div></section>}
     </>}
 
-    {detail && <div className="home-detail-backdrop" role="presentation" onClick={() => setDetail(null)}><section className="home-detail-modal" role="dialog" aria-modal="true" aria-label={detail.item.title} onClick={(event) => event.stopPropagation()}><button type="button" className="home-detail-close" aria-label="Fermer" onClick={() => setDetail(null)}>×</button>{detail.item.cover && <img className="home-detail-cover" src={detail.item.cover} alt="" />}<div className="home-detail-content"><span className="eyebrow">{detail.kind === 'news' ? 'Information' : 'Événement'}</span><h2>{detail.item.title}</h2><time>{detail.kind === 'news' ? formatDate(detail.item.publish_at || detail.item.published_at) : eventSchedule(detail.item)}</time>{detail.kind === 'event' && detail.item.location && <p>📍 {detail.item.location}</p>}<p className="home-detail-text">{detail.kind === 'news' ? (detail.item.content || detail.item.summary) : detail.item.description}</p>{detail.kind === 'event' && detail.item.album && <Link className="secondary-button" to={`/galerie?event=${detail.item.id}`} onClick={() => setDetail(null)}>📷 Ouvrir l’album hors ligne</Link>}<p className="login-help">Les pièces jointes et téléchargements complets nécessitent Internet.</p></div></section></div>}
+    {detail && <div className="home-detail-backdrop" role="presentation" onClick={() => setDetail(null)}><section className="home-detail-modal" role="dialog" aria-modal="true" aria-label={detail.item.title} onClick={(event) => event.stopPropagation()}><button type="button" className="home-detail-close" aria-label="Fermer" onClick={() => setDetail(null)}>×</button>{detail.item.cover && <button type="button" className="home-detail-cover-button" aria-label={`Agrandir la couverture de ${detail.item.title}`} onClick={() => showCover(detail.item)}><img className="home-detail-cover" src={detail.item.cover} alt={`Couverture de ${detail.item.title}`} /></button>}<div className="home-detail-content"><span className="eyebrow">{detail.kind === 'news' ? 'Information' : 'Événement'}</span><h2>{detail.item.title}</h2><time>{detail.kind === 'news' ? formatDate(detail.item.publish_at || detail.item.published_at) : eventSchedule(detail.item)}</time>{detail.kind === 'event' && detail.item.location && <p>📍 {detail.item.location}</p>}<p className="home-detail-text">{detail.kind === 'news' ? (detail.item.content || detail.item.summary) : detail.item.description}</p>{detail.kind === 'event' && detail.item.album && <Link className="secondary-button" to={`/galerie?event=${detail.item.id}`} onClick={() => setDetail(null)}>📷 Ouvrir l’album hors ligne</Link>}<p className="login-help">Les pièces jointes et téléchargements complets nécessitent Internet.</p></div></section></div>}
+    <ImageLightbox src={previewCover?.src} alt={previewCover?.alt} onClose={() => setPreviewCover(null)} />
   </div>
 }
 
-function OfflineTile({ item, onOpen }) {
+function OfflineTile({ item, onOpen, onCover }) {
   const isEvent = item._kind === 'event'
-  return <article className="home-editorial-card compact" role="button" tabIndex="0" onClick={onOpen} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen() } }}>
-    <div className="home-tile-media">{item.cover ? <img src={item.cover} alt="" loading="lazy" /> : <div className="home-tile-placeholder">{isEvent ? '📅' : '📣'}</div>}{isEvent && item.album && <span className="home-album-badge">📷 Album</span>}</div>
+  return <article className="home-editorial-card compact" role="button" tabIndex="0" onClick={onOpen} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen() } }}>
+    <div className="home-tile-media">{item.cover ? <button type="button" className="publication-cover-button" aria-label={`Agrandir la couverture de ${item.title}`} onClick={(event) => { event.stopPropagation(); onCover() }}><img src={item.cover} alt={`Couverture de ${item.title}`} loading="lazy" /></button> : <div className="home-tile-placeholder">{isEvent ? '📅' : '📣'}</div>}{isEvent && item.album && <span className="home-album-badge">📷 Album</span>}</div>
     <div className="home-tile-body"><span className="role-badge">{isEvent ? 'Événement' : 'Information'}</span><time>{isEvent ? eventSchedule(item) : formatDate(item.publish_at || item.published_at)}</time><h3>{item.title}</h3>{isEvent && item.location && <p className="home-tile-location">📍 {item.location}</p>}<p>{trimText(isEvent ? item.description : (item.summary || item.content)) || 'Ouvrez la tuile pour consulter les détails.'}</p><span className="home-tile-more">Voir les détails →</span></div>
   </article>
 }
