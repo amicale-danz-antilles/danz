@@ -144,8 +144,23 @@ export default function HomeOpenPolls() {
           ? (previous ? 'Votre nouveau choix est enregistré sur cet appareil. Il sera synchronisé au retour d’Internet.' : 'Votre choix est enregistré sur cet appareil. Il sera synchronisé au retour d’Internet.')
           : 'Le retrait de votre vote est enregistré sur cet appareil. Il sera synchronisé au retour d’Internet.')
       } else if (nextOptionId === null) {
-        const { error: deleteError } = await supabase.from('poll_votes').delete().eq('poll_id', pollId).eq('user_id', user.id)
+        const { data: deletedRows, error: deleteError } = await supabase
+          .from('poll_votes')
+          .delete()
+          .eq('poll_id', pollId)
+          .eq('user_id', user.id)
+          .select('poll_id')
         if (deleteError) throw deleteError
+        if (!deletedRows?.length) {
+          const { data: remaining, error: remainingError } = await supabase
+            .from('poll_votes')
+            .select('poll_id')
+            .eq('poll_id', pollId)
+            .eq('user_id', user.id)
+            .maybeSingle()
+          if (remainingError) throw remainingError
+          if (remaining) throw new Error('Le sondage vient d’être clôturé : votre vote ne peut plus être retiré.')
+        }
         setVotes((current) => { const next = { ...current }; delete next[pollId]; return next })
         setQueuedVotes((current) => { const next = { ...current }; delete next[pollId]; return next })
         setMessage('Votre vote a bien été retiré.')
@@ -165,6 +180,7 @@ export default function HomeOpenPolls() {
       }
     } catch (voteError) {
       setError(voteError?.message || 'Impossible d’enregistrer ce choix.')
+      await load().catch(() => {})
     } finally {
       setBusyPoll(null)
     }
