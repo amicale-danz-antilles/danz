@@ -5,73 +5,15 @@ import { resolvePrivateMediaBatch } from '../lib/mediaStorage.js'
 import { readOfflineData, saveOfflineData } from '../lib/offlineCache.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { PageTitle } from './Actualites.jsx'
+import ImageLightbox from '../components/ImageLightbox.jsx'
 import '../extra.css'
 import '../home-refactor.css'
-
-const escapeIcs=(value='')=>String(value).replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;')
-const icsDate=value=>new Date(value).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z')
-const isAlbumExpired=album=>Boolean(album?.transfer_expires_at&&new Date(album.transfer_expires_at).getTime()<Date.now())
-const offlineAlbum=album=>album?{id:album.id,event_id:album.event_id,item_count:album.item_count,transfer_expires_at:album.transfer_expires_at}:null
-const newestFirst=(rows=[])=>[...rows].sort((a,b)=>new Date(b.starts_at).getTime()-new Date(a.starts_at).getTime())
-function AppleLogo(){return <img className="calendar-brand-logo" src="/danz/apple-logo.svg" alt="" aria-hidden="true"/>}
-function GoogleLogo(){return <img className="calendar-brand-logo" src="/danz/google-logo.svg" alt="" aria-hidden="true"/>}
-
-export default function Agenda(){
- const navigate=useNavigate()
- const {user}=useAuth()
- const [items,setItems]=useState([]),[albums,setAlbums]=useState({}),[covers,setCovers]=useState({}),[loading,setLoading]=useState(true),[error,setError]=useState('')
-
- const useCached=()=>{
-  const cached=readOfflineData(user?.id,'agenda')
-  if(!cached)return false
-  setItems(newestFirst(cached.items||[]));setAlbums(cached.albums||{});setCovers({})
-  setError('Mode hors ligne · agenda affiché depuis la dernière copie enregistrée sur cet appareil.')
-  setLoading(false)
-  return true
- }
-
- const load=async()=>{
-  setLoading(true);setError('')
-  if(!navigator.onLine){if(!useCached()){setError('Aucune copie hors ligne de l’agenda n’est encore disponible sur cet appareil.');setLoading(false)};return}
-
-  const eventsResult=await supabase.from('events').select('*').order('starts_at',{ascending:false})
-  if(eventsResult.error&&/fetch|network|failed/i.test(String(eventsResult.error.message||''))&&useCached())return
-  if(eventsResult.error)setError('Impossible d’actualiser complètement l’agenda pour le moment.')
-  const events=newestFirst(eventsResult.data||[]),ids=events.map(e=>e.id)
-  setItems(events)
-  if(!ids.length){setCovers({});setAlbums({});setLoading(false);if(user?.id)saveOfflineData(user.id,'agenda',{items:[],albums:{}});return}
-
-  const [assetsResult,albumsResult]=await Promise.all([
-   supabase.from('content_attachments').select('*').in('event_id',ids).eq('is_cover',true),
-   supabase.from('event_albums').select('id,event_id,storage_provider,storage_path,image_url,mime_type,file_size,transfer_url,transfer_expires_at,item_count').in('event_id',ids),
-  ])
-  if(!eventsResult.error&&(assetsResult.error||albumsResult.error))setError('Les événements sont disponibles, mais certaines miniatures n’ont pas pu être chargées.')
-  const assets=assetsResult.data||[],albumRows=albumsResult.data||[]
-  const [assetUrls,albumUrls]=await Promise.all([
-   resolvePrivateMediaBatch(assets,{entity:'attachment',fallbackBucket:'content'}),
-   resolvePrivateMediaBatch(albumRows,{entity:'album',fallbackBucket:'gallery'}),
-  ])
-  const explicitByEvent=new Map(assets.map(asset=>[asset.event_id,asset])),albumByEvent=new Map(albumRows.map(album=>[album.event_id,album]))
-  const coverMap={},albumMap={}
-  for(const event of events){
-   const explicit=explicitByEvent.get(event.id),album=albumByEvent.get(event.id)
-   const albumCover=album?(albumUrls.get(album.id)||album.image_url||null):null
-   coverMap[event.id]=(explicit&&assetUrls.get(explicit.id))||albumCover||null
-   if(album)albumMap[event.id]=album
-  }
-  setCovers(coverMap);setAlbums(albumMap);setLoading(false)
-  if(user?.id){
-   const safeAlbums=Object.fromEntries(Object.entries(albumMap).map(([eventId,album])=>[eventId,offlineAlbum(album)]))
-   saveOfflineData(user.id,'agenda',{items:events,albums:safeAlbums})
-  }
- }
- useEffect(()=>{load()},[])
- useEffect(()=>{const onOnline=()=>load();window.addEventListener('online',onOnline);return()=>window.removeEventListener('online',onOnline)},[])
-
- const addApple=event=>{const start=new Date(event.starts_at),end=event.ends_at?new Date(event.ends_at):new Date(start.getTime()+3600000);const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Amicale DANZ Antilles//Agenda//FR','CALSCALE:GREGORIAN','METHOD:PUBLISH','BEGIN:VEVENT',`UID:${event.id}@amicale-danz-antilles`,`DTSTAMP:${icsDate(new Date())}`,`DTSTART:${icsDate(start)}`,`DTEND:${icsDate(end)}`,`SUMMARY:${escapeIcs(event.title)}`,event.description?`DESCRIPTION:${escapeIcs(event.description)}`:null,event.location?`LOCATION:${escapeIcs(event.location)}`:null,'END:VEVENT','END:VCALENDAR'].filter(Boolean).join('\r\n');const blob=new Blob([lines],{type:'text/calendar;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`${(event.title||'evenement').replace(/[^a-zA-Z0-9À-ÿ _-]/g,'').trim().replace(/\s+/g,'-')||'evenement'}.ics`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)}
- const addGoogle=event=>{if(!navigator.onLine)return;const start=new Date(event.starts_at),end=event.ends_at?new Date(event.ends_at):new Date(start.getTime()+3600000),params=new URLSearchParams({action:'TEMPLATE',text:event.title||'Événement DANZ',dates:`${icsDate(start)}/${icsDate(end)}`,details:event.description||'',location:event.location||''});window.open(`https://calendar.google.com/calendar/render?${params.toString()}`,'_blank','noopener,noreferrer')}
- const formatEnd=event=>{if(!event.ends_at)return null;const start=new Date(event.starts_at),end=new Date(event.ends_at);return start.toDateString()===end.toDateString()?end.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):end.toLocaleString('fr-FR',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'})}
- return <><PageTitle eyebrow="Vie de l'amicale" title="Agenda" text="Consultez les rendez-vous du plus récent au plus ancien et ouvrez leur album lorsqu’il est disponible."/>{error&&<div className={`alert ${error.startsWith('Mode hors ligne')?'warning':'error'}`} style={{marginBottom:'1rem'}}>{error}</div>}{loading?<div className="skeleton-card tall"/>:<div className="timeline">{items.length?items.map(x=>{const d=new Date(x.starts_at),endLabel=formatEnd(x),album=albums[x.id],expired=isAlbumExpired(album);return <article className="timeline-item" key={x.id}><div className="timeline-date"><strong>{d.getDate()}</strong><span>{d.toLocaleDateString('fr-FR',{month:'short',year:'numeric'})}</span></div><div className="timeline-card">
- {covers[x.id]&&<img className="event-cover-image" src={covers[x.id]} alt="" loading="lazy" decoding="async"/>}<div className="event-card-heading"><div><span className="event-time">{d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}{endLabel?` → ${endLabel}`:''}</span><h2>{x.title}</h2></div></div>{x.location&&<p><strong>Lieu :</strong> 📍 {x.location}</p>}{x.description&&<p>{x.description}</p>}<div className="calendar-quick-add"><span>Ajouter au calendrier</span><button type="button" className="calendar-logo-button" aria-label="Ajouter à Apple Calendrier" onClick={()=>addApple(x)}><AppleLogo/></button><button type="button" className="calendar-logo-button" aria-label="Ajouter à Google Agenda" disabled={!navigator.onLine} onClick={()=>addGoogle(x)}><GoogleLogo/></button></div>{album&&<div style={{marginTop:'.75rem'}}>{navigator.onLine?<button type="button" className="secondary-button" onClick={()=>navigate(`/galerie?event=${x.id}`)}>{expired?'📷 Voir la miniature · lien expiré':`📷 Ouvrir l’album${album.item_count!=null?` (${album.item_count})`:''}`}</button>:<span className="login-help">Miniature d’album disponible hors ligne si elle a été synchronisée.</span>}</div>}
- </div></article>}) : <div className="empty-state">Aucun événement enregistré.</div>}</div>}</>
+import '../finance-households.css'
+const escapeIcs=(v='')=>String(v).replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;'),icsDate=v=>new Date(v).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z'),dateOnly=v=>{const d=new Date(v);return`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`},isAlbumExpired=a=>Boolean(a?.transfer_expires_at&&new Date(a.transfer_expires_at)<new Date()),offlineAlbum=a=>a?{id:a.id,event_id:a.event_id,item_count:a.item_count,transfer_expires_at:a.transfer_expires_at}:null,newestFirst=(r=[])=>[...r].sort((a,b)=>new Date(b.starts_at)-new Date(a.starts_at))
+function AppleLogo(){return <img className="calendar-brand-logo" src="/danz/apple-logo.svg" alt=""/>}function GoogleLogo(){return <img className="calendar-brand-logo" src="/danz/google-logo.svg" alt=""/>}
+export default function Agenda(){const navigate=useNavigate(),{user}=useAuth();const[items,setItems]=useState([]),[albums,setAlbums]=useState({}),[covers,setCovers]=useState({}),[loading,setLoading]=useState(true),[error,setError]=useState(''),[preview,setPreview]=useState(null);const useCached=()=>{const c=readOfflineData(user?.id,'agenda');if(!c)return false;setItems(newestFirst(c.items||[]));setAlbums(c.albums||{});setCovers({});setError('Mode hors ligne · agenda affiché depuis la dernière copie.');setLoading(false);return true};const load=async()=>{setLoading(true);setError('');if(!navigator.onLine){if(!useCached()){setError('Aucune copie hors ligne de l’agenda.');setLoading(false)}return}const r=await supabase.from('events').select('*').order('starts_at',{ascending:false});if(r.error&&/fetch|network|failed/i.test(String(r.error.message||''))&&useCached())return;if(r.error)setError('Impossible d’actualiser complètement l’agenda.');const events=newestFirst(r.data||[]),ids=events.map(e=>e.id);setItems(events);if(!ids.length){setLoading(false);return}const[a,b]=await Promise.all([supabase.from('content_attachments').select('*').in('event_id',ids).eq('is_cover',true),supabase.from('event_albums').select('id,event_id,storage_provider,storage_path,image_url,mime_type,file_size,transfer_url,transfer_expires_at,item_count').in('event_id',ids)]),assets=a.data||[],albumRows=b.data||[],[au,bu]=await Promise.all([resolvePrivateMediaBatch(assets,{entity:'attachment',fallbackBucket:'content'}),resolvePrivateMediaBatch(albumRows,{entity:'album',fallbackBucket:'gallery'})]),explicit=new Map(assets.map(x=>[x.event_id,x])),albumMapRows=new Map(albumRows.map(x=>[x.event_id,x])),cm={},am={};for(const ev of events){const ex=explicit.get(ev.id),al=albumMapRows.get(ev.id),ac=al?(bu.get(al.id)||al.image_url||null):null;cm[ev.id]=(ex&&au.get(ex.id))||ac||null;if(al)am[ev.id]=al}setCovers(cm);setAlbums(am);setLoading(false);if(user?.id)saveOfflineData(user.id,'agenda',{items:events,albums:Object.fromEntries(Object.entries(am).map(([id,a])=>[id,offlineAlbum(a)]))})};useEffect(()=>{load()},[]);useEffect(()=>{const h=()=>load();window.addEventListener('online',h);return()=>window.removeEventListener('online',h)},[])
+ const addApple=ev=>{let lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Amicale DANZ Antilles//Agenda//FR','CALSCALE:GREGORIAN','METHOD:PUBLISH','BEGIN:VEVENT',`UID:${ev.id}@amicale-danz-antilles`,`DTSTAMP:${icsDate(new Date())}`];if(ev.all_day){const s=new Date(ev.starts_at),end=ev.ends_at?new Date(ev.ends_at):new Date(s.getFullYear(),s.getMonth(),s.getDate()+1);if(ev.ends_at)end.setDate(end.getDate()+1);lines.push(`DTSTART;VALUE=DATE:${dateOnly(s)}`,`DTEND;VALUE=DATE:${dateOnly(end)}`)}else{const s=new Date(ev.starts_at),end=ev.ends_at?new Date(ev.ends_at):new Date(s.getTime()+3600000);lines.push(`DTSTART:${icsDate(s)}`,`DTEND:${icsDate(end)}`)}lines.push(`SUMMARY:${escapeIcs(ev.title)}`,ev.description?`DESCRIPTION:${escapeIcs(ev.description)}`:null,ev.location?`LOCATION:${escapeIcs(ev.location)}`:null,'END:VEVENT','END:VCALENDAR');const blob=new Blob([lines.filter(Boolean).join('\r\n')],{type:'text/calendar;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`${(ev.title||'evenement').replace(/[^a-zA-Z0-9À-ÿ _-]/g,'').trim().replace(/\s+/g,'-')||'evenement'}.ics`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)}
+ const addGoogle=ev=>{if(!navigator.onLine)return;let dates;if(ev.all_day){const s=new Date(ev.starts_at),end=ev.ends_at?new Date(ev.ends_at):new Date(s);end.setDate(end.getDate()+1);dates=`${dateOnly(s)}/${dateOnly(end)}`}else{const s=new Date(ev.starts_at),end=ev.ends_at?new Date(ev.ends_at):new Date(s.getTime()+3600000);dates=`${icsDate(s)}/${icsDate(end)}`}window.open(`https://calendar.google.com/calendar/render?${new URLSearchParams({action:'TEMPLATE',text:ev.title||'Événement DANZ',dates,details:ev.description||'',location:ev.location||''})}`,'_blank','noopener,noreferrer')}
+ const formatPeriod=ev=>{const s=new Date(ev.starts_at),e=ev.ends_at?new Date(ev.ends_at):null;if(ev.all_day)return e?`Du ${s.toLocaleDateString('fr-FR')} au ${e.toLocaleDateString('fr-FR')}`:s.toLocaleDateString('fr-FR');if(!e)return`${s.toLocaleDateString('fr-FR')} · ${s.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}`;return s.toDateString()===e.toDateString()?`${s.toLocaleDateString('fr-FR')} · ${s.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})} → ${e.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}`:`${s.toLocaleString('fr-FR')} → ${e.toLocaleString('fr-FR')}`}
+ return <><PageTitle eyebrow="Vie de l'amicale" title="Agenda" text="Tous les événements, y compris ceux déjà passés, du plus récent au plus ancien."/>{error&&<div className={`alert ${error.startsWith('Mode hors ligne')?'warning':'error'}`}>{error}</div>}{loading?<div className="skeleton-card tall"/>:<div className="timeline">{items.length?items.map(x=>{const d=new Date(x.starts_at),album=albums[x.id],expired=isAlbumExpired(album);return <article className="timeline-item" key={x.id}><div className="timeline-date"><strong>{d.getDate()}</strong><span>{d.toLocaleDateString('fr-FR',{month:'short',year:'numeric'})}</span></div><div className="timeline-card">{covers[x.id]&&<button type="button" className={`home-detail-cover-button cover-fit-${x.cover_fit||'contain'}`} onClick={()=>setPreview({src:covers[x.id],alt:`Couverture de ${x.title}`})}><img className="event-cover-image" src={covers[x.id]} alt={`Couverture de ${x.title}`}/></button>}<div className="event-card-heading"><div><span className="event-time">{formatPeriod(x)}</span><h2>{x.title}</h2></div></div>{x.location&&<p><strong>Lieu :</strong> 📍 {x.location}</p>}{x.description&&<p>{x.description}</p>}<div className="calendar-quick-add"><span>Ajouter au calendrier</span><button type="button" className="calendar-logo-button" onClick={()=>addApple(x)}><AppleLogo/></button><button type="button" className="calendar-logo-button" disabled={!navigator.onLine} onClick={()=>addGoogle(x)}><GoogleLogo/></button></div>{album&&<div style={{marginTop:'.75rem'}}><button type="button" className="secondary-button" disabled={!navigator.onLine} onClick={()=>navigate(`/galerie?event=${x.id}`)}>{expired?'📷 Voir la miniature · lien expiré':`📷 Ouvrir l’album${album.item_count!=null?` (${album.item_count})`:''}`}</button></div>}</div></article> }):<div className="empty-state">Aucun événement.</div>}</div>}<ImageLightbox src={preview?.src} alt={preview?.alt} onClose={()=>setPreview(null)}/></>
 }

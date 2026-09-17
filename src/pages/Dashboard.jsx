@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { formatMoney } from '../lib/finance.js'
 import { resolvePrivateMediaBatch } from '../lib/mediaStorage.js'
 import { readOfflineData, saveOfflineData } from '../lib/offlineCache.js'
 import HomeOpenPolls from '../components/HomeOpenPolls.jsx'
@@ -9,162 +10,26 @@ import ImageLightbox from '../components/ImageLightbox.jsx'
 import '../extra.css'
 import '../home-refactor.css'
 import '../polls-bureau.css'
+import '../finance-households.css'
 
-const formatDate = (value) => new Date(value).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
-const trimText = (value, max = 120) => { const text = String(value || '').trim(); return text.length > max ? `${text.slice(0, max).trim()}…` : text }
-const isAlbumExpired = (album) => Boolean(album?.transfer_expires_at && new Date(album.transfer_expires_at).getTime() < Date.now())
-const offlineAlbum = (album) => album ? { id: album.id, event_id: album.event_id, item_count: album.item_count, transfer_expires_at: album.transfer_expires_at, expired: isAlbumExpired(album) } : null
-const publicationTime = (item) => new Date(item?._kind === 'event' ? (item.starts_at || item.created_at || item.publish_at) : (item.publish_at || item.published_at || item.created_at)).getTime() || 0
+const formatDate=value=>new Date(value).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})
+const trimText=(value,max=120)=>{const t=String(value||'').trim();return t.length>max?`${t.slice(0,max).trim()}…`:t}
+const isAlbumExpired=album=>Boolean(album?.transfer_expires_at&&new Date(album.transfer_expires_at).getTime()<Date.now())
+const offlineAlbum=album=>album?{id:album.id,event_id:album.event_id,item_count:album.item_count,transfer_expires_at:album.transfer_expires_at,expired:isAlbumExpired(album)}:null
+const publicationTime=item=>new Date(item?._kind==='event'?(item.starts_at||item.created_at||item.publish_at):(item.publish_at||item.published_at||item.created_at)).getTime()||0
+const sameLocalDay=(a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate()
+const isHomeEvent=(event,clock)=>{const now=new Date(clock),start=new Date(event.starts_at);if(event.ends_at)return new Date(event.ends_at).getTime()>=clock;return start.getTime()>clock||sameLocalDay(start,now)}
+const eventSchedule=(event,compact=false)=>{const start=new Date(event.starts_at),end=event.ends_at?new Date(event.ends_at):null;if(event.all_day)return end?`${compact?'':'📅 '}Du ${formatDate(start)} au ${formatDate(end)}`:`${compact?'':'📅 '}${formatDate(start)}`;if(!end)return compact?`${formatDate(start)} · ${start.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}`:`📅 ${start.toLocaleString('fr-FR')}`;if(sameLocalDay(start,end))return`${compact?'':'📅 '}${formatDate(start)} · ${start.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})} → ${end.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}`;return`${compact?'':'📅 '}Du ${start.toLocaleString('fr-FR')} au ${end.toLocaleString('fr-FR')}`}
 
-const eventSchedule = (event, compact = false) => {
-  const start = new Date(event.starts_at)
-  if (!event.ends_at) return compact ? `${formatDate(start)} · ${start.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : `📅 ${start.toLocaleString('fr-FR')}`
-  const end = new Date(event.ends_at)
-  if (start.toDateString() === end.toDateString()) return compact ? `${formatDate(start)} · ${start.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} → ${end.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : `📅 ${formatDate(start)} · ${start.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} → ${end.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
-  return compact ? `${formatDate(start)} → ${formatDate(end)}` : `📅 Du ${start.toLocaleString('fr-FR')} au ${end.toLocaleString('fr-FR')}`
-}
-
-export default function Dashboard() {
-  const { profile, user } = useAuth()
-  const [news, setNews] = useState([])
-  const [events, setEvents] = useState([])
-  const [bureau, setBureau] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [detail, setDetail] = useState(null)
-  const [previewCover, setPreviewCover] = useState(null)
-  const [error, setError] = useState('')
-  const [clock, setClock] = useState(() => Date.now())
-
-  const useCached = () => {
-    const cached = readOfflineData(user?.id, 'dashboard')
-    if (!cached) return false
-    setNews(cached.news || []); setEvents(cached.events || []); setBureau(cached.bureau || [])
-    setError('Mode hors ligne · affichage de la dernière copie enregistrée sur cet appareil.')
-    setLoading(false)
-    return true
-  }
-
-  const load = async () => {
-    setLoading(true); setError('')
-    if (!navigator.onLine) { if (!useCached()) { setError('Aucune copie hors ligne de l’accueil n’est encore disponible sur cet appareil.'); setLoading(false) } return }
-
-    const since = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString()
-    const [newsResult, eventResult, bureauResult] = await Promise.all([
-      supabase.from('news').select('*').eq('published', true).order('publish_at', { ascending: false }).limit(10),
-      supabase.from('events').select('*').gte('starts_at', since).order('starts_at', { ascending: false }).limit(20),
-      supabase.from('bureau_members').select('role_key,role_label,full_name,sort_order').order('sort_order'),
-    ])
-
-    const primaryErrors = [newsResult.error, eventResult.error, bureauResult.error].filter(Boolean)
-    if (primaryErrors.some((err) => /fetch|network|failed/i.test(String(err?.message || ''))) && useCached()) return
-    if (primaryErrors.length) setError('Certaines informations de l’accueil n’ont pas pu être actualisées. Réessayez dans quelques instants.')
-
-    const newsRows = newsResult.data || []
-    const eventRows = eventResult.data || []
-    const eventIds = eventRows.map((item) => item.id)
-    const [newsAssetsResult, eventAssetsResult, albumsResult] = await Promise.all([
-      newsRows.length ? supabase.from('content_attachments').select('*').in('news_id', newsRows.map((item) => item.id)) : Promise.resolve({ data: [], error: null }),
-      eventIds.length ? supabase.from('content_attachments').select('*').in('event_id', eventIds).eq('is_cover', true) : Promise.resolve({ data: [], error: null }),
-      eventIds.length ? supabase.from('event_albums').select('id,event_id,storage_provider,storage_path,image_url,mime_type,file_size,transfer_url,transfer_expires_at,item_count,download_note').in('event_id', eventIds) : Promise.resolve({ data: [], error: null }),
-    ])
-    if (!primaryErrors.length && [newsAssetsResult.error, eventAssetsResult.error, albumsResult.error].some(Boolean)) setError('Les informations principales sont disponibles, mais certains médias n’ont pas pu être chargés.')
-
-    const newsAssets = newsAssetsResult.data || []
-    const eventAssets = eventAssetsResult.data || []
-    const albumRows = albumsResult.data || []
-    const newsCoverAssets = newsAssets.filter((asset) => asset.is_cover)
-    const [newsUrls, eventUrls, albumUrls] = await Promise.all([
-      resolvePrivateMediaBatch(newsCoverAssets, { entity: 'attachment', fallbackBucket: 'content' }),
-      resolvePrivateMediaBatch(eventAssets, { entity: 'attachment', fallbackBucket: 'content' }),
-      resolvePrivateMediaBatch(albumRows, { entity: 'album', fallbackBucket: 'gallery' }),
-    ])
-    const explicitByEvent = new Map(eventAssets.map((asset) => [asset.event_id, asset]))
-    const albumByEvent = new Map(albumRows.map((album) => [album.event_id, album]))
-
-    const newsState = newsRows.map((item) => {
-      const assets = newsAssets.filter((asset) => asset.news_id === item.id)
-      const coverAsset = assets.find((asset) => asset.is_cover)
-      return { ...item, assets, cover: coverAsset ? (newsUrls.get(coverAsset.id) || null) : null }
-    })
-    const eventsState = eventRows.map((item) => {
-      const explicit = explicitByEvent.get(item.id)
-      const album = albumByEvent.get(item.id)
-      const albumCover = album ? (albumUrls.get(album.id) || album.image_url || null) : null
-      return { ...item, cover: (explicit && eventUrls.get(explicit.id)) || albumCover || null, album: album ? { ...album, cover: albumCover, expired: isAlbumExpired(album) } : null }
-    })
-    const bureauState = bureauResult.data || []
-
-    setNews(newsState); setEvents(eventsState); setBureau(bureauState); setClock(Date.now()); setLoading(false)
-    if (user?.id) {
-      const safeNews = newsState.map((item) => ({ ...item, cover: null, assets: (item.assets || []).map((asset) => ({ id: asset.id, file_name: asset.file_name, is_cover: asset.is_cover, mime_type: asset.mime_type, file_size: asset.file_size })) }))
-      const safeEvents = eventsState.map((item) => ({ ...item, cover: null, album: offlineAlbum(item.album) }))
-      saveOfflineData(user.id, 'dashboard', { news: safeNews, events: safeEvents, bureau: bureauState })
-    }
-  }
-
-  useEffect(() => { load() }, [])
-  useEffect(() => { const onOnline = () => load(); window.addEventListener('online', onOnline); return () => window.removeEventListener('online', onOnline) }, [])
-  useEffect(() => { const timer = window.setInterval(() => setClock(Date.now()), 60000); return () => window.clearInterval(timer) }, [])
-  useEffect(() => {
-    if (!detail) return undefined
-    const onKey = (event) => { if (event.key === 'Escape') setDetail(null) }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [detail])
-
-  const publications = useMemo(() => [
-    ...news.map((item) => ({ ...item, _kind: 'news' })),
-    ...events.map((item) => ({ ...item, _kind: 'event' })),
-  ].sort((a, b) => publicationTime(b) - publicationTime(a)).slice(0, 10), [news, events])
-  const future = useMemo(() => events.filter((event) => new Date(event.starts_at).getTime() >= clock).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at)), [events, clock])
-  const nextEvent = future[0] || null
-  const fullName = (profile?.full_name || '').trim()
-  const todayLabel = new Date(clock).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
-
-  const showCover = (item) => {
-    if (!item?.cover) return
-    setPreviewCover({ src: item.cover, alt: `Couverture · ${item.title || 'Publication'}` })
-  }
-
-  const openDetail = async (item) => {
-    const kind = item._kind
-    const canLoadExtra = navigator.onLine && kind === 'news'
-    setDetail({ kind, item: { ...item }, loadingExtra: canLoadExtra, extraError: false })
-    if (!canLoadExtra) return
-    try {
-      const attachments = (item.assets || []).filter((asset) => !asset.is_cover)
-      const urls = await resolvePrivateMediaBatch(attachments, { entity: 'attachment', fallbackBucket: 'content' })
-      const resolved = (item.assets || []).map((asset) => ({ ...asset, url: asset.is_cover ? item.cover : (urls.get(asset.id) || null) }))
-      const missing = attachments.some((asset) => !urls.get(asset.id))
-      setDetail((current) => current?.item?.id === item.id ? { ...current, item: { ...current.item, assets: resolved }, loadingExtra: false, extraError: missing } : current)
-    } catch (_) { setDetail((current) => current?.item?.id === item.id ? { ...current, loadingExtra: false, extraError: true } : current) }
-  }
-
-  const PublicationTile = ({ item, priority = false }) => {
-    const isEvent = item._kind === 'event'
-    const albumLabel = item.album ? (item.album.expired ? '⏱ Expiré' : item.album.item_count != null ? `📷 ${item.album.item_count}` : '📷 Album') : null
-    return <article className="home-editorial-card compact" role="button" tabIndex="0" onClick={() => openDetail(item)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openDetail(item) } }}>
-      <div className="home-tile-media">{item.cover ? <button type="button" className="publication-cover-button" aria-label={`Agrandir la couverture de ${item.title}`} onClick={(event) => { event.stopPropagation(); showCover(item) }}><img src={item.cover} alt={`Couverture de ${item.title}`} loading={priority ? 'eager' : 'lazy'} decoding="async" fetchPriority={priority ? 'high' : 'auto'} /></button> : <div className="home-tile-placeholder">{isEvent ? '📅' : '📣'}</div>}{isEvent && albumLabel && <span className="home-album-badge">{albumLabel}</span>}</div>
-      <div className="home-tile-body"><span className="role-badge">{isEvent ? 'Événement' : 'Information'}</span><time>{isEvent ? eventSchedule(item, true) : formatDate(item.publish_at || item.published_at)}</time><h3>{item.title}</h3>{isEvent && item.location && <p className="home-tile-location">📍 {item.location}</p>}<p>{trimText(isEvent ? item.description : (item.summary || item.content), 100) || 'Ouvrez la tuile pour consulter les détails.'}</p>{!isEvent && item.assets?.filter((asset) => !asset.is_cover).length > 0 && <span className="home-file-badge">📎 {item.assets.filter((asset) => !asset.is_cover).length}</span>}<span className="home-tile-more">Voir les détails →</span></div>
-    </article>
-  }
-
-  return <div className="home-dashboard home-dashboard-compact home-app-dashboard">
-    <section className="home-app-header"><div className="home-app-header-copy"><span className="home-app-date">{todayLabel}</span><span className="eyebrow">Amicale DANZ Antilles</span><h1>{fullName ? `Bonjour ${fullName}` : 'Bienvenue'}</h1><p>Publications, rendez-vous et souvenirs de l’Amicale.</p><div className="home-app-status-row">{nextEvent && <span>📅 Prochain rendez-vous : {eventSchedule(nextEvent, true)}</span>}{publications.length > 0 && <span>● Informations à jour</span>}</div></div><img className="home-app-mark" src="/danz/amicale-danz-icon.png" alt="Insigne DANZ Antilles" /></section>
-
-    <nav className="home-app-actions" aria-label="Raccourcis"><Link to="/agenda"><span>📅</span><strong>Agenda</strong></Link><Link to="/bons-plans"><span>★</span><strong>Bons plans</strong></Link><Link to="/galerie"><span>▦</span><strong>Albums</strong></Link></nav>
-
-    <HomeOpenPolls />
-
-    {error && <div className={`alert ${error.startsWith('Mode hors ligne') ? 'warning' : 'error'}`}>{error}</div>}
-
-    <section className="home-live-section"><div className="home-section-title"><div><span className="eyebrow">À la une</span><h2>Publications récentes</h2></div><Link className="home-more" to="/agenda">Voir l’agenda →</Link></div>
-      {loading ? <div className="skeleton-card tall" /> : publications.length ? <div className="home-editorial-grid compact-grid">{publications.map((item, index) => <PublicationTile key={`${item._kind}-${item.id}`} item={item} priority={index < 2} />)}</div> : <div className="empty-state">Aucune publication disponible.</div>}
-    </section>
-
-    <section className="home-amicale-section"><div className="home-section-title"><div><span className="eyebrow">L’Amicale</span><h2>DANZ Antilles</h2></div></div><div className="text-panel"><p><span className="role-badge">Depuis début 2025 · Association loi 1901</span></p><p>Créée au début de l’année 2025, l’Amicale DANZ Antilles a pour vocation de créer du lien entre les membres, partager les informations utiles et organiser des moments conviviaux, culturels, sportifs, familiaux ou festifs.</p></div><div className="text-panel bureau-panel"><div className="bureau-heading"><div><span className="eyebrow">Organisation</span><h2>Membres du bureau</h2></div></div><div className="bureau-grid">{bureau.map((member) => <article className="bureau-card" key={member.role_key}><span className="bureau-role">{member.role_label}</span><strong>{member.full_name || 'À renseigner'}</strong></article>)}</div></div></section>
-
-    {detail && <div className="home-detail-backdrop" role="presentation" onClick={() => setDetail(null)}><section className="home-detail-modal" role="dialog" aria-modal="true" aria-label={detail.item.title} onClick={(event) => event.stopPropagation()}><button type="button" className="home-detail-close" aria-label="Fermer" onClick={() => setDetail(null)}>×</button>{detail.item.cover && <button type="button" className="home-detail-cover-button" aria-label={`Agrandir la couverture de ${detail.item.title}`} onClick={() => showCover(detail.item)}><img className="home-detail-cover" src={detail.item.cover} alt={`Couverture de ${detail.item.title}`} decoding="async" /></button>}<div className="home-detail-content"><span className="eyebrow">{detail.kind === 'news' ? 'Information' : 'Événement'}</span><h2>{detail.item.title}</h2>{detail.kind === 'news' ? <><time>{formatDate(detail.item.publish_at || detail.item.published_at)}</time>{detail.item.content && <p className="home-detail-text">{detail.item.content}</p>}{detail.loadingExtra && detail.item.assets?.some((asset) => !asset.is_cover) && <p className="home-detail-loading">Chargement des pièces jointes…</p>}{navigator.onLine && !detail.loadingExtra && detail.item.assets?.filter((asset) => !asset.is_cover && asset.url).length > 0 && <div className="home-detail-files"><strong>Pièces jointes</strong>{detail.item.assets.filter((asset) => !asset.is_cover && asset.url).map((asset) => <a key={asset.id} href={asset.url} target="_blank" rel="noopener noreferrer">📎 {asset.file_name}</a>)}</div>}{detail.extraError && <p className="home-detail-loading">Une ou plusieurs pièces jointes sont temporairement indisponibles.</p>}</> : <><p className="home-detail-meta">{eventSchedule(detail.item)}</p>{detail.item.location && <p className="home-detail-meta">📍 {detail.item.location}</p>}{detail.item.description && <p className="home-detail-text">{detail.item.description}</p>}{detail.item.album && <Link className="secondary-button" to={`/galerie?event=${detail.item.id}`} onClick={() => setDetail(null)}>📷 Ouvrir l’album</Link>}</>}</div></section></div>}
-    <ImageLightbox src={previewCover?.src} alt={previewCover?.alt} onClose={() => setPreviewCover(null)} />
-  </div>
+export default function Dashboard(){
+ const {profile,user}=useAuth();const[news,setNews]=useState([]),[events,setEvents]=useState([]),[bureau,setBureau]=useState([]),[loading,setLoading]=useState(true),[detail,setDetail]=useState(null),[previewCover,setPreviewCover]=useState(null),[error,setError]=useState(''),[clock,setClock]=useState(()=>Date.now())
+ const useCached=()=>{const cached=readOfflineData(user?.id,'dashboard');if(!cached)return false;setNews(cached.news||[]);setEvents(cached.events||[]);setBureau(cached.bureau||[]);setError('Mode hors ligne · affichage de la dernière copie enregistrée.');setLoading(false);return true}
+ const load=async()=>{setLoading(true);setError('');if(!navigator.onLine){if(!useCached()){setError('Aucune copie hors ligne de l’accueil n’est disponible.');setLoading(false)}return}const today=new Date();today.setHours(0,0,0,0);const [newsResult,futureResult,activeResult,bureauResult]=await Promise.all([supabase.from('news').select('*').eq('published',true).order('publish_at',{ascending:false}).limit(12),supabase.from('events').select('*').gte('starts_at',today.toISOString()).order('starts_at',{ascending:true}).limit(40),supabase.from('events').select('*').lt('starts_at',today.toISOString()).gte('ends_at',new Date().toISOString()).order('starts_at',{ascending:false}).limit(10),supabase.from('bureau_members').select('role_key,role_label,full_name,sort_order').order('sort_order')]);const primary=[newsResult.error,futureResult.error,activeResult.error,bureauResult.error].filter(Boolean);if(primary.some(e=>/fetch|network|failed/i.test(String(e?.message||'')))&&useCached())return;if(primary.length)setError('Certaines informations n’ont pas pu être actualisées.');const eventRows=[...(activeResult.data||[]),...(futureResult.data||[])].filter((item,index,array)=>array.findIndex(x=>x.id===item.id)===index),newsRows=newsResult.data||[],eventIds=eventRows.map(x=>x.id);const[newsAssetsResult,eventAssetsResult,albumsResult]=await Promise.all([newsRows.length?supabase.from('content_attachments').select('*').in('news_id',newsRows.map(x=>x.id)):Promise.resolve({data:[]}),eventIds.length?supabase.from('content_attachments').select('*').in('event_id',eventIds).eq('is_cover',true):Promise.resolve({data:[]}),eventIds.length?supabase.from('event_albums').select('id,event_id,storage_provider,storage_path,image_url,mime_type,file_size,transfer_url,transfer_expires_at,item_count,download_note').in('event_id',eventIds):Promise.resolve({data:[]})]);const newsAssets=newsAssetsResult.data||[],eventAssets=eventAssetsResult.data||[],albumRows=albumsResult.data||[],newsCoverAssets=newsAssets.filter(a=>a.is_cover);const[newsUrls,eventUrls,albumUrls]=await Promise.all([resolvePrivateMediaBatch(newsCoverAssets,{entity:'attachment',fallbackBucket:'content'}),resolvePrivateMediaBatch(eventAssets,{entity:'attachment',fallbackBucket:'content'}),resolvePrivateMediaBatch(albumRows,{entity:'album',fallbackBucket:'gallery'})]);const explicitByEvent=new Map(eventAssets.map(a=>[a.event_id,a])),albumByEvent=new Map(albumRows.map(a=>[a.event_id,a]));const newsState=newsRows.map(item=>{const assets=newsAssets.filter(a=>a.news_id===item.id),coverAsset=assets.find(a=>a.is_cover);return{...item,assets,cover:coverAsset?(newsUrls.get(coverAsset.id)||null):null}}),eventsState=eventRows.map(item=>{const explicit=explicitByEvent.get(item.id),album=albumByEvent.get(item.id),albumCover=album?(albumUrls.get(album.id)||album.image_url||null):null;return{...item,cover:(explicit&&eventUrls.get(explicit.id))||albumCover||null,album:album?{...album,cover:albumCover,expired:isAlbumExpired(album)}:null}}),bureauState=bureauResult.data||[];setNews(newsState);setEvents(eventsState);setBureau(bureauState);setClock(Date.now());setLoading(false);if(user?.id){saveOfflineData(user.id,'dashboard',{news:newsState.map(i=>({...i,cover:null,assets:(i.assets||[]).map(a=>({id:a.id,file_name:a.file_name,is_cover:a.is_cover,mime_type:a.mime_type,file_size:a.file_size}))})),events:eventsState.map(i=>({...i,cover:null,album:offlineAlbum(i.album)})),bureau:bureauState})}}
+ useEffect(()=>{load()},[]);useEffect(()=>{const h=()=>load();window.addEventListener('online',h);return()=>window.removeEventListener('online',h)},[]);useEffect(()=>{const t=setInterval(()=>setClock(Date.now()),60000);return()=>clearInterval(t)},[]);useEffect(()=>{if(!detail)return;const h=e=>{if(e.key==='Escape')setDetail(null)};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h)},[detail])
+ const currentEvents=useMemo(()=>events.filter(e=>isHomeEvent(e,clock)),[events,clock]);const publications=useMemo(()=>[...news.map(i=>({...i,_kind:'news'})),...currentEvents.map(i=>({...i,_kind:'event'}))].sort((a,b)=>publicationTime(b)-publicationTime(a)).slice(0,12),[news,currentEvents]);const future=useMemo(()=>currentEvents.filter(e=>new Date(e.starts_at).getTime()>=clock||sameLocalDay(new Date(e.starts_at),new Date(clock))).sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at)),[currentEvents,clock]),nextEvent=future[0]||null,fullName=(profile?.full_name||'').trim(),todayLabel=new Date(clock).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})
+ const showCover=item=>item?.cover&&setPreviewCover({src:item.cover,alt:`Couverture · ${item.title||'Publication'}`})
+ const openDetail=async item=>{const kind=item._kind,can=navigator.onLine&&kind==='news';setDetail({kind,item:{...item},loadingExtra:can,extraError:false});if(!can)return;try{const attachments=(item.assets||[]).filter(a=>!a.is_cover),urls=await resolvePrivateMediaBatch(attachments,{entity:'attachment',fallbackBucket:'content'}),resolved=(item.assets||[]).map(a=>({...a,url:a.is_cover?item.cover:(urls.get(a.id)||null)}));setDetail(c=>c?.item?.id===item.id?{...c,item:{...c.item,assets:resolved},loadingExtra:false}:c)}catch{setDetail(c=>c?.item?.id===item.id?{...c,loadingExtra:false,extraError:true}:c)}}
+ const PublicationTile=({item,priority=false})=>{const isEvent=item._kind==='event',albumLabel=item.album?(item.album.expired?'⏱ Expiré':item.album.item_count!=null?`📷 ${item.album.item_count}`:'📷 Album'):null;return <article className="home-editorial-card compact" role="button" tabIndex="0" onClick={()=>openDetail(item)} onKeyDown={e=>{if(e.target===e.currentTarget&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openDetail(item)}}}><div className={`home-tile-media cover-fit-${item.cover_fit||'contain'}`}>{item.cover?<button type="button" className="publication-cover-button" onClick={e=>{e.stopPropagation();showCover(item)}} aria-label={`Agrandir la couverture de ${item.title}`}><img src={item.cover} alt={`Couverture de ${item.title}`} loading={priority?'eager':'lazy'}/></button>:<div className="home-tile-placeholder">{isEvent?'📅':'📣'}</div>}{isEvent&&albumLabel&&<span className="home-album-badge">{albumLabel}</span>}</div><div className="home-tile-body"><span className="role-badge">{isEvent?'Événement':'Information'}</span>{(isEvent||item.show_date!==false)&&<time>{isEvent?eventSchedule(item,true):formatDate(item.publish_at||item.published_at)}</time>}<h3>{item.title}</h3>{isEvent&&item.location&&<p className="home-tile-location">📍 {item.location}</p>}<p>{trimText(isEvent?item.description:(item.summary||item.content),100)||'Ouvrez la tuile pour consulter les détails.'}</p>{isEvent&&item.pricing_enabled&&<span className="home-file-badge">€ Participation</span>}<span className="home-tile-more">Voir les détails →</span></div></article>}
+ return <div className="home-dashboard home-dashboard-compact home-app-dashboard"><section className="home-app-header"><div className="home-app-header-copy"><span className="home-app-date">{todayLabel}</span><span className="eyebrow">Amicale DANZ Antilles</span><h1>{fullName?`Bonjour ${fullName}`:'Bienvenue'}</h1><p>Publications, rendez-vous, recensements et vie de votre foyer.</p><div className="home-app-status-row">{nextEvent&&<span>📅 Prochain rendez-vous : {eventSchedule(nextEvent,true)}</span>}</div></div><img className="home-app-mark" src="/danz/amicale-danz-icon.png" alt="Insigne DANZ Antilles"/></section><nav className="home-app-actions"><Link to="/agenda"><span>📅</span><strong>Agenda</strong></Link><Link to="/foyer"><span>€</span><strong>Foyer & paiements</strong></Link><Link to="/galerie"><span>▦</span><strong>Albums</strong></Link><Link to="/bons-plans"><span>★</span><strong>Bons plans</strong></Link></nav><HomeOpenPolls/>{error&&<div className={`alert ${error.startsWith('Mode hors ligne')?'warning':'error'}`}>{error}</div>}<section className="home-live-section"><div className="home-section-title"><div><span className="eyebrow">À la une</span><h2>Publications récentes</h2></div><Link className="home-more" to="/agenda">Voir l’agenda →</Link></div>{loading?<div className="skeleton-card tall"/>:publications.length?<div className="home-editorial-grid compact-grid">{publications.map((item,index)=><PublicationTile key={`${item._kind}-${item.id}`} item={item} priority={index<2}/>)}</div>:<div className="empty-state">Aucune publication disponible.</div>}</section><section className="home-amicale-section"><div className="home-section-title"><div><span className="eyebrow">L’Amicale</span><h2>DANZ Antilles</h2></div></div><div className="text-panel"><p><span className="role-badge">Association loi 1901</span></p><p>L’Amicale DANZ Antilles crée du lien entre les membres et organise des moments conviviaux, culturels, sportifs, familiaux ou festifs.</p></div>{bureau.length>0&&<div className="text-panel bureau-panel"><div className="bureau-heading"><div><span className="eyebrow">Organisation</span><h2>Membres du bureau</h2></div></div><div className="bureau-grid">{bureau.map(m=><article className="bureau-card" key={m.role_key}><span className="bureau-role">{m.role_label}</span><strong>{m.full_name||'À renseigner'}</strong></article>)}</div></div>}</section>
+ {detail&&<div className="home-detail-backdrop" role="presentation" onClick={()=>setDetail(null)}><section className="home-detail-modal" role="dialog" aria-modal="true" onClick={e=>e.stopPropagation()}><button type="button" className="home-detail-close" onClick={()=>setDetail(null)}>×</button>{detail.item.cover&&<button type="button" className={`home-detail-cover-button cover-fit-${detail.item.cover_fit||'contain'}`} onClick={()=>showCover(detail.item)}><img className="home-detail-cover" src={detail.item.cover} alt={`Couverture de ${detail.item.title}`}/></button>}<div className="home-detail-content"><span className="eyebrow">{detail.kind==='news'?'Information':'Événement'}</span><h2>{detail.item.title}</h2>{detail.kind==='news'?<>{detail.item.show_date!==false&&<time>{formatDate(detail.item.publish_at||detail.item.published_at)}</time>}{detail.item.content&&<p className="home-detail-text">{detail.item.content}</p>}{!detail.loadingExtra&&detail.item.assets?.filter(a=>!a.is_cover&&a.url).length>0&&<div className="home-detail-files"><strong>Pièces jointes</strong>{detail.item.assets.filter(a=>!a.is_cover&&a.url).map(a=><a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer">📎 {a.file_name}</a>)}</div>}</>:<><p className="home-detail-meta">{eventSchedule(detail.item)}</p>{detail.item.location&&<p className="home-detail-meta">📍 {detail.item.location}</p>}{detail.item.description&&<p className="home-detail-text">{detail.item.description}</p>}{detail.item.pricing_enabled&&<div className="privacy-note"><strong>Participation</strong><p>Repas amicaliste : <b>{detail.item.member_meal_cents?formatMoney(detail.item.member_meal_cents):'offert'}</b> · Non-amicaliste : <b>{formatMoney(detail.item.nonmember_meal_cents||0)}</b>.</p>{Object.entries(detail.item.child_prices||{}).some(([,v])=>Number(v)>0)&&<p>{Object.entries(detail.item.child_prices||{}).map(([k,v])=>`${k} : ${formatMoney(v)}`).join(' · ')}</p>}{detail.item.pricing_notes&&<p>{detail.item.pricing_notes}</p>}<small>Les consommations réelles peuvent être ajoutées au solde du foyer après l’événement.</small></div>}{detail.item.album&&<Link className="secondary-button" to={`/galerie?event=${detail.item.id}`} onClick={()=>setDetail(null)}>📷 Ouvrir l’album</Link>}</>}</div></section></div>}<ImageLightbox src={previewCover?.src} alt={previewCover?.alt} onClose={()=>setPreviewCover(null)}/></div>
 }
