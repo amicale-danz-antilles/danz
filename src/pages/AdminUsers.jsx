@@ -2,344 +2,74 @@ import { useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { effectiveAmicaliste, formatMoney, householdBalanceCents, membershipLabel } from '../lib/finance.js'
 import { PageTitle } from './Actualites.jsx'
 import '../admin-users.css'
-
-const CURRENT_YEAR = new Date().getFullYear()
-
-const auditLabels = {
-  user_access_updated: 'Compte / statut modifié',
-  user_suspended: 'Compte suspendu',
-  user_deleted: 'Compte et données personnelles supprimés',
-  user_password_reset_by_admin: 'Mot de passe remplacé par un administrateur',
-  membership_approved: 'Demande d’accès approuvée',
-  membership_rejected: 'Demande d’accès refusée',
-  data_exported: 'Sauvegarde / export des données',
-}
+import '../finance-households.css'
 
 const situationLabel = (profile) => {
-  if (profile?.applicant_type === 'spouse') return 'Conjoint(e) d’un militaire de la DANZ'
+  if (profile?.applicant_type === 'spouse') return 'Conjoint(e) d’un militaire DANZ'
   if (profile?.military_reference === 'other') return 'Militaire hors DANZ'
-  if (profile?.applicant_type === 'military' || profile?.military_reference === 'danz') return 'Militaire de la DANZ'
+  if (profile?.applicant_type === 'military' || profile?.military_reference === 'danz') return 'Militaire DANZ'
   return 'Situation non renseignée'
 }
-
-const valuesFor = (profile) => ({
-  active: profile.active === true,
-  role: profile.role === 'admin' ? 'admin' : 'member',
-  applicant_type: profile.applicant_type || '',
-  is_amicaliste: profile.is_amicaliste === true ? 'yes' : 'no',
-})
-
-const sameValues = (left, right) => Boolean(left && right)
-  && left.active === right.active
-  && left.role === right.role
-  && left.applicant_type === right.applicant_type
-  && left.is_amicaliste === right.is_amicaliste
+const accessValues = (profile) => ({ active: profile?.active === true, role: profile?.role === 'admin' ? 'admin' : 'member', applicant_type: profile?.applicant_type || '' })
+const sameAccess = (a,b) => Boolean(a&&b) && a.active===b.active && a.role===b.role && a.applicant_type===b.applicant_type
 
 export default function AdminUsers() {
   const { user, isAdmin, loading: authLoading } = useAuth()
-  const [profiles, setProfiles] = useState([])
-  const [dues, setDues] = useState({})
-  const [duesReady, setDuesReady] = useState(false)
-  const [audit, setAudit] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const [busyId, setBusyId] = useState(null)
-  const [duesBusyId, setDuesBusyId] = useState(null)
-  const [query, setQuery] = useState('')
-  const [selectedId, setSelectedId] = useState(null)
-  const [draft, setDraft] = useState(null)
-  const [passwordTarget, setPasswordTarget] = useState(null)
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
+  const [profiles,setProfiles]=useState([]),[households,setHouseholds]=useState([]),[members,setMembers]=useState([]),[charges,setCharges]=useState([]),[payments,setPayments]=useState([]),[allocations,setAllocations]=useState([]),[settings,setSettings]=useState(null),[audit,setAudit]=useState([])
+  const [loading,setLoading]=useState(true),[error,setError]=useState(''),[success,setSuccess]=useState(''),[busy,setBusy]=useState(false),[query,setQuery]=useState('')
+  const [selectedId,setSelectedId]=useState(null),[draft,setDraft]=useState(null),[nameDraft,setNameDraft]=useState(''),[membershipActive,setMembershipActive]=useState(false),[membershipUntil,setMembershipUntil]=useState('')
+  const [childName,setChildName]=useState(''),[childCategory,setChildCategory]=useState(''),[mergeUserId,setMergeUserId]=useState('')
+  const [passwordTarget,setPasswordTarget]=useState(null),[newPassword,setNewPassword]=useState(''),[confirmPassword,setConfirmPassword]=useState('')
 
-  const load = async ({ keepSelection = true } = {}) => {
-    setLoading(true)
-    setError('')
-    const [profilesResult, duesResult, auditResult] = await Promise.all([
-      supabase.from('profiles').select('*').order('full_name', { ascending: true }),
-      supabase.from('membership_dues').select('user_id,year,paid,paid_at,updated_at').eq('year', CURRENT_YEAR),
-      supabase.from('admin_audit_log').select('id,actor_id,action,target_user_id,created_at').order('created_at', { ascending: false }).limit(50),
+  const load=async({keepSelection=true}={})=>{
+    setLoading(true);setError('')
+    const [p,h,m,c,pay,s,a]=await Promise.all([
+      supabase.from('profiles').select('*').order('full_name'),supabase.from('households').select('*').order('name'),supabase.from('household_members').select('*').order('sort_order').order('created_at'),supabase.from('household_charges').select('*').order('created_at',{ascending:false}),supabase.from('household_payments').select('*').order('created_at',{ascending:false}),supabase.from('association_settings').select('*').eq('id',1).single(),supabase.from('admin_audit_log').select('id,actor_id,action,target_user_id,created_at').order('created_at',{ascending:false}).limit(50)
     ])
-    if (profilesResult.error) setError(profilesResult.error.message)
-    if (auditResult.error) setError((current) => current || auditResult.error.message)
-    const rows = profilesResult.data || []
-    setProfiles(rows)
-    setAudit(auditResult.data || [])
-    if (duesResult.error) {
-      setDuesReady(false)
-      setDues({})
-    } else {
-      setDuesReady(true)
-      setDues(Object.fromEntries((duesResult.data || []).map((entry) => [entry.user_id, entry])))
-    }
-    if (keepSelection && selectedId) {
-      const fresh = rows.find((profile) => profile.id === selectedId)
-      if (fresh) setDraft(valuesFor(fresh))
-      else { setSelectedId(null); setDraft(null) }
-    }
+    const first=[p.error,h.error,m.error,c.error,pay.error,s.error,a.error].find(Boolean);if(first)setError(first.message||'Chargement incomplet.')
+    const paymentRows=pay.data||[];const al=paymentRows.length?await supabase.from('household_payment_allocations').select('*').in('payment_id',paymentRows.map(x=>x.id)):{data:[],error:null}
+    setProfiles(p.data||[]);setHouseholds(h.data||[]);setMembers(m.data||[]);setCharges(c.data||[]);setPayments(paymentRows);setAllocations(al.data||[]);setSettings(s.data||null);setAudit(a.data||[])
+    if(keepSelection&&selectedId){const fresh=(p.data||[]).find(x=>x.id===selectedId);if(fresh)openDraft(fresh);else setSelectedId(null)}
     setLoading(false)
   }
+  useEffect(()=>{if(isAdmin)load({keepSelection:false});else if(!authLoading)setLoading(false)},[isAdmin,authLoading])
+  if(!authLoading&&!isAdmin)return <Navigate to="/" replace/>
 
-  useEffect(() => {
-    if (isAdmin) load({ keepSelection: false })
-    else if (!authLoading) setLoading(false)
-  }, [isAdmin, authLoading])
+  const memberByUser=useMemo(()=>Object.fromEntries(members.filter(x=>x.user_id).map(x=>[x.user_id,x])),[members])
+  const householdById=useMemo(()=>Object.fromEntries(households.map(x=>[x.id,x])),[households])
+  const balanceByHousehold=useMemo(()=>Object.fromEntries(households.map(h=>[h.id,householdBalanceCents(charges.filter(c=>c.household_id===h.id),allocations,payments)])),[households,charges,allocations,payments])
+  const filtered=useMemo(()=>{const n=query.trim().toLowerCase();if(!n)return profiles;return profiles.filter(p=>`${p.full_name||''} ${p.email||''} ${situationLabel(p)} ${householdById[memberByUser[p.id]?.household_id]?.name||''}`.toLowerCase().includes(n))},[profiles,query,householdById,memberByUser])
+  const selected=profiles.find(p=>p.id===selectedId)||null
+  const selectedMembership=selected?memberByUser[selected.id]:null
+  const selectedHousehold=selectedMembership?householdById[selectedMembership.household_id]:null
+  const selectedHouseholdMembers=selectedHousehold?members.filter(m=>m.household_id===selectedHousehold.id):[]
+  const dirty=selected&&draft&&!sameAccess(draft,accessValues(selected))
+  const categories=Array.isArray(settings?.child_age_categories)?settings.child_age_categories:['0–5 ans','6–12 ans','13–17 ans']
+  const nameById=useMemo(()=>Object.fromEntries(profiles.map(p=>[p.id,p.full_name||p.email||'Utilisateur'])),[profiles])
 
-  useEffect(() => {
-    if (!selectedId && !passwordTarget) return undefined
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    const onKeyDown = (event) => {
-      if (event.key !== 'Escape') return
-      if (passwordTarget && busyId !== passwordTarget.id) setPasswordTarget(null)
-      else if (!busyId && !duesBusyId) { setSelectedId(null); setDraft(null) }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.body.style.overflow = previous
-      window.removeEventListener('keydown', onKeyDown)
-    }
-  }, [selectedId, passwordTarget, busyId, duesBusyId])
+  const openDraft=(profile)=>{setSelectedId(profile.id);setDraft(accessValues(profile));setNameDraft(profile.full_name||'');setMembershipActive(effectiveAmicaliste(profile));setMembershipUntil(profile.membership_valid_until||'');setChildName('');setChildCategory(categories[0]||'');setMergeUserId('');setError('');setSuccess('')}
+  const saveAccess=async()=>{if(!selected||!draft||!dirty)return;setBusy(true);setError('');try{const {data,error:fnError}=await supabase.functions.invoke('admin-user-management',{body:{action:'set-access',userId:selected.id,active:draft.active,role:draft.role,applicantType:draft.applicant_type||null}});if(fnError||data?.error)throw new Error(data?.error||fnError?.message);setSuccess('Droits du compte mis à jour.');await load()}catch(e){setError(e.message||'Modification impossible.')}finally{setBusy(false)}}
+  const saveName=async()=>{if(!selected||!nameDraft.trim()||nameDraft.trim()===selected.full_name)return;setBusy(true);const {error:e}=await supabase.rpc('admin_update_profile_name',{p_user_id:selected.id,p_full_name:nameDraft.trim()});if(e)setError(e.message);else{setSuccess('Nom mis à jour.');await load()}setBusy(false)}
+  const saveMembership=async()=>{if(!selected)return;setBusy(true);setError('');const {error:e}=await supabase.rpc('admin_set_membership_status',{p_user_id:selected.id,p_active:membershipActive,p_valid_until:membershipActive?(membershipUntil||null):null});if(e)setError(e.message);else{setSuccess(membershipActive?'Statut amicaliste mis à jour.':'Statut non-amicaliste enregistré.');await load()}setBusy(false)}
+  const renameHousehold=async()=>{if(!selectedHousehold)return;const name=window.prompt('Nom du foyer',selectedHousehold.name||'');if(!name?.trim())return;setBusy(true);const {error:e}=await supabase.from('households').update({name:name.trim(),updated_at:new Date().toISOString()}).eq('id',selectedHousehold.id);if(e)setError(e.message);else{setSuccess('Foyer renommé.');await load()}setBusy(false)}
+  const addChild=async()=>{if(!selectedHousehold||!childName.trim()||!childCategory)return;setBusy(true);const {error:e}=await supabase.from('household_members').insert({household_id:selectedHousehold.id,display_name:childName.trim(),member_type:'child',age_category:childCategory,sort_order:selectedHouseholdMembers.length});if(e)setError(e.message);else{setChildName('');setSuccess('Enfant ajouté au foyer.');await load()}setBusy(false)}
+  const removeChild=async(member)=>{if(member.member_type!=='child'||!window.confirm(`Retirer ${member.display_name} du foyer ?`))return;setBusy(true);const {error:e}=await supabase.from('household_members').delete().eq('id',member.id);if(e)setError(e.message);else{setSuccess('Enfant retiré.');await load()}setBusy(false)}
+  const mergeHousehold=async()=>{if(!selectedHousehold||!mergeUserId)return;const otherMember=memberByUser[mergeUserId];if(!otherMember||otherMember.household_id===selectedHousehold.id)return;const otherHouse=householdById[otherMember.household_id];if(!window.confirm(`Fusionner « ${otherHouse?.name||'l’autre foyer'} » dans « ${selectedHousehold.name} » ? Adultes, enfants, dettes et paiements seront réunis.`))return;setBusy(true);const {error:e}=await supabase.rpc('admin_merge_households',{p_source:otherMember.household_id,p_target:selectedHousehold.id});if(e)setError(e.message);else{setSuccess('Foyers fusionnés.');await load()}setBusy(false)}
+  const replacePassword=async(event)=>{event.preventDefault();if(!passwordTarget)return;if(newPassword.length<10||!/[A-Za-z]/.test(newPassword)||!/\d/.test(newPassword))return setError('Le mot de passe doit contenir au moins 10 caractères, une lettre et un chiffre.');if(newPassword!==confirmPassword)return setError('Les mots de passe ne correspondent pas.');setBusy(true);const {data,error:fnError}=await supabase.functions.invoke('admin-user-management',{body:{action:'set-password',userId:passwordTarget.id,password:newPassword}});if(fnError||data?.error)setError(data?.error||fnError?.message);else{setPasswordTarget(null);setNewPassword('');setConfirmPassword('');setSuccess('Mot de passe remplacé.')}setBusy(false)}
+  const deleteUser=async(profile)=>{const answer=window.prompt(`Suppression définitive de ${profile.full_name||profile.email}. Tapez SUPPRIMER pour confirmer.`);if(answer!=='SUPPRIMER')return;setBusy(true);const {data,error:fnError}=await supabase.functions.invoke('admin-user-management',{body:{action:'delete',userId:profile.id}});if(fnError||data?.error)setError(data?.error||fnError?.message);else{setSelectedId(null);setSuccess('Compte supprimé.');await load({keepSelection:false})}setBusy(false)}
 
-  if (!authLoading && !isAdmin) return <Navigate to="/" replace />
+  const counts={total:profiles.length,active:profiles.filter(p=>p.active).length,amicalistes:profiles.filter(p=>effectiveAmicaliste(p)).length,households:households.length}
+  return <div className="admin-users-page"><PageTitle eyebrow="Administration · Membres" title="Utilisateurs" text="Gérez les comptes, les foyers, les enfants, le statut amicaliste et consultez le solde de chaque foyer."/><div className="admin-user-stats"><article><strong>{counts.total}</strong><span>comptes</span></article><article><strong>{counts.active}</strong><span>actifs</span></article><article><strong>{counts.amicalistes}</strong><span>amicalistes à jour</span></article><article><strong>{counts.households}</strong><span>foyers</span></article></div>{error&&<div className="alert error">{error}</div>}{success&&<div className="alert success">{success}</div>}<section><div className="admin-section-heading"><div><span className="eyebrow">Base membres</span><h2>Utilisateurs & foyers</h2></div><span>{filtered.length} affiché{filtered.length>1?'s':''}</span></div><div className="admin-user-toolbar"><input type="search" placeholder="Rechercher un nom, e-mail ou foyer…" value={query} onChange={e=>setQuery(e.target.value)}/></div>{loading?<div className="skeleton-card"/>:<div className="admin-member-list">{filtered.map(profile=>{const hm=memberByUser[profile.id],house=householdById[hm?.household_id],balance=balanceByHousehold[hm?.household_id]||0;return <button type="button" className={`admin-member-row ${profile.active?'':'is-suspended'}`} key={profile.id} onClick={()=>openDraft(profile)}><span className="admin-user-avatar">{(profile.full_name||profile.email||'?')[0].toUpperCase()}</span><span className="admin-member-identity"><strong>{profile.full_name||'Nom non renseigné'}</strong><small>{profile.email}</small><em>{house?.name||'Foyer à créer'} · {situationLabel(profile)}</em></span><span className="admin-member-badges"><span className={`admin-state-badge ${profile.active?'ok':'off'}`}>{profile.active?'Actif':'Suspendu'}</span><span className={`admin-state-badge ${effectiveAmicaliste(profile)?'member':'neutral'}`}>{effectiveAmicaliste(profile)?'Amicaliste':'Non-amicaliste'}</span>{balance>0&&<span className="admin-state-badge fee-due">{formatMoney(balance)} dû</span>}{profile.role==='admin'&&<span className="admin-state-badge admin">Admin</span>}</span><span className="admin-member-chevron">›</span></button>})}</div>}</section><section className="admin-audit-section"><details><summary>Journal d’administration · 50 dernières actions</summary><div className="admin-audit-list">{audit.map(entry=><article key={entry.id}><div><strong>{entry.action}</strong><span>{entry.target_user_id?nameById[entry.target_user_id]||'Utilisateur':'Administration'}</span></div><small>{new Date(entry.created_at).toLocaleString('fr-FR')} · par {entry.actor_id?nameById[entry.actor_id]||'Administrateur':'système'}</small></article>)}</div></details></section>
 
-  const counts = useMemo(() => ({
-    total: profiles.length,
-    active: profiles.filter((profile) => profile.active).length,
-    admins: profiles.filter((profile) => profile.active && profile.role === 'admin').length,
-    amicalistes: profiles.filter((profile) => profile.is_amicaliste === true).length,
-    duesPaid: profiles.filter((profile) => profile.is_amicaliste === true && dues[profile.id]?.paid === true).length,
-  }), [profiles, dues])
-
-  const filteredProfiles = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    if (!needle) return profiles
-    return profiles.filter((profile) => `${profile.full_name || ''} ${profile.email || ''} ${situationLabel(profile)}`.toLowerCase().includes(needle))
-  }, [profiles, query])
-
-  const selectedProfile = useMemo(() => profiles.find((profile) => profile.id === selectedId) || null, [profiles, selectedId])
-  const nameById = useMemo(() => Object.fromEntries(profiles.map((profile) => [profile.id, profile.full_name || profile.email || 'Utilisateur'])), [profiles])
-  const dirty = selectedProfile && draft ? !sameValues(draft, valuesFor(selectedProfile)) : false
-
-  const openUser = (profile) => {
-    setError('')
-    setSuccess('')
-    setSelectedId(profile.id)
-    setDraft(valuesFor(profile))
-  }
-
-  const closeUser = () => {
-    if (busyId || duesBusyId) return
-    if (dirty && !window.confirm('Abandonner les modifications non enregistrées ?')) return
-    setSelectedId(null)
-    setDraft(null)
-  }
-
-  const saveUser = async () => {
-    if (!selectedProfile || !draft || !dirty) return
-    setBusyId(selectedProfile.id)
-    setError('')
-    setSuccess('')
-    try {
-      const { data, error: fnError } = await supabase.functions.invoke('admin-user-management', {
-        body: {
-          action: 'set-access',
-          userId: selectedProfile.id,
-          active: draft.active,
-          role: draft.role,
-          applicantType: draft.applicant_type || null,
-          isAmicaliste: draft.is_amicaliste === 'yes',
-        },
-      })
-      if (fnError || data?.error) throw new Error(data?.error || fnError?.message || 'Impossible de modifier ce compte.')
-      setSuccess(`Compte de ${selectedProfile.full_name || selectedProfile.email} mis à jour.`)
-      await load()
-    } catch (err) {
-      setError(err.message || 'Impossible de modifier ce compte.')
-    } finally {
-      setBusyId(null)
-    }
-  }
-
-  const setDuePaid = async (profile, paid) => {
-    if (!duesReady || !profile?.id) return
-    setDuesBusyId(profile.id)
-    setError('')
-    setSuccess('')
-    try {
-      const now = new Date().toISOString()
-      const { error: dueError } = await supabase.from('membership_dues').upsert({
-        user_id: profile.id,
-        year: CURRENT_YEAR,
-        paid,
-        paid_at: paid ? now : null,
-        updated_by: user.id,
-        updated_at: now,
-      }, { onConflict: 'user_id,year' })
-      if (dueError) throw dueError
-      setSuccess(paid ? `Cotisation ${CURRENT_YEAR} marquée comme réglée pour ${profile.full_name || profile.email}.` : `Cotisation ${CURRENT_YEAR} marquée comme non réglée pour ${profile.full_name || profile.email}.`)
-      await load()
-    } catch (err) {
-      setError(err.message || 'Impossible de mettre à jour la cotisation.')
-    } finally {
-      setDuesBusyId(null)
-    }
-  }
-
-  const openPasswordReset = (profile) => {
-    setPasswordTarget(profile)
-    setNewPassword('')
-    setConfirmPassword('')
-    setError('')
-    setSuccess('')
-  }
-
-  const replacePassword = async (event) => {
-    event.preventDefault()
-    if (!passwordTarget) return
-    if (newPassword.length < 10 || !/[A-Za-z]/.test(newPassword) || !/\d/.test(newPassword)) return setError('Le mot de passe doit contenir au moins 10 caractères, avec au moins une lettre et un chiffre.')
-    if (newPassword !== confirmPassword) return setError('Les deux mots de passe ne correspondent pas.')
-    setBusyId(passwordTarget.id)
-    setError('')
-    setSuccess('')
-    try {
-      const { data, error: fnError } = await supabase.functions.invoke('admin-user-management', { body: { action: 'set-password', userId: passwordTarget.id, password: newPassword } })
-      if (fnError || data?.error) throw new Error(data?.error || fnError?.message || 'Impossible de remplacer le mot de passe.')
-      const label = passwordTarget.full_name || passwordTarget.email
-      setPasswordTarget(null)
-      setNewPassword('')
-      setConfirmPassword('')
-      setSuccess(`Nouveau mot de passe enregistré pour ${label}.`)
-      await load()
-    } catch (err) {
-      setError(err.message || 'Impossible de remplacer le mot de passe.')
-    } finally {
-      setBusyId(null)
-    }
-  }
-
-  const deleteUser = async (profile) => {
-    const answer = window.prompt(`Suppression RGPD définitive de ${profile.full_name || profile.email}.\n\nTapez SUPPRIMER pour confirmer.`)
-    if (answer !== 'SUPPRIMER') return
-    setBusyId(profile.id)
-    setError('')
-    setSuccess('')
-    try {
-      const { data, error: fnError } = await supabase.functions.invoke('admin-user-management', { body: { action: 'delete', userId: profile.id } })
-      if (fnError || data?.error) throw new Error(data?.error || fnError?.message || 'Suppression impossible.')
-      setSelectedId(null)
-      setDraft(null)
-      setSuccess('Le compte et ses données personnelles directement rattachées ont été supprimés.')
-      await load({ keepSelection: false })
-    } catch (err) {
-      setError(err.message || 'Suppression impossible.')
-    } finally {
-      setBusyId(null)
-    }
-  }
-
-  const auditTargetLabel = (entry) => {
-    if (entry.action === 'data_exported') return 'Données du site'
-    if (entry.target_user_id) return nameById[entry.target_user_id] || 'Utilisateur'
-    if (entry.action.startsWith('membership_')) return 'Demande d’accès'
-    return 'Compte supprimé'
-  }
-
-  const dueBadge = (profile) => {
-    if (!duesReady) return null
-    if (!profile.is_amicaliste) return <span className="admin-state-badge neutral">Cotisation —</span>
-    return dues[profile.id]?.paid
-      ? <span className="admin-state-badge fee-ok">Cotisation {CURRENT_YEAR} ✓</span>
-      : <span className="admin-state-badge fee-due">Cotisation {CURRENT_YEAR} à régler</span>
-  }
-
-  return <div className="admin-users-page">
-    <PageTitle eyebrow="Administration · Membres" title="Utilisateurs" text="Touchez un utilisateur pour consulter sa situation et gérer ses droits, son statut amicaliste et sa cotisation annuelle." />
-
-    <div className="admin-user-stats">
-      <article><strong>{counts.total}</strong><span>comptes</span></article>
-      <article><strong>{counts.active}</strong><span>actifs</span></article>
-      <article><strong>{counts.amicalistes}</strong><span>amicalistes</span></article>
-      <article><strong>{duesReady ? `${counts.duesPaid}/${counts.amicalistes}` : counts.admins}</strong><span>{duesReady ? `cotisations ${CURRENT_YEAR} réglées` : 'admins'}</span></article>
-    </div>
-
-    {error && <div className="alert error">{error}</div>}
-    {success && <div className="alert">{success}</div>}
-
-    <section>
-      <div className="admin-section-heading"><div><span className="eyebrow">Base membres</span><h2>Liste des utilisateurs</h2></div><span>{filteredProfiles.length} affiché{filteredProfiles.length > 1 ? 's' : ''}</span></div>
-      <div className="admin-user-toolbar"><input type="search" placeholder="Rechercher un nom, e-mail ou situation…" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
-
-      {loading ? <div className="skeleton-card" /> : profiles.length === 0 ? <div className="empty-state">Aucun compte.</div> : filteredProfiles.length === 0 ? <div className="empty-state">Aucun utilisateur ne correspond à cette recherche.</div> : <div className="admin-member-list">
-        {filteredProfiles.map((profile) => {
-          const self = profile.id === user?.id
-          return <button type="button" className={`admin-member-row ${profile.active ? '' : 'is-suspended'}`} key={profile.id} onClick={() => openUser(profile)}>
-            <span className="admin-user-avatar">{(profile.full_name || profile.email || '?')[0].toUpperCase()}</span>
-            <span className="admin-member-identity"><strong>{profile.full_name || 'Nom non renseigné'}</strong><small>{profile.email}</small><em>{situationLabel(profile)}</em></span>
-            <span className="admin-member-badges">
-              <span className={`admin-state-badge ${profile.active ? 'ok' : 'off'}`}>{profile.active ? 'Actif' : 'Suspendu'}</span>
-              <span className={`admin-state-badge ${profile.is_amicaliste ? 'member' : 'neutral'}`}>{profile.is_amicaliste ? 'Amicaliste' : 'Non-amicaliste'}</span>
-              {dueBadge(profile)}
-              {profile.role === 'admin' && <span className="admin-state-badge admin">Admin</span>}
-              {self && <span className="admin-state-badge self">Vous</span>}
-            </span>
-            <span className="admin-member-chevron" aria-hidden="true">›</span>
-          </button>
-        })}
-      </div>}
-    </section>
-
-    <section className="admin-audit-section">
-      <details>
-        <summary>Journal d’administration · 50 dernières actions</summary>
-        {audit.length === 0 ? <div className="empty-state">Aucune modification enregistrée pour le moment.</div> : <div className="admin-audit-list">{audit.map((entry) => <article key={entry.id}><div><strong>{auditLabels[entry.action] || entry.action}</strong><span>{auditTargetLabel(entry)}</span></div><small>{new Date(entry.created_at).toLocaleString('fr-FR')} · par {entry.actor_id ? nameById[entry.actor_id] || 'Administrateur' : 'ancien administrateur'}</small></article>)}</div>}
-      </details>
-    </section>
-
-    {selectedProfile && draft && <div className="admin-user-sheet-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeUser() }}>
-      <section className="admin-user-sheet" role="dialog" aria-modal="true" aria-labelledby="admin-user-sheet-title">
-        <div className="admin-user-sheet-head"><div className="admin-table-user"><span className="admin-user-avatar large">{(selectedProfile.full_name || selectedProfile.email || '?')[0].toUpperCase()}</span><div><span className="eyebrow">Gestion du compte</span><h2 id="admin-user-sheet-title">{selectedProfile.full_name || 'Utilisateur'}</h2><small>{selectedProfile.email}</small></div></div><button type="button" className="admin-sheet-close" aria-label="Fermer" onClick={closeUser}>×</button></div>
-
-        <div className="admin-user-sheet-summary">
-          <span>{selectedProfile.active ? '● Accès actif' : '○ Accès suspendu'}</span>
-          <span>{draft.is_amicaliste === 'yes' ? '✓ Amicaliste' : 'Non-amicaliste'}</span>
-          <span>{situationLabel(selectedProfile)}</span>
-        </div>
-
-        <div className="admin-user-edit-grid">
-          <label>Accès<select value={draft.active ? 'active' : 'suspended'} disabled={busyId === selectedProfile.id || selectedProfile.id === user?.id} onChange={(event) => setDraft({ ...draft, active: event.target.value === 'active' })}><option value="active">Actif</option><option value="suspended">Suspendu</option></select></label>
-          <label>Rôle<select value={draft.role} disabled={busyId === selectedProfile.id || selectedProfile.id === user?.id} onChange={(event) => setDraft({ ...draft, role: event.target.value })}><option value="member">Membre</option><option value="admin">Administrateur</option></select></label>
-          <label>Statut amicale<select value={draft.is_amicaliste} disabled={busyId === selectedProfile.id} onChange={(event) => setDraft({ ...draft, is_amicaliste: event.target.value })}><option value="yes">Amicaliste</option><option value="no">Non-amicaliste</option></select></label>
-          <div className="admin-user-readonly-field"><span>Situation déclarée</span><strong>{situationLabel(selectedProfile)}</strong></div>
-        </div>
-
-        {duesReady && <section className={`admin-dues-card ${selectedProfile.is_amicaliste ? '' : 'disabled'}`}>
-          <div><span className="eyebrow">Cotisation annuelle</span><h3>{CURRENT_YEAR}</h3><p>{selectedProfile.is_amicaliste ? dues[selectedProfile.id]?.paid ? `Réglée${dues[selectedProfile.id]?.paid_at ? ` le ${new Date(dues[selectedProfile.id].paid_at).toLocaleDateString('fr-FR')}` : ''}.` : 'Cotisation à régulariser.' : 'Ce compte est actuellement non-amicaliste.'}</p></div>
-          {selectedProfile.is_amicaliste && <button type="button" className={dues[selectedProfile.id]?.paid ? 'secondary-button' : 'primary-button'} disabled={duesBusyId === selectedProfile.id} onClick={() => setDuePaid(selectedProfile, !dues[selectedProfile.id]?.paid)}>{duesBusyId === selectedProfile.id ? 'Enregistrement…' : dues[selectedProfile.id]?.paid ? 'Marquer non réglée' : `Marquer payée ${CURRENT_YEAR}`}</button>}
-        </section>}
-
-        <div className="privacy-note admin-user-help"><strong>Amicaliste, cotisation et accès sont séparés.</strong><br/>Le statut amicaliste indique l’adhésion à l’Amicale. La cotisation est suivie année par année. Suspendre un compte coupe son accès au site sans modifier ces deux informations.</div>
-
-        <div className="admin-user-sheet-actions">
-          <button type="button" className="primary-button" disabled={busyId === selectedProfile.id || !dirty} onClick={saveUser}>{busyId === selectedProfile.id ? 'Enregistrement…' : dirty ? 'Enregistrer les modifications' : 'Aucune modification'}</button>
-          {dirty && <button type="button" className="secondary-button" disabled={busyId === selectedProfile.id} onClick={() => setDraft(valuesFor(selectedProfile))}>Annuler les changements</button>}
-          <button type="button" className="secondary-button" disabled={busyId === selectedProfile.id} onClick={() => openPasswordReset(selectedProfile)}>Changer le mot de passe</button>
-          <button type="button" className="ghost-button danger-action" disabled={busyId === selectedProfile.id || selectedProfile.id === user?.id} onClick={() => deleteUser(selectedProfile)}>Supprimer définitivement le compte</button>
-        </div>
-      </section>
-    </div>}
-
-    {passwordTarget && <div className="admin-password-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && busyId !== passwordTarget.id) setPasswordTarget(null) }}>
-      <form className="admin-password-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-password-title" onSubmit={replacePassword}>
-        <span className="eyebrow">Sécurité du compte</span><h2 id="admin-password-title">Nouveau mot de passe</h2><p>Compte : <strong>{passwordTarget.full_name || passwordTarget.email}</strong></p>
-        <label>Nouveau mot de passe<input type="password" autoFocus required minLength="10" maxLength="128" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="10 caractères minimum" /></label>
-        <label>Confirmer le mot de passe<input type="password" required minLength="10" maxLength="128" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></label>
-        <small>Au moins 10 caractères, dont une lettre et un chiffre. Le mot de passe actuel n’est jamais affiché.</small>
-        <div className="admin-password-actions"><button className="primary-button" disabled={busyId === passwordTarget.id}>{busyId === passwordTarget.id ? 'Enregistrement…' : 'Remplacer le mot de passe'}</button><button type="button" className="ghost-button" disabled={busyId === passwordTarget.id} onClick={() => setPasswordTarget(null)}>Annuler</button></div>
-      </form>
-    </div>}
+  {selected&&draft&&<div className="admin-user-sheet-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget&&!busy)setSelectedId(null)}}><section className="admin-user-sheet" role="dialog" aria-modal="true"><div className="admin-user-sheet-head"><div><span className="eyebrow">Utilisateur</span><h2>{selected.full_name||selected.email}</h2><p>{selected.email}</p></div><button type="button" className="admin-user-sheet-close" onClick={()=>!busy&&setSelectedId(null)}>×</button></div><div className="admin-user-sheet-body">
+    <section className="admin-user-panel"><h3>Identité & accès</h3><label>Nom affiché<input value={nameDraft} maxLength="160" onChange={e=>setNameDraft(e.target.value)}/></label><button type="button" className="ghost-button" disabled={busy||!nameDraft.trim()||nameDraft.trim()===selected.full_name} onClick={saveName}>Enregistrer le nom</button><div className="admin-publication-options"><label>Compte<select value={draft.active?'yes':'no'} onChange={e=>setDraft({...draft,active:e.target.value==='yes'})}><option value="yes">Actif</option><option value="no">Suspendu</option></select></label><label>Rôle<select value={draft.role} onChange={e=>setDraft({...draft,role:e.target.value})}><option value="member">Membre</option><option value="admin">Administrateur</option></select></label></div><label>Situation<select value={draft.applicant_type} onChange={e=>setDraft({...draft,applicant_type:e.target.value})}><option value="military">Militaire</option><option value="spouse">Conjoint(e)</option><option value="">Autre / non renseigné</option></select></label><button type="button" className="primary-button" disabled={busy||!dirty} onClick={saveAccess}>Enregistrer les droits</button></section>
+    <section className="admin-user-panel"><h3>Statut amicaliste</h3><p><strong>{membershipLabel(selected)}</strong></p><label>Statut<select value={membershipActive?'yes':'no'} onChange={e=>setMembershipActive(e.target.value==='yes')}><option value="no">Non-amicaliste</option><option value="yes">Amicaliste</option></select></label>{membershipActive&&<label>Valable jusqu’au<input type="date" value={membershipUntil} onChange={e=>setMembershipUntil(e.target.value)}/></label>}<button type="button" className="primary-button" disabled={busy||membershipActive&&!membershipUntil} onClick={saveMembership}>Enregistrer le statut</button><small>Le paiement d’une cotisation de {formatMoney(settings?.membership_fee_cents??6000)} active automatiquement une année. Cette commande sert aux corrections administratives.</small></section>
+    <section className="admin-user-panel"><div className="finance-heading"><div><h3>Foyer</h3><small>{selectedHousehold?.name||'Non défini'} · solde {formatMoney(balanceByHousehold[selectedHousehold?.id]||0)}</small></div>{selectedHousehold&&<button type="button" className="ghost-button" onClick={renameHousehold}>Renommer</button>}</div><div className="admin-household-members">{selectedHouseholdMembers.map(member=><div className="admin-household-member" key={member.id}><span>{member.member_type==='child'?'🧒':'👤'}</span><div><strong>{member.display_name}</strong><small>{member.member_type==='child'?member.age_category:'Compte adulte'}</small></div>{member.member_type==='child'&&<button type="button" className="ghost-button admin-danger-button" disabled={busy} onClick={()=>removeChild(member)}>Retirer</button>}</div>)}</div>{selectedHousehold&&<div className="admin-finance-form" style={{marginTop:'1rem'}}><h4>Ajouter un enfant</h4><div className="form-row"><label>Prénom<input value={childName} maxLength="80" onChange={e=>setChildName(e.target.value)}/></label><label>Catégorie d’âge<select value={childCategory} onChange={e=>setChildCategory(e.target.value)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label></div><button type="button" className="secondary-button" disabled={busy||!childName.trim()} onClick={addChild}>＋ Ajouter l’enfant</button><h4>Réunir deux foyers</h4><label>Autre adulte<select value={mergeUserId} onChange={e=>setMergeUserId(e.target.value)}><option value="">Choisir…</option>{profiles.filter(p=>p.id!==selected.id&&memberByUser[p.id]?.household_id!==selectedHousehold.id).map(p=><option value={p.id} key={p.id}>{p.full_name||p.email} · {householdById[memberByUser[p.id]?.household_id]?.name||'foyer'}</option>)}</select></label><button type="button" className="secondary-button" disabled={busy||!mergeUserId} onClick={mergeHousehold}>Fusionner les foyers</button></div>}</section>
+    <section className="admin-user-panel"><h3>Sécurité du compte</h3><div className="finance-button-row"><button type="button" className="ghost-button" onClick={()=>{setPasswordTarget(selected);setNewPassword('');setConfirmPassword('')}}>Remplacer le mot de passe</button>{selected.id!==user.id&&<button type="button" className="ghost-button admin-danger-button" onClick={()=>deleteUser(selected)}>Supprimer le compte</button>}</div></section>
+  </div></section></div>}
+  {passwordTarget&&<div className="admin-user-sheet-backdrop"><section className="admin-password-dialog" role="dialog" aria-modal="true"><h2>Nouveau mot de passe</h2><p>{passwordTarget.full_name||passwordTarget.email}</p><form onSubmit={replacePassword}><label>Nouveau mot de passe<input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} minLength="10" required/></label><label>Confirmation<input type="password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} minLength="10" required/></label><div className="finance-button-row"><button className="primary-button" disabled={busy}>Enregistrer</button><button type="button" className="ghost-button" disabled={busy} onClick={()=>setPasswordTarget(null)}>Annuler</button></div></form></section></div>}
   </div>
 }
