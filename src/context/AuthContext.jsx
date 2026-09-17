@@ -4,29 +4,44 @@ import { clearOfflineData, readOfflineData, saveOfflineData } from '../lib/offli
 
 const AuthContext = createContext(null)
 const PROFILE_FIELDS = '*'
+const PROFILE_TIMEOUT_MS = 9000
+
+const withTimeout = (promise, timeoutMs = PROFILE_TIMEOUT_MS) => Promise.race([
+  promise,
+  new Promise((_, reject) => window.setTimeout(() => reject(new Error('timeout')), timeoutMs)),
+])
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
   const [sessionReady, setSessionReady] = useState(false)
   const [profileUserId, setProfileUserId] = useState(null)
+  const [profileRevision, setProfileRevision] = useState(0)
 
   useEffect(() => {
     if (!supabase) { setSessionReady(true); return undefined }
     let mounted = true
 
-    supabase.auth.getSession().then(({ data, error }) => {
+    withTimeout(supabase.auth.getSession()).then(({ data, error }) => {
       if (!mounted) return
       if (!error) setSession(data.session)
-      setProfileUserId(null)
+      setSessionReady(true)
+    }).catch(() => {
+      if (!mounted) return
       setSessionReady(true)
     })
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!mounted) return
       setSession(nextSession)
-      setProfileUserId(null)
-      if (!nextSession?.user) setProfile(null)
+      setSessionReady(true)
+      if (!nextSession?.user) {
+        setProfile(null)
+        setProfileUserId(null)
+        return
+      }
+      setProfileUserId((current) => current === nextSession.user.id ? current : null)
+      if (event === 'SIGNED_IN' || event === 'USER_UPDATED') setProfileRevision((value) => value + 1)
     })
 
     return () => { mounted = false; listener.subscription.unsubscribe() }
@@ -51,32 +66,60 @@ export function AuthProvider({ children }) {
         return
       }
 
-      const { data, error } = await supabase.from('profiles').select(PROFILE_FIELDS).eq('id', currentUserId).maybeSingle()
-      if (cancelled) return
+      try {
+        const { data, error } = await withTimeout(supabase.from('profiles').select(PROFILE_FIELDS).eq('id', currentUserId).maybeSingle())
+        if (cancelled) return
+        if (error) throw error
 
-      if (error) {
+        if (!data?.active) {
+          clearOfflineData(currentUserId)
+          setProfile(null)
+          setProfileUserId(currentUserId)
+          await supabase.auth.signOut({ scope: 'local' })
+          return
+        }
+
+        setProfile(data)
+        setProfileUserId(currentUserId)
+        saveOfflineData(currentUserId, 'profile', data)
+      } catch (_) {
+        if (cancelled) return
         if (cached?.active) setProfile(cached)
-        else setProfile(null)
         setProfileUserId(currentUserId)
-        return
       }
-
-      if (!data?.active) {
-        clearOfflineData(currentUserId)
-        setProfile(null)
-        setProfileUserId(currentUserId)
-        await supabase.auth.signOut({ scope: 'local' })
-        return
-      }
-
-      setProfile(data)
-      setProfileUserId(currentUserId)
-      saveOfflineData(currentUserId, 'profile', data)
     }
 
     loadProfile()
     return () => { cancelled = true }
-  }, [session?.user?.id, sessionReady])
+  }, [session?.user?.id, sessionReady, profileRevision])
+
+  useEffect(() => {
+    if (!supabase) return undefined
+    let refreshing = false
+    const refreshOnResume = async () => {
+      if (refreshing || document.visibilityState === 'hidden') return
+      refreshing = true
+      try {
+        const { data } = await withTimeout(supabase.auth.getSession(), 6000)
+        if (data?.session) {
+          setSession(data.session)
+          setProfileUserId((current) => current === data.session.user.id ? current : null)
+          setProfileRevision((value) => value + 1)
+        }
+      } catch (_) {
+        // Le profil mis en cache reste utilisable si le réseau tarde à revenir.
+      } finally {
+        refreshing = false
+      }
+    }
+    const onVisibility = () => { if (document.visibilityState === 'visible') refreshOnResume() }
+    window.addEventListener('pageshow', refreshOnResume)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('pageshow', refreshOnResume)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [])
 
   const loading = !sessionReady || Boolean(session?.user?.id && profileUserId !== session.user.id)
 
@@ -88,6 +131,7 @@ export function AuthProvider({ children }) {
     hasAccess: profile?.active === true,
     loading,
     configured: isSupabaseConfigured,
+    refreshProfile: () => setProfileRevision((value) => value + 1),
     signIn: async (email, password) => {
       if (!supabase) throw new Error('Supabase n’est pas encore configuré.')
       const normalizedEmail = email.trim().toLowerCase()
