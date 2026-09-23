@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>DANZ — Diagnostic Nhost</title>
+<style>
+:root{font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#143354;background:#f4f8fc}
+*{box-sizing:border-box}body{margin:0}main{max-width:760px;margin:3rem auto;padding:0 1rem 3rem}
+h1{font-size:clamp(1.65rem,4vw,2.3rem);line-height:1.2;margin:.3rem 0 1rem}h2{font-size:1.12rem;margin:0 0 .6rem}
+.card{background:white;border:1px solid #d6e5f3;border-radius:16px;padding:1.35rem;margin:1rem 0;box-shadow:0 3px 14px #15446c09}
+.badge{display:inline-block;background:#e6f0ff;color:#124d9c;border-radius:15px;font-weight:700;font-size:.75rem;padding:.25rem .7rem}
+label{display:block;font-weight:700;margin:.7rem 0 .25rem}input{width:100%;padding:.65rem;border:1px solid #b3c9dd;border-radius:8px;font:inherit;background:white;color:#143354}
+.row{display:grid;grid-template-columns:2fr 1fr;gap:1rem}@media(max-width:560px){.row{grid-template-columns:1fr}}
+button{border:0;background:#175aa7;color:white;padding:.8rem 1.1rem;border-radius:9px;font:inherit;font-weight:700;cursor:pointer}
+button:disabled{opacity:.5;cursor:wait}button.secondary{background:#ecf3fd;color:#164c8c}button+button{margin-left:.5rem}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:.8rem;background:#f2f6fb;border-radius:8px;font-size:.82rem;color:#264461}
+.results{display:grid;gap:.7rem}.result{border:1px solid #d5e5f3;border-radius:10px;padding:.75rem}
+.result strong{display:block}.result small{display:block;color:#46617b}.ok{border-color:#2f9967;background:#f2fff7}.error{border-color:#bd7b30;background:#fff9ed}.pending{border-color:#8ca4bb}
+a{color:#154f9a}p{margin:.5rem 0 1rem}.quiet{color:#51697e;font-size:.91rem}
+</style>
+</head>
+<body>
+<main>
+  <span class="badge">Amicale DANZ Antilles · Test non intrusif</span>
+  <h1>Diagnostic de connexion à Nhost</h1>
+  <p>Cette page est servie directement depuis GitHub Pages. Elle vérifie si ton navigateur professionnel peut joindre les services Nhost <strong>depuis l'application</strong> (requêtes CORS), au-delà des simples liens ouverts manuellement.</p>
+  <section class="card">
+    <h2>Projet de test</h2>
+    <div class="row">
+      <div><label for="subdomain">Sous-domaine Nhost</label><input id="subdomain" autocomplete="off" value="mdlqqvchbymlsctnrpvd" spellcheck="false" maxlength="63"></div>
+      <div><label for="region">Région</label><input id="region" autocomplete="off" value="us-east-1" spellcheck="false" maxlength="40"></div>
+    </div>
+    <p class="quiet">Vérifie ces deux valeurs dans Nhost → Project Info. Si tu recrées le projet en Europe, remplace-les ici. Ne saisis aucune clé secrète.</p>
+    <button id="run" type="button">Lancer les tests</button>
+    <button id="copy" class="secondary" type="button" disabled>Copier les résultats</button>
+  </section>
+  <section class="card">
+    <h2>Résultats</h2>
+    <div class="results" id="results" aria-live="polite">
+      <p class="quiet">Aucun test lancé. Aucun compte et aucun mot de passe nécessaires.</p>
+    </div>
+  </section>
+  <section class="card">
+    <h2>Ce que ces résultats signifient</h2>
+    <p><strong>Réponse HTTP (même 400, 401 ou 404) :</strong> la requête a atteint le service et le navigateur a pu lire sa réponse.</p>
+    <p><strong>« Échec réseau / CORS » :</strong> le navigateur n'a pas pu lire la réponse. Cela peut venir d'un filtrage réseau ou des règles CORS du serveur. Il faut distinguer les deux avant toute migration.</p>
+    <p>Le test GraphQL utilise une requête anonyme <code>{ __typename }</code>. Le stockage teste volontairement un identifiant de fichier inexistant. Aucune donnée personnelle n'est envoyée et aucune écriture n'est effectuée.</p>
+  </section>
+  <p class="quiet">La version actuelle de DANZ et sa base Supabase restent inchangées pendant ces tests.</p>
+</main>
+<script>
+"use strict";
+const $=id=>document.getElementById(id), tasks=[
+  ["Authentification (GET)", "auth", "/v1/version", {method:"GET",cache:"no-store"}],
+  ["GraphQL (POST + CORS)", "graphql", "/v1/graphql", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:"query DanzConnectivity { __typename }"}),cache:"no-store"}],
+  ["Stockage (GET)", "storage", "/v1/files/00000000-0000-0000-0000-000000000000", {method:"GET",cache:"no-store"}]
+];
+let report="";
+function node(name,status,message,link) {
+ const el=document.createElement("div"); el.className="result "+status;
+ const strong=document.createElement("strong");strong.textContent=name;el.append(strong);
+ const small=document.createElement("small");small.textContent=message;el.append(small);
+ if(link){const a=document.createElement("a");a.href=link;a.target="_blank";a.rel="noopener noreferrer";a.textContent="Ouvrir l'adresse séparément";el.append(a)}
+ return el;
+}
+$("run").addEventListener("click",async()=>{
+ const sub=$("subdomain").value.trim().toLowerCase(),region=$("region").value.trim().toLowerCase();
+ if(!/^[a-z0-9][a-z0-9-]{2,62}$/.test(sub)||!/^[a-z]{2}-[a-z]+-\d+$/.test(region)){
+  $("results").replaceChildren(node("Configuration","error","Sous-domaine ou région invalide."));return;
+ }
+ const root=$("results");root.replaceChildren();$("run").disabled=true;$("copy").disabled=true;
+ const results=[];
+ for(const [name,service,path,options] of tasks) {
+  const url="https://"+sub+"."+service+"."+region+".nhost.run"+path;
+  const waiting=node(name,"pending","Test en cours…",url);root.append(waiting);
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
+  try {
+   const response=await fetch(url,{...options,mode:"cors",credentials:"omit",signal:controller.signal});
+   const status=response.status;let body="";
+   try{body=(await response.text()).slice(0,220)}catch{}
+   const result={name,url,status,body};results.push(result);
+   const ok=status>=200&&status<300;
+   waiting.replaceWith(node(name,ok?"ok":"error","Réponse HTTP "+status+(ok?" — communication OK":" — serveur atteint ; vérifier la réponse")+(body?" · "+body.replace(/\s+/g," ").slice(0,110):""),url));
+  }catch(err){
+   const message=err.name==="AbortError"?"Délai dépassé (10 s).":"Échec réseau / CORS : "+(err.message||"aucune réponse lisible");
+   results.push({name,url,error:message});
+   waiting.replaceWith(node(name,"error",message,url));
+  }finally{clearTimeout(timer)}
+ }
+ report="Diagnostic DANZ / Nhost\nSous-domaine : "+sub+"\nRégion : "+region+"\nOrigine : "+location.origin+"\n"+results.map(r=>r.name+": "+(r.error||"HTTP "+r.status)+(r.body?" · "+r.body.replace(/\s+/g," ").slice(0,120):"")).join("\n");
+ $("run").disabled=false;$("copy").disabled=false;
+});
+$("copy").addEventListener("click",async()=>{
+ try{await navigator.clipboard.writeText(report);$("copy").textContent="Résultats copiés ✓"}
+ catch{const ta=document.createElement("textarea");ta.value=report;ta.style.width="100%";ta.rows=8;$("results").append(ta);ta.select();$("copy").textContent="Copie manuelle ci-dessous";}
+});
+</script>
+</body>
+</html>
