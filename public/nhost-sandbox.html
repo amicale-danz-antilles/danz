@@ -48,8 +48,11 @@ button:disabled{opacity:.5;cursor:wait}.muted{color:#506b84;font-size:.9rem}.sta
 </article>
 <article>
 <h2>5. Vérifier l'isolation de deux comptes</h2>
-<p>Depuis le second compte fictif, récupère son UUID dans le tableau de bord Nhost. Connecte-toi ici avec le <strong>premier</strong> compte et indique uniquement l'UUID du second.</p>
+<p><strong>Compte 2 :</strong> connecte-toi avec le second compte fictif, crée une note témoin et copie l'UUID du compte affiché. Efface ensuite la session locale et reconnecte-toi avec le premier compte. Sans note témoin existante, une lecture vide ne prouve pas que les comptes sont isolés.</p>
+<button id="witness" disabled>Créer une note témoin (compte 2)</button>
+<p id="witnessStatus" class="status">Aucun témoin créé.</p>
 <label for="other">UUID du second compte fictif</label><input id="other" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off">
+<label><input id="confirmedWitness" type="checkbox" style="width:auto;margin-right:.5rem">J'ai créé une note témoin avec le second compte fictif.</label>
 <button id="isolation" disabled>Vérifier le refus de lecture et d'écriture</button>
 <p id="isolationStatus" class="status">En attente de connexion.</p>
 </article>
@@ -65,7 +68,7 @@ button:disabled{opacity:.5;cursor:wait}.muted{color:#506b84;font-size:.9rem}.sta
 "use strict";
 const get=id=>document.getElementById(id);
 let accessToken=null,userId=null;
-const outcomes={anonymous:"non testé",login:"non testé",crud:"non testé",isolation:"non testé"};
+const outcomes={anonymous:"non testé",login:"non testé",crud:"non testé",witness:"non testé",isolation:"non testé"};
 function status(id,msg,kind=""){const el=get(id);el.textContent=msg;el.className="status "+kind;}
 function root(service){const sub=get("sub").value.trim().toLowerCase(),reg=get("reg").value.trim().toLowerCase();if(!/^[a-z0-9][a-z0-9-]{2,62}$/.test(sub)||!/^[a-z]{2}-[a-z]+-\d+$/.test(reg))throw Error("Sous-domaine ou région invalide.");return "https://"+sub+"."+service+"."+reg+".nhost.run"}
 async function jsonFetch(url,options){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),12000);try{const response=await fetch(url,{...options,mode:"cors",credentials:"omit",cache:"no-store",signal:controller.signal});let data;try{data=await response.json()}catch{data={}}return {status:response.status,data}}finally{clearTimeout(timer)}}
@@ -83,18 +86,18 @@ finally{get("anonymous").disabled=false}
 get("login").onclick=async()=>{
 get("login").disabled=true;const pass=get("password").value,email=get("email").value.trim();
 get("password").value="";
-accessToken=null;userId=null;get("crud").disabled=true;get("isolation").disabled=true;get("logout").disabled=true;
+accessToken=null;userId=null;get("crud").disabled=true;get("isolation").disabled=true;get("witness").disabled=true;get("logout").disabled=true;
 try{
 if(!email||!pass)throw Error("Renseigne les identifiants de ton compte de test.");
 const res=await jsonFetch(root("auth")+"/v1/signin/email-password",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email,password:pass})});
 const session=res.data?.session;
 if(!session?.accessToken||!session?.user?.id){const reason=res.data?.error?.message||res.data?.message||("HTTP "+res.status);throw Error("Connexion refusée : "+String(reason).slice(0,160))}
-accessToken=session.accessToken;userId=session.user.id;get("logout").disabled=false;get("crud").disabled=false;get("isolation").disabled=false;
+accessToken=session.accessToken;userId=session.user.id;get("logout").disabled=false;get("crud").disabled=false;get("isolation").disabled=false;get("witness").disabled=false;
 outcomes.login="OK : session fictive obtenue";status("loginStatus",outcomes.login,"good");
 }catch(e){outcomes.login="ECHEC";status("loginStatus","Connexion impossible. "+e.message,"bad")}
 finally{get("login").disabled=false}
 };
-get("logout").onclick=()=>{accessToken=null;userId=null;get("password").value="";get("email").value="";get("crud").disabled=true;get("isolation").disabled=true;get("logout").disabled=true;status("loginStatus","Session locale effacée. Ferme cette page pour terminer le test.","good")};
+get("logout").onclick=()=>{accessToken=null;userId=null;get("password").value="";get("email").value="";get("crud").disabled=true;get("isolation").disabled=true;get("witness").disabled=true;get("logout").disabled=true;status("loginStatus","Session locale effacée. Ferme cette page pour terminer le test.","good")};
 get("crud").onclick=async()=>{
 if(!accessToken)return;get("crud").disabled=true;let inserted=null;let pass=false;
 try{
@@ -110,8 +113,21 @@ pass=true;outcomes.crud="OK : création, lecture, suppression sous le bon propri
 }catch(e){outcomes.crud="ECHEC : "+e.message;status("crudStatus",outcomes.crud,"bad")}
 finally{get("crud").disabled=false;if(!pass&&inserted?.id){status("crudStatus",outcomes.crud+"\nUne note fictive peut subsister : supprime-la dans Nhost après les tests.","warn")}}
 };
+get("witness").onclick=async()=>{
+if(!accessToken)return;
+get("witness").disabled=true;
+try{
+const res=await gql('mutation { insert_danz_nhost_test_notes_one(object:{note:"TEMOIN FICTIF DANZ"}) { id owner_user_id } }');
+const row=res.data?.data?.insert_danz_nhost_test_notes_one;
+if(res.data?.errors?.length||row?.owner_user_id!==userId||!row?.id)throw Error("Écriture refusée ou propriétaire incorrect.");
+outcomes.witness="OK : note témoin créée";
+status("witnessStatus","Témoin créé ! UUID du second compte : "+userId+". Copie cet UUID, efface la session de test puis connecte-toi avec le premier compte. Le témoin sera effacé lors du nettoyage final de la table.","good");
+}catch(e){outcomes.witness="ÉCHEC de création du témoin";status("witnessStatus",outcomes.witness+" : "+e.message,"bad")}
+finally{get("witness").disabled=false}
+};
 get("isolation").onclick=async()=>{
 if(!accessToken)return;const other=get("other").value.trim();
+if(!get("confirmedWitness").checked){status("isolationStatus","Crée d'abord une note témoin sous le second compte et confirme sa présence : sans elle, une lecture vide n'est pas une preuve d'isolation.","warn");return}
 if(!/^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$/.test(other)||other.toLowerCase()===userId?.toLowerCase()){status("isolationStatus","Renseigne l'UUID du SECOND compte fictif, différent du compte connecté.","warn");return}
 get("isolation").disabled=true;
 try{
