@@ -54,7 +54,7 @@ a{color:#154f9a}p{margin:.5rem 0 1rem}.quiet{color:#51697e;font-size:.91rem}
 "use strict";
 const $=id=>document.getElementById(id), tasks=[
   ["Authentification (GET)", "auth", "/v1/version", {method:"GET",cache:"no-store"}],
-  ["GraphQL (POST + CORS)", "graphql", "/v1/graphql", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:"query DanzConnectivity { __typename }"}),cache:"no-store"}],
+  ["GraphQL (POST + CORS)", "graphql", "/v1", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:"query DanzConnectivity { __typename }"}),cache:"no-store"}],
   ["Stockage (GET)", "storage", "/v1/files/00000000-0000-0000-0000-000000000000", {method:"GET",cache:"no-store"}]
 ];
 let report="";
@@ -82,7 +82,9 @@ $("run").addEventListener("click",async()=>{
    try{body=(await response.text()).slice(0,220)}catch{}
    const result={name,url,status,body};results.push(result);
    const ok=status>=200&&status<300;
-   waiting.replaceWith(node(name,ok?"ok":"error","Réponse HTTP "+status+(ok?" — communication OK":" — serveur atteint ; vérifier la réponse")+(body?" · "+body.replace(/\s+/g," ").slice(0,110):""),url));
+   const reached=status===401||status===403||status===404;
+   const explanation=ok?" — communication OK":reached?" — service joignable ; accès ou ressource non autorisé":" — serveur atteint ; vérifier la réponse";
+   waiting.replaceWith(node(name,ok||reached?"ok":"error","Réponse HTTP "+status+explanation+(body?" · "+body.replace(/\s+/g," ").slice(0,110):""),url));
   }catch(err){
    const message=err.name==="AbortError"?"Délai dépassé (10 s).":"Échec réseau / CORS : "+(err.message||"aucune réponse lisible");
    results.push({name,url,error:message});
