@@ -11,7 +11,7 @@ if(!html.includes('/danz/apple-touch-icon-v8.png'))throw new Error('L’icône i
 const manifest=JSON.parse(manifestText)
 if(manifest.start_url!=='/danz/#/'||manifest.scope!=='/danz/')throw new Error('Le manifeste PWA ne cible pas le bon périmètre.')
 for(const icon of manifest.icons||[]){const pathname=String(icon.src||'').split('?')[0].replace(/^\/danz\//,'');if(!pathname)throw new Error('Une icône PWA n’a pas de chemin valide.');await assertFile(pathname)}
-if(!serviceWorker.includes("const CACHE_NAME = 'danz-shell-v26'"))throw new Error('La version attendue du cache PWA v25 est absente.')
+if(!serviceWorker.includes("const CACHE_NAME = 'danz-shell-v27'"))throw new Error('La version attendue du cache PWA v27 est absente.')
 if(!serviceWorker.includes('/danz/image001-1.png'))throw new Error('Le logo officiel n’est pas précaché par le service worker.')
 const assetRefs=[...html.matchAll(/(?:src|href)=["']\/danz\/assets\/([^"'?]+)[^"']*["']/g)].map(m=>`assets/${m[1]}`)
 if(!assetRefs.length)throw new Error('Aucun bundle Vite n’est référencé par le HTML de production.')
