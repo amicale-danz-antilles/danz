@@ -1,7 +1,7 @@
 import { access, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 const dist = path.resolve('dist')
-const required = ['index.html','manifest.webmanifest','sw.js','migration-status.json','image001-1.png','favicon-v8.png','apple-touch-icon-v8.png','icon-192-v8.png','icon-512-v8.png','icon-maskable-192-v8.png','icon-maskable-512-v8.png']
+const required = ['index.html','manifest.webmanifest','sw.js','migration-status.json','suivi-migration.html','image001-1.png','favicon-v8.png','apple-touch-icon-v8.png','icon-192-v8.png','icon-512-v8.png','icon-maskable-192-v8.png','icon-maskable-512-v8.png']
 async function assertFile(relativePath) { const filePath=path.join(dist,relativePath); await access(filePath); const info=await stat(filePath); if(!info.isFile()||info.size===0) throw new Error(`Fichier de production invalide : ${relativePath}`) }
 for (const file of required) await assertFile(file)
 const [html,manifestText,serviceWorker,migrationText]=await Promise.all([readFile(path.join(dist,'index.html'),'utf8'),readFile(path.join(dist,'manifest.webmanifest'),'utf8'),readFile(path.join(dist,'sw.js'),'utf8'),readFile(path.join(dist,'migration-status.json'),'utf8')])

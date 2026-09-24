@@ -61,7 +61,7 @@ export default function AdminMigration(){
         {report.gates.map(g=><div className="migration-gate" key={g.id}><span aria-hidden="true">{g.passed?'✓':'○'}</span><strong>{g.title}</strong><span>{g.passed?'Vérifié':'Non vérifié'}</span></div>)}
         <p>Aucun transfert définitif ni changement de fournisseur ne sera entrepris sur la seule base de ce tableau. Une validation des sauvegardes, des rapprochements et des droits est indispensable.</p>
       </section>
-      <div className="migration-resources"><Link className="secondary-button" to="/administration/sauvegardes">Sauvegardes et exports</Link><Link className="secondary-button" to="/administration/systeme">État du système</Link><a className="ghost-button" href="https://github.com/amicale-danz-antilles/danz/actions" target="_blank" rel="noopener noreferrer">Derniers déploiements GitHub ↗</a></div>
+      <div className="migration-resources"><a className="secondary-button" href="/danz/suivi-migration.html" target="_blank" rel="noopener noreferrer">Consulter depuis le poste professionnel ↗</a><Link className="secondary-button" to="/administration/sauvegardes">Sauvegardes et exports</Link><Link className="secondary-button" to="/administration/systeme">État du système</Link><a className="ghost-button" href="https://github.com/amicale-danz-antilles/danz/actions" target="_blank" rel="noopener noreferrer">Derniers déploiements GitHub ↗</a></div>
       <small className="migration-fineprint">{report.notes}</small>
     </>}
     {!report&&loading&&<div className="skeleton-card tall" aria-label="Chargement du suivi"/>}
