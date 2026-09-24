@@ -6,7 +6,7 @@
   "staging": "Nhost us-east-1 — tests fictifs",
   "real_data_transferred": false,
   "cutover_ready": false,
-  "next_action": "Exécuter le schéma de foyer/trésorerie fictifs sur Nhost et vérifier les droits, sans donnée réelle.",
+  "next_action": "Nhost TEST : laisser danz_test_validate_allocation non suivie (elle retourne TRIGGER). Exécuter 04_verifier_installation_finance.sql, puis 03_repetition_fictive.sql et à nouveau 04. Communiquer les résultats pour valider la trésorerie fictive.",
   "stages": [
     {
       "id": "network",
@@ -26,8 +26,8 @@
       "id": "synthetic-finance",
       "title": "Foyers et trésorerie fictifs",
       "status": "in_progress",
-      "detail": "Schéma de test et contrôle de cohérence préparés ; exécution et recette Nhost encore nécessaires.",
-      "evidence_url": "https://github.com/amicale-danz-antilles/danz/tree/main/docs/nhost-sandbox"
+      "detail": "Cinq tables fictives et déclencheur anti-surallocation préparés. Hasura ne doit pas suivre la fonction TRIGGER ; l'installation et la recette SQL sur le projet Nhost attendent une confirmation.",
+      "evidence_url": "https://github.com/amicale-danz-antilles/danz/blob/main/docs/nhost-sandbox/README.md"
     },
     {
       "id": "media",
