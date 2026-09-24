@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Referrer-Policy" content="no-referrer">
+<title>DANZ — Test Nhost Storage privé</title>
+<style>
+:root{font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#153451;background:#f3f8fd}
+*{box-sizing:border-box}body{margin:0}main{max-width:760px;margin:2rem auto;padding:0 1rem 3rem}
+h1{font-size:clamp(1.6rem,5vw,2.2rem);line-height:1.2}h2{font-size:1.12rem;margin:0 0 .7rem}
+.box{background:#fff;padding:1.2rem;border:1px solid #d5e5f3;border-radius:14px;margin:1rem 0}
+label{display:block;font-weight:700;margin:.6rem 0 .2rem}input{width:100%;font:inherit;border:1px solid #b3c8db;border-radius:8px;padding:.7rem}
+.grid{display:grid;grid-template-columns:2fr 1fr;gap:1rem}@media(max-width:560px){.grid{grid-template-columns:1fr}}
+button{background:#14559b;color:white;border:0;border-radius:9px;padding:.7rem 1rem;font:inherit;font-weight:700;cursor:pointer;margin:.5rem .4rem .1rem 0}
+button.secondary{background:#e8f1ff;color:#174e85}button:disabled{opacity:.45;cursor:not-allowed}
+.status{white-space:pre-wrap;overflow-wrap:anywhere;padding:.8rem;border-radius:8px;background:#edf4fb;color:#234c70}
+.good{border-left:5px solid #338455}.bad{border-left:5px solid #b44836}.warn{border-left:5px solid #b4832f}
+small,.muted{color:#526d84}code{overflow-wrap:anywhere}
+.badge{display:inline-block;background:#dceefd;color:#17518c;border-radius:20px;padding:.25rem .7rem;font-size:.8rem;font-weight:700}
+</style>
+</head>
+<body>
+<main>
+<span class="badge">ENVIRONNEMENT FICTIF — AUCUN FICHIER DANZ RÉEL</span>
+<h1>Test Nhost Storage depuis le poste professionnel</h1>
+<p>Ce test utilise seulement un minuscule fichier texte fictif, jamais une photo ou un document de l'Amicale. Il vérifie qu'un utilisateur peut gérer ses fichiers, mais pas ceux des autres.</p>
+<section class="box">
+<h2>1. Préparer le stockage dans Nhost</h2>
+<p>Dans <strong>Nhost → Storage</strong>, crée un bucket nommé <code>danz-test-private</code>. Dans <strong>Storage → Permissions</strong>, configure uniquement le rôle <code>user</code> :</p>
+<ul>
+<li><strong>Upload</strong> : condition <code>bucket_id = danz-test-private</code> ; activer « Uploader identity » pour remplir <code>uploaded_by_user_id</code>.</li>
+<li><strong>Download</strong> et <strong>Delete</strong> : conditions <code>bucket_id = danz-test-private</code> <strong>ET</strong> <code>uploaded_by_user_id = X-Hasura-User-Id</code>.</li>
+<li>Ne donne <strong>aucun accès</strong> aux rôles <code>public</code> ou <code>anonymous</code>. N'utilise jamais le secret administrateur dans cette page.</li>
+</ul>
+<div class="grid">
+<div><label for="sub">Sous-domaine Nhost</label><input id="sub" value="mdlqqvchbymlsctnrpvd" spellcheck="false" autocomplete="off"></div>
+<div><label for="reg">Région</label><input id="reg" value="us-east-1" spellcheck="false" autocomplete="off"></div>
+</div>
+</section>
+<section class="box">
+<h2>2. Se connecter avec un compte fictif</h2>
+<label for="email">Adresse e-mail du compte fictif</label><input id="email" type="email" autocomplete="off">
+<label for="password">Mot de passe fictif</label><input id="password" type="password" autocomplete="off">
+<button id="login">Se connecter</button><button id="logout" class="secondary" disabled>Effacer la session locale</button>
+<p id="loginStatus" class="status">Aucun compte connecté.</p>
+<small>Ton mot de passe est effacé après la tentative ; le jeton est conservé uniquement en mémoire tant que la page reste ouverte. N'entre pas ton compte DANZ réel.</small>
+</section>
+<section class="box">
+<h2>3. Créer un fichier témoin avec le compte 2</h2>
+<p>Connecte-toi d'abord avec le <strong>second</strong> compte fictif, puis crée son témoin. Copie l'ID affiché, efface la session et reconnecte-toi avec le premier compte.</p>
+<button id="witness" disabled>Créer un fichier témoin</button>
+<p id="witnessStatus" class="status">En attente de connexion.</p>
+</section>
+<section class="box">
+<h2>4. Tester l'envoi, la lecture et la suppression avec le compte 1</h2>
+<button id="own" disabled>Envoyer → lire → supprimer mon fichier fictif</button>
+<p id="ownStatus" class="status">En attente de connexion.</p>
+</section>
+<section class="box">
+<h2>5. Vérifier qu'aucun autre compte ne lit le témoin</h2>
+<label for="fileId">ID du témoin créé par le compte 2</label><input id="fileId" type="text" autocomplete="off" spellcheck="false" placeholder="UUID du fichier témoin">
+<button id="isolation" disabled>Tester l'accès interdit (compte 1)</button>
+<button id="anonymous" class="secondary">Tester l'accès anonyme interdit</button>
+<p id="isolationStatus" class="status">En attente du témoin et du compte 1.</p>
+</section>
+<section class="box">
+<h2>6. Nettoyer le fichier témoin</h2>
+<p>Reconnecte-toi avec le <strong>compte 2</strong>, conserve l'ID du fichier dans le champ ci-dessus, puis supprime-le.</p>
+<button id="cleanup" disabled>Supprimer le témoin fictif</button>
+<p id="cleanupStatus" class="status">Non effectué.</p>
+</section>
+<section class="box">
+<h2>Rapport anonymisé</h2>
+<button id="copy">Copier les résultats (sans identifiants)</button>
+<p id="copyStatus" class="status">Aucun résultat à transmettre pour le moment.</p>
+</section>
+<p class="muted">Si le test échoue, recopie uniquement l'erreur technique. Ne partage aucun mot de passe, jeton ou lien privé vers un fichier.</p>
+</main>
+<script>
+"use strict";
+const el=id=>document.getElementById(id);
+let token=null,userId=null;
+const report={auth:"non testé",witness:"non testé",own:"non testé",isolation:"non testé",anonymous:"non testé",cleanup:"non testé"};
+function set(id,message,kind=""){const x=el(id);x.textContent=message;x.className="status "+kind}
+function endpoint(){const s=el("sub").value.trim().toLowerCase(),r=el("reg").value.trim().toLowerCase();if(!/^[a-z0-9][a-z0-9-]{2,62}$/.test(s)||!/^[a-z]{2}-[a-z]+-\d+$/.test(r))throw Error("Sous-domaine ou région non valide.");return {auth:"https://"+s+".auth."+r+".nhost.run/v1",storage:"https://"+s+".storage."+r+".nhost.run/v1"}}
+async function request(url,options={}){const ctrl=new AbortController();const timeout=setTimeout(()=>ctrl.abort(),12000);try{return await fetch(url,{...options,mode:"cors",credentials:"omit",cache:"no-store",signal:ctrl.signal})}finally{clearTimeout(timeout)}}
+async function responseError(res){try{const t=await res.text();const j=JSON.parse(t);return String(j?.error?.message||j?.message||t).slice(0,220)}catch{return "HTTP "+res.status}}
+function bearer(){if(!token)throw Error("Connecte-toi avec un compte fictif.");return {"Authorization":"Bearer "+token}}
+function buttons(connected){for(const id of ["witness","own","isolation","cleanup"])el(id).disabled=!connected;el("logout").disabled=!connected}
+el("login").onclick=async()=>{
+el("login").disabled=true;const email=el("email").value.trim(),password=el("password").value;el("password").value="";token=null;userId=null;buttons(false);
+try{if(!email||!password)throw Error("Renseigne les identifiants du compte fictif.");
+const res=await request(endpoint().auth+"/signin/email-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password})});
+const data=await res.json();if(!res.ok||!data?.session?.accessToken||!data?.session?.user?.id)throw Error("Connexion refusée : "+String(data?.error?.message||data?.message||res.status).slice(0,150));
+token=data.session.accessToken;userId=data.session.user.id;buttons(true);report.auth="OK";set("loginStatus","OK : compte fictif connecté. Le jeton reste en mémoire uniquement.","good");
+}catch(e){report.auth="ÉCHEC";set("loginStatus",e.message,"bad")}finally{el("login").disabled=false}
+};
+el("logout").onclick=()=>{token=null;userId=null;el("email").value="";el("password").value="";buttons(false);set("loginStatus","Session effacée de cette page. Tu peux utiliser l'autre compte.","good")};
+async function upload(text,name){const form=new FormData();form.append("bucket-id","danz-test-private");form.append("file[]",new Blob([text],{type:"text/plain"}),name);
+const res=await request(endpoint().storage+"/files",{method:"POST",headers:bearer(),body:form});if(!res.ok)throw Error("Upload : "+await responseError(res));
+const data=await res.json();const file=data?.processedFiles?.[0];if(!file?.id)throw Error("Upload : réponse sans ID de fichier.");
+if(file.uploadedByUserId!==userId)throw Error("Le fichier a été créé, mais l'identité de l'expéditeur n'est pas vérifiée. Vérifie « Uploader identity » et supprime le fichier manuellement.");
+return file}
+async function download(id,headers){return request(endpoint().storage+"/files/"+encodeURIComponent(id),{method:"GET",headers})}
+async function remove(id){const res=await request(endpoint().storage+"/files/"+encodeURIComponent(id),{method:"DELETE",headers:bearer()});if(!res.ok)throw Error("Suppression : "+await responseError(res))}
+const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function id(){const v=el("fileId").value.trim();if(!uuidPattern.test(v))throw Error("L'ID du témoin doit être un UUID valide.");return v}
+el("witness").onclick=async()=>{el("witness").disabled=true;
+try{const file=await upload("TEMOIN_FICTIF_DANZ_V1","danz-fictif-temoin.txt");el("fileId").value=file.id;report.witness="OK";set("witnessStatus","Témoin fictif créé. Son ID a été ajouté dans la section 5. Copie cet ID avant de fermer la page, puis change de compte.","good")}
+catch(e){report.witness="ÉCHEC : "+e.message;set("witnessStatus",report.witness,"bad")}
+finally{el("witness").disabled=!token}};
+el("own").onclick=async()=>{el("own").disabled=true;let saved=null,deleted=false;
+try{saved=await upload("MON_FICHIER_FICTIF_DANZ","danz-fictif-prive.txt");const res=await download(saved.id,bearer());if(!res.ok)throw Error("Téléchargement : "+await responseError(res));const body=await res.text();if(body!=="MON_FICHIER_FICTIF_DANZ")throw Error("Contenu du fichier incorrect.");
+await remove(saved.id);deleted=true;report.own="OK : upload, téléchargement et suppression";set("ownStatus",report.own,"good")}
+catch(e){report.own="ÉCHEC : "+e.message;set("ownStatus",report.own+(saved&&!deleted?"\nUn fichier fictif subsiste : ID "+saved.id+" (supprime-le dans Nhost).":""),"bad")}
+finally{el("own").disabled=!token}};
+el("isolation").onclick=async()=>{el("isolation").disabled=true;
+try{const res=await download(id(),bearer());if(res.ok){report.isolation="ÉCHEC CRITIQUE : fichier d'un autre compte lisible";set("isolationStatus",report.isolation,"bad")}
+else if([401,403,404].includes(res.status)){report.isolation="OK : lecture de l'autre compte refusée (HTTP "+res.status+")";set("isolationStatus",report.isolation,"good")}
+else{report.isolation="À examiner : HTTP "+res.status;set("isolationStatus",report.isolation,"warn")}}
+catch(e){report.isolation="INCOMPLET : "+e.message;set("isolationStatus",report.isolation,"warn")}
+finally{el("isolation").disabled=!token}};
+el("anonymous").onclick=async()=>{el("anonymous").disabled=true;
+try{const res=await download(id(),{});if(res.ok){report.anonymous="ÉCHEC CRITIQUE : fichier visible sans connexion";set("isolationStatus",report.anonymous,"bad")}
+else if([401,403,404].includes(res.status)){report.anonymous="OK : lecture anonyme refusée (HTTP "+res.status+")";set("isolationStatus",report.anonymous,"good")}
+else{report.anonymous="À examiner : HTTP "+res.status;set("isolationStatus",report.anonymous,"warn")}}
+catch(e){report.anonymous="INCOMPLET : "+e.message;set("isolationStatus",report.anonymous,"warn")}
+finally{el("anonymous").disabled=false}};
+el("cleanup").onclick=async()=>{el("cleanup").disabled=true;
+try{await remove(id());report.cleanup="OK : témoin supprimé";set("cleanupStatus",report.cleanup,"good")}
+catch(e){report.cleanup="ÉCHEC : "+e.message;set("cleanupStatus",report.cleanup,"bad")}
+finally{el("cleanup").disabled=!token}};
+el("copy").onclick=async()=>{const text="DANZ — stockage fictif Nhost (aucun secret)\n"+Object.entries(report).map(([k,v])=>k+" : "+v.replace(/[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}/ig,"[identifiant masqué]")).join("\n");
+try{await navigator.clipboard.writeText(text);set("copyStatus","Rapport anonymisé copié.","good")}
+catch{set("copyStatus",text+"\nSélectionne et copie le texte ci-dessus.","warn")}};
+</script>
+</body></html>
