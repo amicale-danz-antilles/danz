@@ -69,6 +69,26 @@ button:disabled{opacity:.5;cursor:wait}.muted{color:#506b84;font-size:.9rem}.sta
 const get=id=>document.getElementById(id);
 let accessToken=null,userId=null;
 const outcomes={anonymous:"non testé",login:"non testé",crud:"non testé",witness:"non testé",isolation:"non testé"};
+let currentRole="inconnu";
+function roleSummary(jwt) {
+  try {
+    const encoded=jwt.split(".")[1].replace(/-/g,"+").replace(/_/g,"/");
+    const claims=JSON.parse(atob(encoded));
+    const hasura=claims["https://hasura.io/jwt/claims"]||{};
+    const allowed=hasura["x-hasura-allowed-roles"]||[];
+    currentRole=hasura["x-hasura-default-role"]||"inconnu";
+    return "Rôle GraphQL par défaut : "+currentRole+" ; rôles autorisés : "+allowed.join(", ")+".";
+  } catch { currentRole="inconnu"; return "Rôle GraphQL non lisible dans le jeton de test."; }
+}
+function graphqlError(result) {
+  const errors=result?.data?.errors;
+  if(Array.isArray(errors)&&errors.length) {
+    const e=errors[0];
+    return "GraphQL : "+String(e.message||"erreur non précisée").slice(0,250)+
+      (e.extensions?.code?" (code : "+String(e.extensions.code).slice(0,60)+")":"");
+  }
+  return result?.status?"HTTP "+result.status+" — aucune erreur GraphQL détaillée.":"Réponse GraphQL absente.";
+}
 function status(id,msg,kind=""){const el=get(id);el.textContent=msg;el.className="status "+kind;}
 function root(service){const sub=get("sub").value.trim().toLowerCase(),reg=get("reg").value.trim().toLowerCase();if(!/^[a-z0-9][a-z0-9-]{2,62}$/.test(sub)||!/^[a-z]{2}-[a-z]+-\d+$/.test(reg))throw Error("Sous-domaine ou région invalide.");return "https://"+sub+"."+service+"."+reg+".nhost.run"}
 async function jsonFetch(url,options){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),12000);try{const response=await fetch(url,{...options,mode:"cors",credentials:"omit",cache:"no-store",signal:controller.signal});let data;try{data=await response.json()}catch{data={}}return {status:response.status,data}}finally{clearTimeout(timer)}}
@@ -93,7 +113,7 @@ const res=await jsonFetch(root("auth")+"/v1/signin/email-password",{method:"POST
 const session=res.data?.session;
 if(!session?.accessToken||!session?.user?.id){const reason=res.data?.error?.message||res.data?.message||("HTTP "+res.status);throw Error("Connexion refusée : "+String(reason).slice(0,160))}
 accessToken=session.accessToken;userId=session.user.id;get("logout").disabled=false;get("crud").disabled=false;get("isolation").disabled=false;get("witness").disabled=false;
-outcomes.login="OK : session fictive obtenue";status("loginStatus",outcomes.login,"good");
+outcomes.login="OK : session fictive obtenue";status("loginStatus",outcomes.login+"\n"+roleSummary(accessToken),"good");
 }catch(e){outcomes.login="ECHEC";status("loginStatus","Connexion impossible. "+e.message,"bad")}
 finally{get("login").disabled=false}
 };
@@ -103,7 +123,9 @@ if(!accessToken)return;get("crud").disabled=true;let inserted=null;let pass=fals
 try{
 const add=await gql("mutation ($note: String!) { insert_danz_nhost_test_notes_one(object:{note:$note}) { id owner_user_id note } }",{note:"Test fictif DANZ"});
 inserted=add.data?.data?.insert_danz_nhost_test_notes_one;
-if(add.status!==200||add.data?.errors?.length||!inserted?.id||inserted.owner_user_id!==userId)throw Error("Écriture refusée ou identité du propriétaire incorrecte.");
+if(add.status!==200||add.data?.errors?.length)throw Error(graphqlError(add));
+if(!inserted?.id)throw Error("Aucune ligne retournée par l'insertion. Vérifie les permissions INSERT et SELECT pour le rôle "+currentRole+".");
+if(inserted.owner_user_id!==userId)throw Error("L'insertion a abouti mais le propriétaire est différent du compte connecté. Vérifie le preset owner_user_id et les rôles Hasura.");
 const list=await gql("query ($id: uuid!) { danz_nhost_test_notes(where:{id:{_eq:$id}}){id owner_user_id note} }",{id:inserted.id});
 const found=list.data?.data?.danz_nhost_test_notes?.[0];
 if(list.data?.errors?.length||found?.owner_user_id!==userId||found?.note!=="Test fictif DANZ")throw Error("La lecture de la note créée a échoué.");
@@ -119,10 +141,12 @@ get("witness").disabled=true;
 try{
 const res=await gql('mutation { insert_danz_nhost_test_notes_one(object:{note:"TEMOIN FICTIF DANZ"}) { id owner_user_id } }');
 const row=res.data?.data?.insert_danz_nhost_test_notes_one;
-if(res.data?.errors?.length||row?.owner_user_id!==userId||!row?.id)throw Error("Écriture refusée ou propriétaire incorrect.");
+if(res.status!==200||res.data?.errors?.length)throw Error(graphqlError(res));
+if(!row?.id)throw Error("Aucune ligne retournée. Vérifie les permissions INSERT et SELECT pour le rôle "+currentRole+".");
+if(row.owner_user_id!==userId)throw Error("L'insertion a abouti, mais le propriétaire ne correspond pas. Vérifie le preset owner_user_id.");
 outcomes.witness="OK : note témoin créée";
 status("witnessStatus","Témoin créé ! UUID du second compte : "+userId+". Copie cet UUID, efface la session de test puis connecte-toi avec le premier compte. Le témoin sera effacé lors du nettoyage final de la table.","good");
-}catch(e){outcomes.witness="ÉCHEC de création du témoin";status("witnessStatus",outcomes.witness+" : "+e.message,"bad")}
+}catch(e){outcomes.witness="ÉCHEC : "+e.message;status("witnessStatus",outcomes.witness,"bad")}
 finally{get("witness").disabled=false}
 };
 get("isolation").onclick=async()=>{
