@@ -342,6 +342,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
       <button type="button" className="tv2-action tv2-action-primary" onClick={() => openForm('expense')}>− Dépense</button>
       <button type="button" className="tv2-action" onClick={() => openForm('income')}>＋ Recette</button>
       <button type="button" className="tv2-action" onClick={() => openForm('transfer')}>⇄ Transfert banque / caisse</button>
+      <button type="button" className="tv2-action tv2-action-export" disabled={exporting} onClick={exportFullExcel}>{exporting ? "Création du fichier…" : "↓ Sauvegarde Excel complète"}</button>
     </div>}
 
     {formType && <section className="tv2-panel tv2-editor">
