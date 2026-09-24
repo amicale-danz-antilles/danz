@@ -8,7 +8,7 @@
     "build": "node scripts/generate-icons.mjs && vite build",
     "verify:production": "node scripts/verify-production-build.mjs",
     "preview": "vite preview",
-    "test:treasury": "node --test scripts/treasury-ledger.test.mjs scripts/treasury-export.test.mjs"
+    "test:treasury": "node --test scripts/treasury-ledger.test.mjs scripts/treasury-export.test.mjs scripts/event-finance.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
