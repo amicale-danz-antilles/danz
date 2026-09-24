@@ -18,7 +18,7 @@ create table if not exists public.offline_people (
 create index if not exists offline_people_name_idx on public.offline_people(display_name);
 create unique index if not exists offline_people_unlinked_household_idx on public.offline_people(household_id) where linked_user_id is null;
 alter table public.offline_people enable row level security;
-revoke all on public.offline_people from anon;
+revoke all on public.offline_people from anon, authenticated;
 grant select on public.offline_people to authenticated;
 -- Les liens de comptes et foyers ne peuvent être modifiés que par le RPC atomique.
 grant update(display_name,email,notes,is_amicaliste,membership_valid_until,updated_at)
