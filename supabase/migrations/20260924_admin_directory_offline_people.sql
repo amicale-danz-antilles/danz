@@ -19,7 +19,10 @@ create index if not exists offline_people_name_idx on public.offline_people(disp
 create unique index if not exists offline_people_unlinked_household_idx on public.offline_people(household_id) where linked_user_id is null;
 alter table public.offline_people enable row level security;
 revoke all on public.offline_people from anon;
-grant select, update on public.offline_people to authenticated;
+grant select on public.offline_people to authenticated;
+-- Les liens de comptes et foyers ne peuvent être modifiés que par le RPC atomique.
+grant update(display_name,email,notes,is_amicaliste,membership_valid_until,updated_at)
+  on public.offline_people to authenticated;
 drop policy if exists "administrators see offline people" on public.offline_people;
 create policy "administrators see offline people" on public.offline_people
   for select to authenticated using ((select private.is_admin()));
