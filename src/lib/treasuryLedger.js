@@ -12,16 +12,19 @@ export const signedCents = (entry) => {
   if (entry.kind === 'expense') return -Number(entry.amount_cents)
   return Number(entry.amount_cents)
 }
-export function ledgerBalances(opening, entries = [], transfers = []) {
+export function ledgerBalances(opening, entries = [], transfers = [], at = new Date()) {
   if (!opening) return null
   const balance = { bank: Number(opening.bank_cents), cash: Number(opening.cash_cents) }
   const from = new Date(opening.as_of).getTime()
+  const until = new Date(at).getTime()
   for (const entry of entries) {
-    if (entry.status !== 'settled' || new Date(accountingDate(entry)).getTime() <= from) continue
+    const date = new Date(accountingDate(entry)).getTime()
+    if (entry.status !== 'settled' || !Number.isFinite(date) || date <= from || date > until) continue
     balance[accountFor(entry)] += signedCents(entry)
   }
   for (const transfer of transfers) {
-    if (new Date(transfer.occurred_at).getTime() <= from) continue
+    const date = new Date(transfer.occurred_at).getTime()
+    if (!Number.isFinite(date) || date <= from || date > until) continue
     balance[transfer.from_account] -= Number(transfer.amount_cents)
     balance[transfer.to_account] += Number(transfer.amount_cents)
   }
