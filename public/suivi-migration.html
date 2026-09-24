@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>DANZ — Suivi de migration Nhost</title>
+<style>
+:root{font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;color:#143654;background:#f3f7fb}*{box-sizing:border-box}
+body{margin:0}main{max-width:900px;margin:2rem auto 4rem;padding:0 1rem}h1{font-size:clamp(1.6rem,4vw,2.5rem);margin:.3rem 0}.eyebrow{font-size:.76rem;color:#41698d;letter-spacing:.07em;text-transform:uppercase;font-weight:800}
+.hero,.panel{background:#fff;border:1px solid #dae6f0;border-radius:16px;padding:1.2rem;margin:1rem 0;box-shadow:0 4px 18px #17436c08}.hero{background:linear-gradient(110deg,#e9f4ff,#fff)}
+h2{font-size:1.15rem;margin:.1rem 0 .5rem}.muted,p{color:#48667d}.flag{display:inline-block;padding:.3rem .75rem;font-size:.77rem;font-weight:800;border-radius:99px;background:#e1f3e9;color:#207850;margin:.25rem}
+.flag.pending{background:#e8eff6;color:#416580}.flag.blocked{background:#fff0cf;color:#9b5f1d}.flag.in_progress{background:#deecfb;color:#225f96}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem}.step{padding:1rem;border:1px solid #dce7ef;border-radius:12px;background:#fff}.step h3{font-size:1rem;margin:0 0 .35rem}.step p{font-size:.83rem;line-height:1.6;margin:.6rem 0}.step a{font-size:.78rem;color:#205d9b;font-weight:800}.details{color:#425f72}
+.notice{border-left:4px solid #d29d40;padding:.75rem;background:#fff8e9;font-size:.88rem;color:#775627;margin:.8rem 0}
+a{color:#24689b}button{font:inherit;font-weight:800;background:#2269a6;color:white;border:0;border-radius:10px;padding:.7rem 1rem;cursor:pointer}
+footer{font-size:.75rem;color:#738697;margin:2rem 0}@media(max-width:650px){.grid{grid-template-columns:1fr}}
+</style></head>
+<body><main>
+<span class="eyebrow">Amicale DANZ Antilles · Informations techniques</span>
+<h1>Migration DANZ vers Nhost</h1>
+<div class="notice">Ce suivi est public et ne comporte aucune donnée de membre. Pour les comptages de la base source, utilise Administration → Suivi de migration, depuis un réseau qui autorise Supabase.</div>
+<div id="head" class="hero" role="status">Chargement du dernier suivi publié…</div>
+<section class="panel"><h2>Jalons techniques</h2><div class="grid" id="stages" aria-live="polite"></div></section>
+<section class="panel"><h2>Prochaines conditions de basculement</h2><div id="gates" class="details"></div></section>
+<button id="refresh" type="button">↻ Actualiser</button>
+<p><a href="https://amicale-danz-antilles.github.io/danz/" rel="noopener noreferrer">Retour au site DANZ</a></p>
+<footer>L'avancement est mis à jour après validation technique et publication sur GitHub Pages, pas automatiquement à chaque modification sur Nhost.</footer>
+</main><script>
+'use strict';
+const $=id=>document.getElementById(id), labels={validated:'Validé',in_progress:'En cours',pending:'À réaliser',blocked:'Bloqué'};
+const gateLabels={approved_region:'Région définitive approuvée',restore_tested:'Sauvegarde restaurée',fake_auth_import_passed:'Compte fictif importé',target_permissions_audited:'Permissions Nhost auditées',storage_and_functions_passed:'Fichiers et fonctions validés',app_acceptance_passed:'Recette DANZ validée',inventories_match:'Inventaires rapprochés',final_source_freeze:'Écritures gelées et synchronisées',production_cutover_authorized:'Basculement autorisé'};
+function el(tag,text,cls){const n=document.createElement(tag);n.textContent=text;if(cls)n.className=cls;return n}
+async function load(){
+$('refresh').disabled=true;
+try{
+const response=await fetch('/danz/migration-status.json?ts='+Date.now(),{cache:'no-store'});
+if(!response.ok)throw Error('HTTP '+response.status);
+const state=await response.json();
+if(state.schema_version!==1||!Array.isArray(state.milestones))throw Error('format invalide');
+$('head').replaceChildren(el('div','État publié le '+new Date(state.updated_on+'T12:00:00').toLocaleDateString('fr-FR'),'eyebrow'),el('h2',state.phase),el('p',state.overview),el('span',state.milestones.filter(m=>m.state==='validated').length+' jalons validés sur '+state.milestones.length,'flag'));
+$('stages').replaceChildren();
+for(const item of state.milestones){
+const card=el('article','','step');
+card.append(el('h3',item.title),el('span',labels[item.state]||item.state,'flag '+item.state),el('p',item.detail));
+if(item.evidence&&/^https:\/\/(github\.com|amicale-danz-antilles\.github\.io)\//.test(item.evidence)){
+const a=el('a','Voir le test ou le document ↗');a.href=item.evidence;a.rel='noopener noreferrer';a.target='_blank';card.append(a)
+}
+$('stages').append(card)
+}
+$('gates').replaceChildren();
+for(const [key,value] of Object.entries(state.gates||{})){
+const row=el('p',(value?'✓ ':'○ ')+(gateLabels[key]||key)+' — '+(value?'Validé':'En attente'));
+$('gates').append(row)
+}
+}catch(e){$('head').replaceChildren(el('h2','Suivi momentanément indisponible'),el('p','Actualise la page ou réessaie plus tard. '+String(e.message||'')))}
+finally{$('refresh').disabled=false}
+}
+$('refresh').addEventListener('click',load);
+load();
+</script></body></html>
