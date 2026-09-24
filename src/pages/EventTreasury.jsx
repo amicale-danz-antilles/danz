@@ -129,11 +129,15 @@ export default function EventTreasury({ data, onReload, user }) {
         p_event_id:activeEvent.id,p_batch_id:batchRef.current.id,p_rows:payload
       })
       if(saveError)throw saveError
+      return result
+    },payload.length+' personne(s) enregistrée(s) dans '+activeEvent.title+'.')
+    // Conserver la clé de lot si l'enregistrement a réussi mais le rechargement a échoué :
+    // retenter ne créera jamais les mêmes dettes une deuxième fois.
+    if(success){
       if(clear){setDraft({});setGlobalAmount('');setLabel('')}
       setQuick(null)
       batchRef.current={payload:'',id:''}
-      return result
-    },payload.length+' personne(s) enregistrée(s) dans '+activeEvent.title+'.')
+    }
     return success
   }
   const createEvent = (event) => {
@@ -141,7 +145,7 @@ export default function EventTreasury({ data, onReload, user }) {
     if(newEvent.title.trim().length<3 || !newEvent.date){setError('Renseignez un titre et une date.');return}
     execute(async()=>{
       const {data:created,error:e}=await supabase.from('events').insert({
-        title:newEvent.title.trim(),starts_at:new Date(newEvent.date+'T18:00:00').toISOString(),
+        title:newEvent.title.trim(),starts_at:new Date(newEvent.date+'T18:00:00').toISOString(),created_by:user.id,
         published:false,notify_on_publish:false,audience:'everyone',pricing_enabled:false
       }).select('id').single()
       if(e)throw e
