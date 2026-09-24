@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { chargeResidualCents, effectiveAmicaliste, formatMoney, householdBalanceCents } from '../lib/finance.js'
 import { optimizeImageFile } from '../lib/mediaStorage.js'
+import { accountFor, accountingDate, ledgerBalances, signedCents } from '../lib/treasuryLedger.js'
 
 const EXPENSE_CATEGORIES = {
   courses: 'Courses & alimentation', evenement: 'Événement & réception', materiel: 'Matériel',
@@ -20,15 +21,6 @@ const centsOf = (value) => {
 }
 const timeOf = (date) => date === localDay() ? new Date().toISOString() : new Date(date + 'T12:00:00').toISOString()
 const formattedDate = (value) => value ? new Date(value).toLocaleDateString('fr-FR') : '—'
-const accountFor = (entry) => {
-  if (entry.payment_method === 'cash') return 'cash'
-  if (entry.payment_method === 'personal_advance') return entry.reimbursement_method === 'cash' ? 'cash' : 'bank'
-  return 'bank'
-}
-const accountingDate = (entry) => entry.payment_method === 'personal_advance'
-  ? (entry.settled_at || entry.occurred_at || entry.created_at)
-  : (entry.occurred_at || entry.created_at)
-const signedCents = (entry) => entry.kind === 'expense' ? -Number(entry.amount_cents) : Number(entry.amount_cents)
 const csvCell = (value) => {
   let text = String(value ?? '')
   if (/^\s*[=+@-]/.test(text)) text = "'" + text
@@ -136,15 +128,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     .reduce((sum, c) => sum + chargeResidualCents(c, allocations, payments), 0)
   const pendingAdvanceCents = pendingAdvances.reduce((s, e) => s + Number(e.amount_cents), 0)
   const cleared = entries.filter((e) => e.status === 'settled')
-  const includedEntries = opening ? cleared.filter((e) => new Date(accountingDate(e)) > new Date(opening.as_of)) : []
-  const includedTransfers = opening ? transfers.filter((t) => new Date(t.occurred_at) > new Date(opening.as_of)) : []
-  const openingBalances = { bank: Number(opening?.bank_cents || 0), cash: Number(opening?.cash_cents || 0) }
-  const balances = { ...openingBalances }
-  includedEntries.forEach((e) => { balances[accountFor(e)] += signedCents(e) })
-  includedTransfers.forEach((t) => {
-    balances[t.from_account] -= Number(t.amount_cents)
-    balances[t.to_account] += Number(t.amount_cents)
-  })
+  const balances = ledgerBalances(opening, entries, transfers) || { bank: 0, cash: 0 }
 
   const activity = [
     ...entries.map((e) => ({ ...e, type: 'entry', date: accountingDate(e), account: accountFor(e), signed: e.status === 'pending' || e.status === 'cancelled' ? 0 : signedCents(e) })),
