@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PageTitle } from './Actualites.jsx'
-import './admin-migration.css'
+import '../admin-migration.css'
 
 const STATUS_LABELS = {validated:'Validée',in_progress:'En cours',pending:'À réaliser',blocked:'Bloquée'}
 const STATUS_CSS = {validated:'complete',in_progress:'working',pending:'waiting',blocked:'blocked'}

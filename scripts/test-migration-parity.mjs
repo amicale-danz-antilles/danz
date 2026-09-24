@@ -19,9 +19,9 @@ const assertRejected=(modify,label)=>{
 }
 assertRejected(t=>t.tables.profiles.count++,'Ligne manquante')
 assertRejected(t=>t.tables.profiles.canonical_rows_sha256='e'.repeat(64),'Ligne modifiée avec comptage égal')
-assertRejected(t=>t.auth.accounts++,'Identité supplémentaire')
+assertRejected(t=>{t.auth.accounts++;t.auth.unlinked_accounts++},'Identité supplémentaire')
 assertRejected(t=>t.media.content_inventory_sha256='f'.repeat(64),'Fichier altéré')
 assertRejected(t=>t.finance.confirmed_payments_cents+=1,'Montants divergents')
 assertRejected(t=>{t.batch_id='autre-lot'},'Lot erroné')
 assert.throws(()=>compareMigrationSnapshots(source,{schema_version:1}),/invalide|manquant/)
-console.log('7 contrôles synthétiques de parité et anti-perte réussis (dont 6 échecs attendus).')
+console.log('8 contrôles synthétiques de parité et anti-perte réussis (dont 7 échecs attendus).')
