@@ -6,8 +6,8 @@
  *
  * Shape:
  * {
- *   "tables": {"public.profiles":{"row_count":24,"ids_sha256":"64 hex digits"}, ...},
- *   "auth": {"row_count":25,"ids_sha256":"64 hex digits"},
+ *   "tables": {"public.profiles":{"row_count":24,"keys_sha256":"64 hex digits"}, ...},
+ *   "auth": {"row_count":25,"keys_sha256":"64 hex digits"},
  *   "files": {"r2":{"file_count":2,"total_bytes":123,"content_sha256":"64 hex digits"}}
  * }
  *
@@ -35,14 +35,14 @@ function validateRecord(name, record, kind) {
     if (!int(record.file_count) || !int(record.total_bytes) || !digest.test(record.content_sha256 || '')) fail(name + ': fichiers incomplets')
     return
   }
-  if (!int(record.row_count) || !digest.test(record.ids_sha256 || '')) fail(name + ': compteur ou empreinte manquant(e)')
-  if (financialTables.has(name) && !Number.isSafeInteger(record.amount_cents_sum)) fail(name + ': somme en centimes obligatoire')
+  if (!int(record.row_count) || !digest.test(record.keys_sha256 || '') || !digest.test(record.rows_sha256 || '')) fail(name + ': compteur ou empreinte manquant(e)')
+  if ([...financialTables].some(table => name.startsWith(table + ' ')) && !Number.isSafeInteger(record.amount_cents_sum)) fail(name + ': somme en centimes obligatoire')
 }
 function compareRows(name, left, right, kind) {
   validateRecord(name + ' source', left, kind)
   validateRecord(name + ' cible', right, kind)
   if (!left || !right) return
-  const keys = kind === 'file' ? ['file_count', 'total_bytes', 'content_sha256'] : ['row_count', 'ids_sha256']
+  const keys = kind === 'file' ? ['file_count', 'total_bytes', 'content_sha256'] : ['row_count', 'keys_sha256', 'rows_sha256']
   if (financialTables.has(name)) keys.push('amount_cents_sum')
   for (const key of keys) if (left[key] !== right[key]) fail(name + ': ' + key + ' divergent')
 }
@@ -71,10 +71,10 @@ function compare(source, target) {
 }
 const sample = {
   tables: {
-    'public.profiles': { row_count: 2, ids_sha256: 'a'.repeat(64) },
-    'public.treasury_entries': { row_count: 1, ids_sha256: 'b'.repeat(64), amount_cents_sum: 6000 },
+    'public.profiles': { row_count: 2, keys_sha256: 'a'.repeat(64), rows_sha256: 'e'.repeat(64) },
+    'public.treasury_entries': { row_count: 1, keys_sha256: 'b'.repeat(64), rows_sha256: 'f'.repeat(64), amount_cents_sum: 6000 },
   },
-  auth: { row_count: 2, ids_sha256: 'c'.repeat(64) },
+  auth: { row_count: 2, keys_sha256: 'c'.repeat(64), rows_sha256: '0'.repeat(64) },
   files: { r2: { file_count: 1, total_bytes: 123, content_sha256: 'd'.repeat(64) } },
 }
 if (process.argv[2] === '--self-test') {
@@ -86,8 +86,8 @@ if (process.argv[2] === '--self-test') {
   delete missing.tables['public.profiles']
   if (!compare(sample, missing).some(error => error.includes('entrée manquante'))) throw Error('Une table manquante est passée inaperçue')
   const changed = structuredClone(sample)
-  changed.auth.ids_sha256 = 'e'.repeat(64)
-  if (!compare(sample, changed).some(error => error.includes('ids_sha256'))) throw Error('Un compte manquant est passé inaperçu')
+  changed.auth.keys_sha256 = 'e'.repeat(64)
+  if (!compare(sample, changed).some(error => error.includes('keys_sha256'))) throw Error('Un compte manquant est passé inaperçu')
   process.stdout.write('Contrôles fictifs réussis : égalité, écart financier, table absente et UUID divergents.\n')
   process.exit(0)
 }
