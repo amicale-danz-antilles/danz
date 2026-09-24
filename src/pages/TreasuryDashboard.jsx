@@ -4,13 +4,14 @@ import { chargeResidualCents, effectiveAmicaliste, formatMoney, householdBalance
 import { optimizeImageFile } from '../lib/mediaStorage.js'
 import { accountFor, accountingDate, ledgerBalances, signedCents } from '../lib/treasuryLedger.js'
 import EventTreasury from './EventTreasury.jsx'
+import TreasuryJournalManager from './TreasuryJournalManager.jsx'
 
 const EXPENSE_CATEGORIES = {
   courses: 'Courses & alimentation', evenement: 'Événement & réception', materiel: 'Matériel',
   transport: 'Transport', frais_bancaires: 'Frais bancaires', fonctionnement: 'Fonctionnement', autre: 'Autre dépense',
 }
 const INCOME_CATEGORIES = { don: 'Don', subvention: 'Subvention', evenement: 'Recette d’événement', autre: 'Autre recette' }
-const METHOD_NAMES = { cash: 'Espèces', card: 'Carte bancaire', bank_transfer: 'Virement bancaire', personal_advance: 'Avance personnelle' }
+const METHOD_NAMES = { cash: 'Espèces', card: 'Carte bancaire', bank_transfer: 'Virement bancaire', personal_advance: 'Avance personnelle', unassigned: 'À affecter (Excel)' }
 const MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
 const localDay = () => {
   const d = new Date()
@@ -77,7 +78,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
   const [exporting, setExporting] = useState(false)
 
   async function reload() {
-    const [entries, transfers, households, members, profiles, charges, payments, allocations, subscriptions, events, offline, eventParticipants, openingResult, settingsResult] = await Promise.all([
+    const [entries, transfers, households, members, profiles, charges, payments, allocations, subscriptions, events, offline, eventParticipants, importBatches, importArchive, openingResult, settingsResult] = await Promise.all([
       fetchAll('treasury_entries', 'occurred_at'),
       fetchAll('treasury_transfers', 'occurred_at'),
       fetchAll('households', 'name'),
@@ -90,12 +91,14 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
       fetchAll('events', 'starts_at'),
       fetchAll('offline_people', 'display_name'),
       fetchAll('treasury_event_participants'),
+      fetchAll('treasury_import_batches', 'imported_at'),
+      fetchAll('treasury_import_archive_lines', 'source_row'),
       supabase.from('treasury_opening').select('*').eq('id', 1).maybeSingle(),
       supabase.from('association_settings').select('*').eq('id', 1).single(),
     ])
     if (openingResult.error) throw openingResult.error
     if (settingsResult.error) throw settingsResult.error
-    setData({ entries, transfers, households, members, profiles, charges, payments, allocations, subscriptions, events, offline, eventParticipants, opening: openingResult.data, settings: settingsResult.data })
+    setData({ entries, transfers, households, members, profiles, charges, payments, allocations, subscriptions, events, offline, eventParticipants, importBatches, importArchive, opening: openingResult.data, settings: settingsResult.data })
     setOpeningDraft({ bank: openingResult.data ? String(openingResult.data.bank_cents / 100) : '', cash: openingResult.data ? String(openingResult.data.cash_cents / 100) : '' })
   }
 
@@ -140,7 +143,8 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     .reduce((sum, c) => sum + chargeResidualCents(c, allocations, payments), 0)
   const pendingAdvanceCents = pendingAdvances.reduce((s, e) => s + Number(e.amount_cents), 0)
   const cleared = entries.filter((e) => e.status === 'settled')
-  const balances = ledgerBalances(opening, entries, transfers) || { bank: 0, cash: 0 }
+  const balances = ledgerBalances(opening, entries, transfers) || { bank: 0, cash: 0, unassigned: 0 }
+  const importedOpening = opening?.import_batch_id && data?.importBatches?.find((item) => item.id === opening.import_batch_id)
 
   const activity = [
     ...entries.map((e) => ({ ...e, type: 'entry', date: accountingDate(e), account: accountFor(e), signed: e.status === 'pending' || e.status === 'cancelled' ? 0 : signedCents(e) })),
@@ -273,11 +277,18 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     event.preventDefault()
     const bank = centsOf(openingDraft.bank), cash = centsOf(openingDraft.cash)
     if (!Number.isSafeInteger(bank) || !Number.isSafeInteger(cash) || cash < 0) return setError('Indiquez deux soldes valides. La caisse espèces ne peut pas être négative.')
-    if (!window.confirm(opening ? 'Remplacer le point de départ par les soldes réels actuels ? Les opérations antérieures au nouvel instant de référence resteront dans l’historique mais ne seront plus incluses dans les soldes affichés.' : 'Confirmer que ces deux montants correspondent aux soldes réellement constatés maintenant ? Les opérations antérieures restent consultables sans être comptées une seconde fois.')) return
+    if (importedOpening && bank + cash > importedOpening.opening_cents) return setError('La répartition dépasse le report de ' + formatMoney(importedOpening.opening_cents) + '.')
+    if (!window.confirm(importedOpening
+      ? 'Répartir le report initial de ' + formatMoney(importedOpening.opening_cents) + ' sans modifier les opérations importées ?'
+      : opening ? 'Remplacer le point de départ par les soldes réels actuels ? Les opérations antérieures resteront dans l’historique et ne seront plus incluses dans les soldes.'
+      : 'Confirmer les deux soldes réellement constatés maintenant ?')) return
     await action(async () => {
-      const { error: saveError } = await supabase.from('treasury_opening').upsert({
-        id: 1, bank_cents: bank, cash_cents: cash, as_of: new Date().toISOString(), updated_by: user.id, updated_at: new Date().toISOString(),
-      }, { onConflict: 'id' })
+      const { error: saveError } = importedOpening
+        ? await supabase.rpc('treasury_split_import_opening',{p_bank_cents:bank,p_cash_cents:cash})
+        : await supabase.from('treasury_opening').upsert({
+          id: 1, bank_cents: bank, cash_cents: cash, as_of: new Date().toISOString(),
+          updated_by: user.id, updated_at: new Date().toISOString()
+        }, { onConflict: 'id' })
       if (saveError) throw saveError
     }, 'Soldes de référence enregistrés. Les opérations suivantes ajusteront les deux comptes.')
   }
@@ -377,12 +388,16 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     {view === 'overview' && <>
       <div className="evt-overview-cta"><div><strong>Une soirée à organiser ?</strong><span>Inscrire les participants, attribuer les dettes aux foyers et encaisser les cotisations.</span></div><button type="button" className="tv2-action tv2-action-primary" onClick={() => onView('events')}>Ouvrir mes événements →</button></div>
       {!opening && <div className="tv2-setup-warning"><strong>À faire une fois : initialiser les soldes</strong><span>Indiquez le montant réel sur le compte bancaire et le liquide actuellement en caisse. Les montants ci-dessous ne seront fiables qu’après cette étape.</span><button type="button" onClick={() => onView('settings')}>Renseigner mes soldes →</button></div>}
-      <div className="tv2-balances">
+      <div className={'tv2-balances' + (opening?.import_batch_id ? ' tv2-balances-four' : '')}>
         <article className="tv2-balance tv2-bank"><span>Compte bancaire</span><strong>{opening ? formatMoney(balances.bank) : 'À initialiser'}</strong><small>Carte, virements et remboursements bancaires</small></article>
         <article className="tv2-balance tv2-cash"><span>Caisse espèces</span><strong>{opening ? formatMoney(balances.cash) : 'À initialiser'}</strong><small>Entrées et sorties de liquide</small></article>
-        <article className="tv2-balance tv2-total"><span>Disponibilités totales</span><strong>{opening ? formatMoney(balances.bank + balances.cash) : 'À initialiser'}</strong><small>Banque + caisse, hors dettes et avances</small></article>
+        {Boolean(opening?.import_batch_id) && <article className="tv2-balance tv2-unassigned"><span>À ventiler (Excel)</span><strong>{formatMoney(balances.unassigned)}</strong><small>À affecter à la banque ou aux espèces depuis le journal</small></article>}
+        <article className="tv2-balance tv2-total"><span>Solde comptable total</span><strong>{opening ? formatMoney(balances.bank + balances.cash + balances.unassigned) : 'À initialiser'}</strong><small>Banque + caisse + écritures à affecter ; hors dettes et avances</small></article>
       </div>
-      {opening && <p className="tv2-reference">Soldes calculés à partir du relevé du {new Date(opening.as_of).toLocaleString('fr-FR')} et des mouvements enregistrés depuis.</p>}
+      {opening && <p className="tv2-reference">{importedOpening
+        ? 'Report Excel : ' + formatMoney(importedOpening.opening_cents) + ' · Solde confirmé au terme du fichier : ' + formatMoney(importedOpening.confirmed_closing_cents) + '. Les mouvements déjà datés et importés sont inclus une fois.'
+        : 'Soldes calculés à partir du relevé du ' + new Date(opening.as_of).toLocaleString('fr-FR') + ' et des mouvements enregistrés depuis.'}</p>}
+      {opening?.import_batch_id && balances.unassigned !== 0 && <div className="tj-warning">Des opérations importées restent à affecter entre banque et espèces. <button type="button" onClick={()=>onView('operations')}>Ventiler mes écritures →</button></div>}
       <div className="tv2-metric-grid">
         <button type="button" className="tv2-metric" onClick={() => onView('memberships')}><span>À recevoir des foyers</span><strong>{formatMoney(dueTotal)}</strong><small>Dont cotisations : {formatMoney(dues)}</small></button>
         <button type="button" className="tv2-metric" onClick={() => onView('memberships')}><span>Virements à confirmer</span><strong>{pendingPayments.length}</strong><small>À rapprocher</small></button>
@@ -406,15 +421,17 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     </>}
 
     {view === 'operations' && <>
-      <section className="tv2-panel"><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Historique complet</span><h2>Mes opérations</h2></div><div className="tv2-section-actions"><button type="button" className="primary-button" disabled={exporting} onClick={exportFullExcel}>{exporting ? 'Préparation…' : 'Sauvegarde complète Excel ↓'}</button><button type="button" className="ghost-button" onClick={exportRows}>CSV filtré</button></div></div>
+      <TreasuryJournalManager data={data} onReload={reload} onReceipt={openReceipt}/>
+      <details className="tv2-panel"><summary style={{cursor:'pointer',fontWeight:750}}>Historique chronologique · recherche avancée · export CSV</summary>
+      <section><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Historique complet</span><h2>Mes opérations</h2></div><div className="tv2-section-actions"><button type="button" className="primary-button" disabled={exporting} onClick={exportFullExcel}>{exporting ? 'Préparation…' : 'Sauvegarde complète Excel ↓'}</button><button type="button" className="ghost-button" onClick={exportRows}>CSV filtré</button></div></div>
         <div className="tv2-filters"><label>Rechercher<input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Libellé ou note..." /></label>
           <label>Type<select value={kindFilter} onChange={(e) => setKindFilter(e.target.value)}><option value="all">Tout</option><option value="income">Recettes</option><option value="expense">Dépenses</option><option value="transfer">Transferts</option></select></label>
-          <label>Compte<select value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)}><option value="all">Tous</option><option value="bank">Banque</option><option value="cash">Espèces</option></select></label>
+          <label>Compte<select value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)}><option value="all">Tous</option><option value="bank">Banque</option><option value="cash">Espèces</option><option value="unassigned">À affecter</option></select></label>
           <label>Mois<input type="month" value={monthFilter === 'all' ? '' : monthFilter} onChange={(e) => setMonthFilter(e.target.value || 'all')} /></label>
         </div>
         <p className="tv2-hint">{activityFiltered.length} opération{activityFiltered.length > 1 ? 's' : ''} · Les transferts ne modifient pas le résultat.</p>
         {renderOperations(activityFiltered, openReceipt)}
-      </section>
+      </section></details>
       {pendingAdvances.length > 0 && <section className="tv2-panel"><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Dettes envers les membres</span><h2>Remboursements en attente</h2></div></div><div className="tv2-advance-list">
         {pendingAdvances.map((e) => <div className="tv2-advance" key={e.id}><div><strong>{e.label}</strong><small>{profileById[e.advanced_by]?.full_name || 'Membre'} · {formattedDate(e.occurred_at)}</small></div><b>{formatMoney(e.amount_cents)}</b><label>Rembourser depuis<select value={reimburseBy[e.id] || 'bank_transfer'} onChange={(evt) => setReimburseBy({ ...reimburseBy, [e.id]: evt.target.value })}><option value="bank_transfer">Compte bancaire</option><option value="cash">Caisse espèces</option></select></label><button type="button" className="primary-button" disabled={busy} onClick={() => reimburse(e)}>Marquer remboursé</button></div>)}
       </div></section>}
@@ -459,18 +476,19 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
 
     {view === 'settings' && <div className="tv2-two-cols">
       <section className="tv2-panel"><span className="tv2-eyebrow">Position comptable</span><h2>Initialiser ou rapprocher mes deux soldes</h2>
-        <p>Relevez les montants réellement disponibles maintenant sur le compte bancaire et dans la caisse. Ce point de départ évite de compter deux fois les anciennes écritures.</p>
-        {opening && <div className="tv2-reference-card"><strong>Dernière référence</strong><span>{new Date(opening.as_of).toLocaleString('fr-FR')}</span><span>Banque : {formatMoney(opening.bank_cents)} · Espèces : {formatMoney(opening.cash_cents)}</span></div>}
+        <p>{importedOpening ? 'Répartissez uniquement le report initial de ' + formatMoney(importedOpening.opening_cents) + ' entre le compte bancaire et le liquide. La part non renseignée reste « À affecter ». Les écritures Excel seront ventilées individuellement dans le journal.' : 'Relevez les montants réellement disponibles maintenant sur le compte bancaire et dans la caisse. Ce point de départ évite de compter deux fois les anciennes écritures.'}</p>
+        {opening && <div className="tv2-reference-card"><strong>Dernière référence</strong><span>{new Date(opening.as_of).toLocaleString('fr-FR')}</span><span>Banque : {formatMoney(opening.bank_cents)} · Espèces : {formatMoney(opening.cash_cents)}{opening.import_batch_id ? ' · Report non ventilé : ' + formatMoney(opening.unassigned_cents) : ''}</span></div>}
         <form className="tv2-form" onSubmit={saveOpening}><label>Solde bancaire réel (€)<input required inputMode="decimal" value={openingDraft.bank} onChange={(e) => setOpeningDraft({ ...openingDraft, bank: e.target.value })} placeholder="Ex. 1240,50" /></label>
           <label>Liquidités réellement en caisse (€)<input required inputMode="decimal" value={openingDraft.cash} onChange={(e) => setOpeningDraft({ ...openingDraft, cash: e.target.value })} placeholder="Ex. 185,00" /></label>
-          <p className="tv2-hint">Le nouveau point de départ est daté au moment de l’enregistrement. Une modification ultérieure repart des nouveaux soldes réels, sans supprimer l’historique.</p>
-          <button type="submit" className="primary-button" disabled={busy}>{opening ? 'Rapprocher les soldes actuels' : 'Initialiser mes comptes'}</button>
+          <p className="tv2-hint">{importedOpening ? 'Le report total reste ' + formatMoney(importedOpening.opening_cents) + '. La date d’origine est préservée, donc aucune dépense ni cotisation n’est comptée deux fois.' : 'Le nouveau point de départ est daté au moment de l’enregistrement. Une modification ultérieure repart des nouveaux soldes réels, sans supprimer l’historique.'}</p>
+          <button type="submit" className="primary-button" disabled={busy}>{importedOpening ? 'Répartir le report Excel' : opening ? 'Rapprocher les soldes actuels' : 'Initialiser mes comptes'}</button>
         </form>
       </section>
       <section className="tv2-panel"><span className="tv2-eyebrow">Organisation</span><h2>Comptabilité et sauvegardes</h2>
         <p>Aucun RIB n’est nécessaire. Suivez uniquement le compte bancaire et la caisse (liquide). Téléchargez une sauvegarde complète Excel, avec tous les mouvements et les dettes.</p>
         <div className="tv2-list-row"><div><strong>Compte bancaire</strong><small>Solde {opening ? formatMoney(balances.bank) : 'à initialiser'}</small></div></div>
         <div className="tv2-list-row"><div><strong>Caisse (liquide)</strong><small>Solde {opening ? formatMoney(balances.cash) : 'à initialiser'}</small></div></div>
+        {Boolean(opening?.import_batch_id)&&<div className="tv2-list-row"><div><strong>À ventiler (provisoire)</strong><small>{formatMoney(balances.unassigned)} · à attribuer aux deux comptes réels</small></div></div>}
         <div className="tv2-setting-actions"><button type="button" className="primary-button" disabled={exporting} onClick={exportFullExcel}>Sauvegarde complète Excel ↓</button><button type="button" className="ghost-button" onClick={() => onView('operations')}>Consulter / exporter le journal</button></div>
         <p className="tv2-hint">La banque et la caisse sont suivies séparément. Les avances personnelles n’impactent aucun solde avant leur remboursement.</p>
       </section>

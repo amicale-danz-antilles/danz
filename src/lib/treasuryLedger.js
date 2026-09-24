@@ -2,6 +2,7 @@
 // Le relevé initial est une photographie des soldes à un instant donné.
 export const accountFor = (entry) => {
   if (entry.payment_method === 'cash') return 'cash'
+  if (entry.payment_method === 'unassigned') return 'unassigned'
   if (entry.payment_method === 'personal_advance') return entry.reimbursement_method === 'cash' ? 'cash' : 'bank'
   return 'bank'
 }
@@ -14,7 +15,7 @@ export const signedCents = (entry) => {
 }
 export function ledgerBalances(opening, entries = [], transfers = [], at = new Date()) {
   if (!opening) return null
-  const balance = { bank: Number(opening.bank_cents), cash: Number(opening.cash_cents) }
+  const balance = { bank: Number(opening.bank_cents), cash: Number(opening.cash_cents), unassigned: Number(opening.unassigned_cents || 0) }
   const from = new Date(opening.as_of).getTime()
   const until = new Date(at).getTime()
   for (const entry of entries) {
