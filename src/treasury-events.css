@@ -117,3 +117,10 @@
 @media(max-width:1050px){.evt-tools{grid-template-columns:repeat(2,minmax(0,1fr))}.evt-create{grid-template-columns:repeat(2,minmax(0,1fr))}.evt-totals{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.evt-roster-head,.evt-roster-row{grid-template-columns:minmax(160px,1.5fr) minmax(70px,.6fr) minmax(100px,.8fr);gap:.3rem}.evt-roster-head{font-size:.59rem;padding:.4rem}.evt-roster-row{padding:.28rem}.evt-member-toggle{font-size:.6rem}.evt-avatar{width:23px;height:23px;flex-basis:23px}.evt-household-head{gap:.35rem}.evt-household-state{display:none}.evt-event-strip{display:flex;overflow-x:auto;scroll-snap-type:x mandatory}.evt-event-card{min-width:185px;flex:0 0 185px;scroll-snap-align:start}}
 @media(max-width:510px){.evt-tools,.evt-create{grid-template-columns:1fr}.evt-totals{gap:.4rem}.evt-totals article{padding:.65rem}.evt-roster-head,.evt-roster-row{grid-template-columns:minmax(122px,2fr) 74px 90px}.evt-person-text strong{font-size:.72rem}.evt-person-text small{font-size:.6rem}.evt-money-input{padding:.38rem!important}.evt-person-toggle{gap:.3rem}.evt-roster-row .evt-avatar{display:none}.evt-household-name strong{font-size:.8rem}.evt-household-stats b{font-size:.73rem}.evt-household-stats small{font-size:.59rem}.evt-household-body{padding:.5rem}.evt-inline{display:none}.evt-pay-footer{justify-content:stretch}.evt-pay-footer button{flex:1;font-size:.7rem}.evt-filterbar>input{flex-basis:100%}}
+
+.evt-overview-cta{display:flex;justify-content:space-between;align-items:center;gap:.8rem;padding:.85rem 1rem;background:linear-gradient(110deg,#ecf7f3,#f7faf6);border:1px solid #bcdccf;border-radius:14px;flex-wrap:wrap}
+.evt-overview-cta>div{display:grid;gap:.24rem;flex:1;min-width:170px}
+.evt-overview-cta strong{color:#1f6056;font-size:.92rem}
+.evt-overview-cta span{font-size:.76rem;color:#56776c;line-height:1.45}
+.evt-overview-cta>button{white-space:nowrap}
+@media(max-width:510px){.evt-overview-cta>button{width:100%}}
