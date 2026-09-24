@@ -1,7 +1,47 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../context/AuthContext.jsx'
-import { PageTitle } from './Actualites.jsx'
-const situationLabel=r=>r.applicant_type==='spouse'?'Conjoint(e) d’un militaire de la DANZ':r.military_reference==='other'?'Militaire hors DANZ':'Militaire de la DANZ'
-export default function AdminRequests(){const{isAdmin,loading:authLoading}=useAuth();const[requests,setRequests]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[busyId,setBusyId]=useState(null),pendingCount=useMemo(()=>requests.filter(r=>r.status==='pending').length,[requests]);const load=async()=>{setLoading(true);setError('');const{data,error:e}=await supabase.from('membership_requests').select('id,auth_user_id,full_name,first_name,last_name,email,applicant_type,military_reference,status,created_at').order('created_at',{ascending:false});if(e)setError(e.message);setRequests(data||[]);setLoading(false)};useEffect(()=>{if(isAdmin)load();else if(!authLoading)setLoading(false)},[isAdmin,authLoading]);if(!authLoading&&!isAdmin)return <Navigate to="/" replace/>;const processRequest=async(id,action)=>{if(action==='reject'&&!window.confirm('Refuser cette demande ?'))return;setBusyId(id);const{data,error:e}=await supabase.functions.invoke('approve-membership-request',{body:{requestId:id,action}});if(e||data?.error)setError(data?.error||e?.message);else await load();setBusyId(null)};const tools=[['/administration/systeme','◉','État du système','Vérifier les services et la synchronisation.'],['/administration/utilisateurs','👥','Utilisateurs','Comptes, foyers, enfants, statut amicaliste et soldes.'],['/administration/tresorerie','€','Trésorerie','Suivre la banque, la caisse, les cotisations et les dépenses avec le rôle trésorier.'],['/administration/sauvegardes','💾','Sauvegardes & exports','Télécharger les données de contrôle.'],['/administration/contenus','✍️','Publications','Informations, événements, tarifs et albums.'],['/notifications','🔔','Notifications','Préférences et réglages globaux.'],['/administration/bons-plans','⭐','Bons plans','Valider et gérer les fiches.'],['/administration/sondages','✓','Sondages & recensements','Recensements par foyer et sondages simples.'],['/administration/bureau','👥','Bureau','Membres du bureau.'],['/confidentialite','📄','Confidentialité','Notice RGPD.']];return <div className="admin-hub"><PageTitle eyebrow="Espace réservé" title="Administration" text="Gestion des membres, foyers, publications et trésorerie de l’Amicale."/><section><div className="admin-section-heading"><div><span className="eyebrow">Gestion du site</span><h2>Que voulez-vous administrer ?</h2></div></div><div className="admin-hub-grid">{tools.map(([to,icon,title,text])=><Link className="admin-hub-card" to={to} key={to}><span className="admin-hub-icon">{icon}</span><strong>{title}</strong><span>{text}</span></Link>)}<a className="admin-hub-card" href="#demandes-acces"><span className="admin-hub-icon">🔐</span><strong>Demandes d’accès</strong><span>Approuver ou refuser les nouveaux comptes.</span>{pendingCount>0&&<span className="role-badge">{pendingCount} en attente</span>}</a></div></section><section id="demandes-acces"><div className="admin-section-heading"><div><span className="eyebrow">Comptes membres</span><h2>Demandes d’accès</h2></div><span>{pendingCount?`${pendingCount} en attente`:'Aucune demande en attente'}</span></div><div className="privacy-note"><strong>Après approbation :</strong> un foyer individuel est créé automatiquement. Un administrateur peut ensuite réunir deux adultes dans le même foyer et ajouter les enfants.</div>{error&&<div className="alert error">{error}</div>}{loading?<div className="skeleton-card"/>:requests.length===0?<div className="empty-state">Aucune demande.</div>:<div className="card-grid">{requests.map(r=>{const name=[r.first_name,r.last_name].filter(Boolean).join(' ')||r.full_name;return <article className="content-card" key={r.id}><time>{new Date(r.created_at).toLocaleDateString('fr-FR')}</time><h3>{name}</h3><p><strong>E-mail :</strong> {r.email}</p><p><strong>Situation :</strong> {situationLabel(r)}</p><p><strong>Amicaliste :</strong> non par défaut · adhésion possible ensuite à 60 € / an</p><span className="role-badge">{r.status==='pending'?'En attente':r.status==='approved'?'Approuvée':'Refusée'}</span>{r.status==='pending'&&<div className="finance-button-row"><button className="primary-button" disabled={busyId===r.id} onClick={()=>processRequest(r.id,'approve')}>Approuver</button><button className="ghost-button" disabled={busyId===r.id} onClick={()=>processRequest(r.id,'reject')}>Refuser</button></div>}</article>})}</div>}</section></div>}
+import '../admin-central.css'
+
+const mainLinks = [
+  ['/administration/utilisateurs', '👥', 'Membres & accès', 'Demandes en attente, comptes actifs et personnes sans compte.'],
+  ['/administration/tresorerie', '€', 'Trésorerie', 'Compte bancaire, caisse, dettes, cotisations et remboursements.'],
+  ['/administration/contenus', '✎', 'Publications & événements', 'Actualités, agenda, photos et albums.'],
+]
+const associationLinks = [
+  ['/administration/bons-plans', 'Bons plans', 'Offres et validation'],
+  ['/administration/sondages', 'Sondages', 'Recensements et participations'],
+  ['/administration/bureau', 'Bureau', 'Organisation et contacts'],
+]
+const toolLinks = [
+  ['/administration/sauvegardes', 'Sauvegardes du site'],
+  ['/administration/systeme', 'État du système'],
+  ['/notifications', 'Notifications'],
+]
+
+export default function AdminRequests() {
+  const { isAdmin, loading: authLoading } = useAuth()
+  const [counts, setCounts] = useState({ pending: 0, active: 0, offline: 0 })
+  useEffect(() => {
+    if (!isAdmin) return
+    let active = true
+    Promise.all([
+      supabase.from('membership_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('active', true),
+      supabase.from('offline_people').select('id', { count: 'exact', head: true }).is('linked_user_id', null),
+    ]).then(([pending, profiles, offline]) => {
+      if (active) setCounts({ pending: pending.count || 0, active: profiles.count || 0, offline: offline.count || 0 })
+    }).catch(() => {})
+    return () => { active = false }
+  }, [isAdmin])
+  if (authLoading) return <div className="skeleton-card tall" />
+  if (!isAdmin) return <Navigate to="/" replace />
+
+  return <div className="admin-home-v3">
+    <header className="admin-home-heading"><div><span className="eyebrow">Espace administrateur</span><h1>Administration</h1><p>Trois espaces essentiels, les autres outils rangés par usage.</p></div><Link className="admin-home-pending" to="/administration/utilisateurs"><strong>{counts.pending}</strong><span>demande{counts.pending > 1 ? 's' : ''}<br/>à traiter →</span></Link></header>
+    <div className="admin-home-main">{mainLinks.map(([to, icon, title, desc], index) => <Link className="admin-home-primary" to={to} key={to}><span className="admin-home-primary-icon">{icon}</span><div><h2>{title}</h2><p>{desc}</p>{index === 0 && <small>{counts.active} compte{counts.active > 1 ? 's' : ''} actif{counts.active > 1 ? 's' : ''} · {counts.offline} sans compte · {counts.pending} en attente</small>}</div><span className="admin-home-arrow">↗</span></Link>)}</div>
+    <section className="admin-home-extras"><h2>Vie associative</h2><div className="admin-home-compact-links">{associationLinks.map(([to, label, desc]) => <Link key={to} to={to}><strong>{label}</strong><span>{desc}</span><b>›</b></Link>)}</div></section>
+    <details className="admin-home-advanced"><summary>Outils techniques et réglages</summary><div>{toolLinks.map(([to, label]) => <Link key={to} to={to}>{label} <span>↗</span></Link>)}<Link to="/confidentialite">Confidentialité <span>↗</span></Link></div></details>
+  </div>
+}
