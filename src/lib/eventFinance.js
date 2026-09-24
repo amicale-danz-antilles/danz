@@ -28,7 +28,7 @@ export function eventPeople(data) {
     if (!offline.linked_user_id) continue
     const profile = profiles[offline.linked_user_id]
     const person = byKey[eventKey('account', offline.linked_user_id)]
-    if (profile && person) byKey[eventKey('offline', offline.id)] = { ...person, key: eventKey('offline', offline.id), name: person.name + ' (ancienne fiche)' }
+    if (profile && person) byKey[eventKey('offline', offline.id)] = person
   }
   return { people, byKey, households }
 }
