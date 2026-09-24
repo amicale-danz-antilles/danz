@@ -3,3 +3,7 @@ dist
 .env
 .env.local
 .DS_Store
+
+# Données de migration privées et comptes réels : ne jamais commiter.
+migration-private/
+*.migration-export.json
