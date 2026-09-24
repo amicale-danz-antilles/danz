@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "updated_on": "2026-09-24",
+  "source": "Supabase",
+  "target": "Nhost",
+  "production_backend": "Supabase",
+  "current_phase": "Préparation et essais fictifs",
+  "target_test_region": "us-east-1",
+  "real_data_transferred": false,
+  "cutover_authorized": false,
+  "intro": "La production DANZ reste connectée à Supabase. Les validations Nhost concernent uniquement un environnement de test fictif.",
+  "baseline": {
+    "captured_on": "2026-09-24",
+    "public_tables": 29,
+    "auth_users": 25,
+    "profiles": 24,
+    "households": 24,
+    "charges": 0,
+    "payments": 0,
+    "treasury_entries": 1,
+    "events": 3,
+    "good_deals": 83,
+    "attachments": 3,
+    "note": "Photographie de référence seulement : les volumes réels peuvent changer jusqu'au gel des écritures."
+  },
+  "milestones": [
+    {
+      "id": "network",
+      "title": "Réseau professionnel",
+      "state": "validated",
+      "detail": "Auth 200, GraphQL POST/CORS 200 et stockage accessible (403 sans connexion) depuis le poste professionnel.",
+      "evidence": "https://github.com/amicale-danz-antilles/danz/pull/19"
+    },
+    {
+      "id": "sandbox",
+      "title": "Comptes et permissions fictifs",
+      "state": "validated",
+      "detail": "Connexion et opérations de lecture, écriture, suppression, puis tests d'isolation déclarés fonctionnels par l'administrateur.",
+      "evidence": "https://github.com/amicale-danz-antilles/danz/pull/24"
+    },
+    {
+      "id": "inventory",
+      "title": "Inventaire Supabase initial",
+      "state": "validated",
+      "detail": "29 tables publiques, 25 comptes Auth, 24 profils, 24 foyers et 8 fonctions serveur identifiés ; relevé à refaire avant le transfert.",
+      "evidence": "https://github.com/amicale-danz-antilles/danz/blob/main/docs/migration-nhost-preparation.md"
+    },
+    {
+      "id": "tracking",
+      "title": "Tableau de suivi de migration",
+      "state": "in_progress",
+      "detail": "Interface d'administration, état versionné et contrôles de publication en cours de mise en service.",
+      "evidence": "https://github.com/amicale-danz-antilles/danz/pulls"
+    },
+    {
+      "id": "schema",
+      "title": "Schéma PostgreSQL et fonctions métier",
+      "state": "pending",
+      "detail": "Recréer sur Nhost les tables, relations, fonctions SQL et contraintes sans importer de données réelles."
+    },
+    {
+      "id": "roles",
+      "title": "Sécurité et permissions Hasura",
+      "state": "pending",
+      "detail": "Reprendre les règles RLS de chaque table ; tester membre, conjoint, trésorier, admin, compte inactif et accès anonyme."
+    },
+    {
+      "id": "edge",
+      "title": "Fonctions serveur et médias",
+      "state": "pending",
+      "detail": "Remplacer les 8 fonctions Supabase, contrôler R2, les pièces jointes privées et les notifications."
+    },
+    {
+      "id": "identity",
+      "title": "Migration d'identité fictive",
+      "state": "pending",
+      "detail": "Valider sur un compte inventé l'import d'une empreinte bcrypt et la reprise du même mot de passe."
+    },
+    {
+      "id": "features",
+      "title": "Recette fonctionnelle DANZ",
+      "state": "pending",
+      "detail": "Valider foyer, publications, recensements, cotisations, paiements partiels, dépenses et administration sur des données fictives."
+    },
+    {
+      "id": "region",
+      "title": "Région définitive et conformité",
+      "state": "blocked",
+      "detail": "Projet de test actuel aux États-Unis. Choisir une région et vérifier les conditions applicables avant tout transfert réel."
+    },
+    {
+      "id": "backup",
+      "title": "Sauvegardes restaurables",
+      "state": "pending",
+      "detail": "Préparer et tester une sauvegarde complète hors GitHub avant la migration de production."
+    },
+    {
+      "id": "dryrun",
+      "title": "Répétition et rapprochements",
+      "state": "blocked",
+      "detail": "Après choix de région : essai de transfert sécurisé, contrôles des UUID, volumes, liens et montants sans changer la production."
+    },
+    {
+      "id": "cutover",
+      "title": "Basculement définitif",
+      "state": "blocked",
+      "detail": "Après recette : gel des écritures, sauvegarde, import final, contrôle des écritures et plan de retour arrière."
+    }
+  ],
+  "links": {
+    "migration_plan": "https://github.com/amicale-danz-antilles/danz/blob/main/docs/migration-nhost-preparation.md",
+    "sandbox": "https://amicale-danz-antilles.github.io/danz/nhost-sandbox.html",
+    "repo": "https://github.com/amicale-danz-antilles/danz"
+  }
+}
