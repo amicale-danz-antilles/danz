@@ -5,7 +5,7 @@ create table if not exists public.offline_people (
   display_name text not null check (char_length(btrim(display_name)) between 2 and 160),
   email text,
   notes text,
-  household_id uuid not null unique references public.households(id) on delete restrict,
+  household_id uuid not null references public.households(id) on delete restrict,
   linked_user_id uuid unique references public.profiles(id) on delete set null,
   is_amicaliste boolean not null default false,
   membership_valid_until date,
@@ -16,6 +16,7 @@ create table if not exists public.offline_people (
   constraint offline_people_validity check (not is_amicaliste or membership_valid_until is not null)
 );
 create index if not exists offline_people_name_idx on public.offline_people(display_name);
+create unique index if not exists offline_people_unlinked_household_idx on public.offline_people(household_id) where linked_user_id is null;
 alter table public.offline_people enable row level security;
 revoke all on public.offline_people from anon;
 grant select, update on public.offline_people to authenticated;
