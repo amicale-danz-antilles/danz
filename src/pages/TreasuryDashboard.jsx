@@ -19,7 +19,10 @@ const centsOf = (value) => {
   const normalized = String(value).trim().replace(/\s/g, '').replace(',', '.')
   return /^-?\d+(\.\d{1,2})?$/.test(normalized) ? Math.round(Number(normalized) * 100) : NaN
 }
-const timeOf = (date) => date === localDay() ? new Date().toISOString() : new Date(date + 'T12:00:00').toISOString()
+const timeOf = (date) => {
+  if (!date || date > localDay()) throw new Error('Sélectionnez une date au plus tard aujourd’hui.')
+  return date === localDay() ? new Date().toISOString() : new Date(date + 'T12:00:00').toISOString()
+}
 const formattedDate = (value) => value ? new Date(value).toLocaleDateString('fr-FR') : '—'
 const csvCell = (value) => {
   let text = String(value ?? '')
@@ -280,7 +283,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
       {formType === 'transfer' ? <form className="tv2-form" onSubmit={submitTransfer}>
         <div className="tv2-field-grid"><label>Depuis<select value={transferForm.from_account} onChange={(e) => setTransferForm({ ...transferForm, from_account: e.target.value })}><option value="bank">Compte bancaire → Espèces</option><option value="cash">Caisse espèces → Banque</option></select></label>
           <label>Montant (€)<input required inputMode="decimal" value={transferForm.amount} onChange={(e) => setTransferForm({ ...transferForm, amount: e.target.value })} placeholder="100,00" /></label></div>
-        <div className="tv2-field-grid"><label>Date<input type="date" required value={transferForm.date} onChange={(e) => setTransferForm({ ...transferForm, date: e.target.value })} /></label><label>Note (facultatif)<input value={transferForm.note} onChange={(e) => setTransferForm({ ...transferForm, note: e.target.value })} placeholder="Retrait pour la caisse..." /></label></div>
+        <div className="tv2-field-grid"><label>Date<input type="date" required max={localDay()} value={transferForm.date} onChange={(e) => setTransferForm({ ...transferForm, date: e.target.value })} /></label><label>Note (facultatif)<input value={transferForm.note} onChange={(e) => setTransferForm({ ...transferForm, note: e.target.value })} placeholder="Retrait pour la caisse..." /></label></div>
         <p className="tv2-hint">Le montant passe d’un compte à l’autre. Le total de l’Amicale ne change pas.</p><button type="submit" className="primary-button" disabled={busy}>{busy ? 'Enregistrement…' : 'Enregistrer le transfert'}</button>
       </form> : <form className="tv2-form" onSubmit={submitEntry}>
         <div className="tv2-field-grid"><label>Libellé<input required maxLength={200} value={entryForm.label} onChange={(e) => setEntryForm({ ...entryForm, label: e.target.value })} placeholder={formType === 'income' ? 'Ex. Don lors du repas' : 'Ex. Courses pour le repas'} /></label>
@@ -291,7 +294,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
             {formType === 'expense' && <option value="personal_advance">Avance d’un membre</option>}
           </select></label></div>
         {entryForm.payment_method === 'personal_advance' && <label>Avancé par<select required value={entryForm.advanced_by} onChange={(e) => setEntryForm({ ...entryForm, advanced_by: e.target.value })}><option value="">Sélectionner une personne</option>{profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}</select></label>}
-        <div className="tv2-field-grid"><label>Date de l’opération<input type="date" required value={entryForm.date} onChange={(e) => setEntryForm({ ...entryForm, date: e.target.value })} /></label>
+        <div className="tv2-field-grid"><label>Date de l’opération<input type="date" required max={localDay()} value={entryForm.date} onChange={(e) => setEntryForm({ ...entryForm, date: e.target.value })} /></label>
           <label>Événement (facultatif)<select value={entryForm.event_id} onChange={(e) => setEntryForm({ ...entryForm, event_id: e.target.value })}><option value="">Sans événement</option>{(data.events || []).map((ev) => <option key={ev.id} value={ev.id}>{ev.title}</option>)}</select></label></div>
         <label>Note (facultatif)<textarea rows="2" value={entryForm.note} onChange={(e) => setEntryForm({ ...entryForm, note: e.target.value })} /></label>
         {formType === 'expense' && <label>Justificatif (photo ou PDF)<input type="file" accept="image/*,.pdf" onChange={(e) => setReceipt(e.target.files?.[0] || null)} /></label>}
