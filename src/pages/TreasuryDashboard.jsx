@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase.js'
 import { chargeResidualCents, effectiveAmicaliste, formatMoney, householdBalanceCents } from '../lib/finance.js'
 import { optimizeImageFile } from '../lib/mediaStorage.js'
 import { accountFor, accountingDate, ledgerBalances, signedCents } from '../lib/treasuryLedger.js'
+import EventTreasury from './EventTreasury.jsx'
 
 const EXPENSE_CATEGORIES = {
   courses: 'Courses & alimentation', evenement: 'Événement & réception', materiel: 'Matériel',
@@ -76,7 +77,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
   const [exporting, setExporting] = useState(false)
 
   async function reload() {
-    const [entries, transfers, households, members, profiles, charges, payments, allocations, subscriptions, events, offline, openingResult, settingsResult] = await Promise.all([
+    const [entries, transfers, households, members, profiles, charges, payments, allocations, subscriptions, events, offline, eventParticipants, openingResult, settingsResult] = await Promise.all([
       fetchAll('treasury_entries', 'occurred_at'),
       fetchAll('treasury_transfers', 'occurred_at'),
       fetchAll('households', 'name'),
@@ -88,12 +89,13 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
       fetchAll('membership_subscriptions'),
       fetchAll('events', 'starts_at'),
       fetchAll('offline_people', 'display_name'),
+      fetchAll('treasury_event_participants'),
       supabase.from('treasury_opening').select('*').eq('id', 1).maybeSingle(),
       supabase.from('association_settings').select('*').eq('id', 1).single(),
     ])
     if (openingResult.error) throw openingResult.error
     if (settingsResult.error) throw settingsResult.error
-    setData({ entries, transfers, households, members, profiles, charges, payments, allocations, subscriptions, events, offline, opening: openingResult.data, settings: settingsResult.data })
+    setData({ entries, transfers, households, members, profiles, charges, payments, allocations, subscriptions, events, offline, eventParticipants, opening: openingResult.data, settings: settingsResult.data })
     setOpeningDraft({ bank: openingResult.data ? String(openingResult.data.bank_cents / 100) : '', cash: openingResult.data ? String(openingResult.data.cash_cents / 100) : '' })
   }
 
@@ -338,7 +340,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     {error && <div className="alert error" role="alert">{error}<button type="button" onClick={() => setError('')} aria-label="Fermer l’erreur">×</button></div>}
     {notice && <div className="alert success" role="status">{notice}<button type="button" onClick={() => setNotice('')} aria-label="Fermer la confirmation">×</button></div>}
 
-    {view !== 'settings' && <div className="tv2-actions">
+    {view !== 'settings' && view !== 'events' && <div className="tv2-actions">
       <button type="button" className="tv2-action tv2-action-primary" onClick={() => openForm('expense')}>− Dépense</button>
       <button type="button" className="tv2-action" onClick={() => openForm('income')}>＋ Recette</button>
       <button type="button" className="tv2-action" onClick={() => openForm('transfer')}>⇄ Transfert banque / caisse</button>
@@ -370,7 +372,10 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
       </form>}
     </section>}
 
+    {view === 'events' && <EventTreasury data={data} onReload={reload} user={user} />}
+
     {view === 'overview' && <>
+      <div className="evt-overview-cta"><div><strong>Une soirée à organiser ?</strong><span>Inscrire les participants, attribuer les dettes aux foyers et encaisser les cotisations.</span></div><button type="button" className="tv2-action tv2-action-primary" onClick={() => onView('events')}>Ouvrir mes événements →</button></div>
       {!opening && <div className="tv2-setup-warning"><strong>À faire une fois : initialiser les soldes</strong><span>Indiquez le montant réel sur le compte bancaire et le liquide actuellement en caisse. Les montants ci-dessous ne seront fiables qu’après cette étape.</span><button type="button" onClick={() => onView('settings')}>Renseigner mes soldes →</button></div>}
       <div className="tv2-balances">
         <article className="tv2-balance tv2-bank"><span>Compte bancaire</span><strong>{opening ? formatMoney(balances.bank) : 'À initialiser'}</strong><small>Carte, virements et remboursements bancaires</small></article>
