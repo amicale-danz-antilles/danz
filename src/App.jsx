@@ -26,7 +26,6 @@ const AdminUsers = lazy(() => import('./pages/AdminUsers.jsx'))
 const AdminTreasury = lazy(() => import('./pages/AdminTreasury.jsx'))
 const AdminBackup = lazy(() => import('./pages/AdminBackup.jsx'))
 const AdminSystemStatus = lazy(() => import('./pages/AdminSystemStatus.jsx'))
-const AdminMigration = lazy(() => import('./pages/AdminMigration.jsx'))
 
 function PageLoader() {
   return <div className="route-loader" role="status" aria-live="polite"><span className="route-loader-spinner" /><span>Chargement…</span></div>
@@ -78,7 +77,6 @@ export default function App() {
       <Route path="administration/tresorerie" element={adminOnline(<AdminTreasury />)} />
       <Route path="administration/sauvegardes" element={adminOnline(<AdminBackup />)} />
       <Route path="administration/systeme" element={adminOnline(<AdminSystemStatus />)} />
-      <Route path="administration/migration" element={adminOnline(<AdminMigration />)} />
       <Route path="administration/contenus" element={adminOnline(<AdminContent />)} />
       <Route path="administration/galerie" element={<Navigate to="/administration/contenus?type=albums" replace />} />
       <Route path="administration/notifications" element={<Navigate to="/notifications" replace />} />

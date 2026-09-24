@@ -27,8 +27,6 @@ jobs:
         run: npm install --no-fund --no-audit
       - name: Bloquer un déploiement avec vulnérabilité haute
         run: npm audit --audit-level=high
-      - name: Tester les contrôles anti-perte synthétiques
-        run: npm run test:migration
       - name: Construire l'application
         run: npm run build
         env:
@@ -77,15 +75,11 @@ jobs:
           fetch_with_retry "$base/" /tmp/danz-index.html
           fetch_with_retry "$base/manifest.webmanifest" /tmp/danz-manifest.json
           fetch_with_retry "$base/sw.js" /tmp/danz-sw.js
-          fetch_with_retry "$base/migration-status.json" /tmp/danz-migration.json
-          fetch_with_retry "$base/suivi-migration.html" /tmp/danz-migration-page.html
           fetch_with_retry "$base/image001-1.png" /tmp/danz-logo.png
           fetch_with_retry "$base/favicon-v8.png" /tmp/danz-favicon.png
           grep -q "Amicale DANZ Antilles" /tmp/danz-index.html
           grep -q "icon-192-v8.png" /tmp/danz-manifest.json
-          grep -q "danz-shell-v25" /tmp/danz-sw.js
-          grep -q '"schema_version": 1' /tmp/danz-migration.json
-          grep -q "Suivi de la migration Nhost" /tmp/danz-migration-page.html
+          grep -q "danz-shell-v26" /tmp/danz-sw.js
           test -s /tmp/danz-logo.png
           test -s /tmp/danz-favicon.png
           echo "Smoke test production réussi : page, PWA, service worker et identité visuelle sont accessibles."

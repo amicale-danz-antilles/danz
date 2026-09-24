@@ -1,4 +1,4 @@
-const CACHE_NAME = 'danz-shell-v25'
+const CACHE_NAME = 'danz-shell-v26'
 const PRIVATE_MEDIA_CACHE = 'danz-private-thumbs-v2'
 const APP_ROOT = '/danz/'
 const OFFICIAL_LOGO = '/danz/image001-1.png?v=official-image001-1-20260914'
@@ -53,7 +53,7 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return
   if (event.request.mode === 'navigate') {
     // Only the application's root HTML may replace its offline shell.
-    // Standalone pages (diagnostics, test sandbox) must never poison the root cache.
+    // Standalone pages must never replace the offline app shell.
     const appShellNavigation = url.pathname === APP_ROOT || url.pathname === APP_ROOT + 'index.html'
     event.respondWith((async () => {
       try {

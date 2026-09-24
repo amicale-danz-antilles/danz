@@ -45,7 +45,7 @@ export default function AdminSystemStatus(){
 
   return <div className="system-status-page">
     <PageTitle eyebrow="Administration · Supervision" title="État du système" text="Contrôlez en un coup d’œil les services, les utilisateurs, les volumes de données, les sauvegardes et la préparation du mode hors ligne."/>
-    <div className="system-status-actions"><Link className="ghost-button" to="/administration">← Administration</Link><Link className="secondary-button" to="/administration/migration">↗ Migration Nhost</Link><button className="secondary-button" onClick={load} disabled={loading}>{loading?'Vérification…':'↻ Actualiser'}</button></div>
+    <div className="system-status-actions"><Link className="ghost-button" to="/administration">← Administration</Link><button className="secondary-button" onClick={load} disabled={loading}>{loading?'Vérification…':'↻ Actualiser'}</button></div>
     {error&&<div className="alert error">{error}</div>}
     {loading&&!data?<div className="skeleton-card tall"/>:data&&<>
       <section><div className="admin-section-heading"><div><span className="eyebrow">Santé technique</span><h2>Services essentiels</h2></div><small>Contrôle : {formatDate(data.checked_at)}</small></div><div className="system-service-grid">{Object.entries(data.services||{}).map(([key,service])=><article key={key} className={service.ok?'ok':'warning'}><span className="system-state-dot"/><div><strong>{service.label}</strong><small>{service.ok?'Opérationnel':'Attention requise'}</small></div></article>)}</div></section>

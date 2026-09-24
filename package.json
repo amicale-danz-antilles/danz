@@ -7,9 +7,7 @@
     "dev": "vite",
     "build": "node scripts/generate-icons.mjs && vite build",
     "verify:production": "node scripts/verify-production-build.mjs",
-    "preview": "vite preview",
-    "test:migration": "node scripts/test-migration-parity.mjs",
-    "verify:migration": "node scripts/verify-migration-parity.mjs"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
