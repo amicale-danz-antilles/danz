@@ -12,7 +12,8 @@ as $$
       and active = true and role = 'admin' and is_treasurer = true
   );
 $$;
-revoke all on function private.is_treasurer() from public, anon, authenticated;
+revoke all on function private.is_treasurer() from public, anon;
+grant execute on function private.is_treasurer() to authenticated;
 
 -- Attribution nominative : l'administrateur connecté active SON propre compte.
 -- Verrou transactionnel et index unique empêchent deux titulaires concurrents.
