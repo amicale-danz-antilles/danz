@@ -64,7 +64,9 @@ declare
   v_subscription uuid;
   v_charge uuid;
   v_existing uuid;
-  v_existing_meta jsonb;
+  v_existing_event uuid;
+  v_seen jsonb := '[]'::jsonb;
+  v_replayed_event uuid;
   v_count integer := 0;
   v_charges integer := 0;
   v_memberships integer := 0;
@@ -80,8 +82,11 @@ begin
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(p_event_id::text));
   select * into v_event from public.events where id=p_event_id;
   if not found then raise exception 'Événement introuvable.'; end if;
-  select b.result into v_result from public.treasury_event_batches b where b.id=p_batch_id;
-  if found then return v_result; end if;
+  select b.event_id,b.result into v_replayed_event,v_result from public.treasury_event_batches b where b.id=p_batch_id;
+  if found then
+    if v_replayed_event<>p_event_id then raise exception 'Un identifiant de lot est déjà utilisé pour un autre événement.'; end if;
+    return v_result;
+  end if;
   select coalesce(membership_fee_cents,6000) into v_fee from public.association_settings where id=1;
   v_fee := coalesce(v_fee,6000);
   if v_fee <= 0 then raise exception 'Le tarif de cotisation est invalide.'; end if;
@@ -118,6 +123,10 @@ begin
       raise exception 'Type de personne inconnu.';
     end if;
     if v_household is null then raise exception 'Rattachez d’abord cette personne à un foyer.'; end if;
+    if v_seen ? (v_kind || ':' || v_person::text) then
+      raise exception 'Une personne ne peut apparaître deux fois dans le même lot.';
+    end if;
+    v_seen := v_seen || jsonb_build_array(v_kind || ':' || v_person::text);
 
     if not exists (
       select 1 from public.treasury_event_participants t
@@ -153,8 +162,13 @@ begin
           where s.user_id=v_user and s.status='pending'
           order by s.created_at desc limit 1 for update;
         if v_existing is not null then
-          update public.household_charges set event_id=coalesce(event_id,p_event_id)
-            where id=v_existing and household_id=v_household;
+          select c.event_id into v_existing_event from public.household_charges c
+            where c.id=v_existing and c.household_id=v_household and c.status='open' for update;
+          if not found then raise exception 'La cotisation déjà appelée doit être régularisée dans Cotisations & dettes.'; end if;
+          if v_existing_event is not null and v_existing_event<>p_event_id then
+            raise exception 'Cotisation déjà associée à un autre événement : réglez-la dans Cotisations & dettes.';
+          end if;
+          update public.household_charges set event_id=p_event_id where id=v_existing;
           v_memberships := v_memberships+1;
         else
           if v_profile.is_amicaliste and v_profile.membership_valid_until >= current_date then
@@ -189,7 +203,13 @@ begin
             where a.charge_id=c.id and p.status='confirmed'),0)
         order by c.created_at desc limit 1 for update;
         if v_existing is not null then
-          update public.household_charges set event_id=coalesce(event_id,p_event_id) where id=v_existing;
+          select c.event_id into v_existing_event from public.household_charges c
+            where c.id=v_existing and c.household_id=v_household and c.status='open' for update;
+          if not found then raise exception 'Cotisation sans compte introuvable : vérifiez les dettes.'; end if;
+          if v_existing_event is not null and v_existing_event<>p_event_id then
+            raise exception 'Cette cotisation est déjà liée à un autre événement.';
+          end if;
+          update public.household_charges set event_id=p_event_id where id=v_existing;
           v_memberships := v_memberships+1;
         else
           if v_offline_person.is_amicaliste and v_offline_person.membership_valid_until >= current_date then
@@ -317,22 +337,14 @@ begin
     raise exception 'Paiement invalide.';
   end if;
   if array_length(p_charge_ids,1)<>(
-    select count(distinct id) from unnest(p_charge_ids) as id
+    select count(distinct item.charge_id) from unnest(p_charge_ids) as item(charge_id)
   ) then raise exception 'La même dette figure plusieurs fois.'; end if;
   select title into v_title from public.events where id=p_event_id;
   if not found then raise exception 'Événement introuvable.'; end if;
   v_expected := array_length(p_charge_ids,1);
   select count(*) into v_valid from public.household_charges c
   where c.id=any(p_charge_ids) and c.status='open' and c.household_id=p_household_id
-    and (
-      c.event_id=p_event_id
-      or (c.category='membership' and exists(
-        select 1 from public.treasury_event_participants t
-        where t.event_id=p_event_id
-          and ((t.user_id is not null and t.user_id=c.user_id)
-            or (t.offline_person_id is not null and t.offline_person_id=c.offline_person_id))
-      ))
-    );
+    and c.event_id=p_event_id;
   if v_valid<>v_expected then raise exception 'Certaines dettes ne correspondent pas à cet événement et à ce foyer.'; end if;
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(p_household_id::text));
   v_payment := public.admin_record_household_payment(p_household_id,p_charge_ids,p_method,
