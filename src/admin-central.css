@@ -71,3 +71,14 @@
 .admin-surface .treasury-row{padding:.5rem .7rem;border-radius:9px}
 @media(max-width:990px){.admin-home-main{grid-template-columns:1fr}.admin-home-primary{padding:.85rem}.admin-home-compact-links{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.admin-home-compact-links,.admin-home-advanced>div{grid-template-columns:1fr}.admin-home-heading{align-items:start}.admin-home-pending{padding:.5rem}.admin-home-primary-icon{width:36px;height:36px;flex-basis:36px}}
+
+/* Densité homogène dans les tuiles secondaires de l'administration. */
+.admin-surface .card-grid{gap:.65rem;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr))}
+.admin-surface .content-card{padding:.85rem;min-width:0;box-shadow:none}
+.admin-surface .content-card h3{font-size:1rem;margin:.15rem 0}
+.admin-surface .content-card p{font-size:.78rem;line-height:1.42;margin:.32rem 0}
+.admin-surface .text-panel{padding:.95rem}
+.admin-surface .admin-section-heading{margin:0 0 .55rem}
+.admin-surface .admin-section-heading h2{font-size:1.12rem}
+.admin-surface .admin-finance-form{gap:.52rem}
+.admin-surface .admin-finance-form input,.admin-surface .admin-finance-form select{padding:.55rem}
