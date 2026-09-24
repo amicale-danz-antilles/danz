@@ -1,6 +1,7 @@
 import { createFinancialXlsx, eur } from './treasuryXlsx.js'
 import { ledgerBalances, accountFor, accountingDate, signedCents } from './treasuryLedger.js'
 import { chargeResidualCents, effectiveAmicaliste, householdBalanceCents } from './finance.js'
+import { buildEventGroups, eventOverview } from './eventFinance.js'
 
 const date = (value) => value ? new Date(value).toISOString().slice(0, 10) : ''
 const asDate = (value) => value ? new Date(value).toLocaleString('fr-FR') : ''
@@ -74,6 +75,17 @@ export function buildFinancialSheets(data, takenAt = new Date()) {
       asDate(e.occurred_at), nameOf(people[e.advanced_by || e.advanced_by_offline]), e.label, e.note || '', eur(e.amount_cents), e.status, e.reimbursement_method === 'cash' ? 'Caisse (liquide)' : e.reimbursement_method ? 'Compte bancaire' : 'En attente', asDate(e.settled_at), e.receipt_file_name || '', e.id,
     ]) },
     { name: 'Transferts internes', headers: ['Date', 'Depuis', 'Vers', 'Montant EUR', 'Motif', 'Créé le', 'ID'], rows: transfers.map((t) => [asDate(t.occurred_at), t.from_account === 'cash' ? 'Caisse (liquide)' : 'Compte bancaire', t.to_account === 'cash' ? 'Caisse (liquide)' : 'Compte bancaire', eur(t.amount_cents), t.note || '', asDate(t.created_at), t.id]) },
+    { name: 'Bilan par événement', headers: ['Événement', 'Date', 'Visibilité', 'Participants', 'Foyers', 'Dettes attribuées', 'Dont cotisations', 'Total facturé EUR', 'Encaissé EUR', 'Reste dû EUR', 'ID événement'], rows: (data.events || []).map((event) => {
+      const summary = eventOverview(event.id, data)
+      return [event.title, asDate(event.starts_at), event.published ? 'Agenda public' : 'Fiche interne', summary.participants, summary.households,
+        summary.charges, summary.memberships, eur(summary.total), eur(summary.paid), eur(summary.due), event.id]
+    }) },
+    { name: 'Détail par événement', headers: ['Événement', 'Foyer', 'Participant', 'Catégorie', 'Libellé', 'Facturé EUR', 'Déjà payé EUR', 'Restant EUR', 'État', 'ID dette', 'ID événement'], rows: (data.events || []).flatMap((event) =>
+      buildEventGroups(event.id, data).flatMap((group) => group.charges.length
+        ? group.charges.map((charge) => [event.title, group.name, charge.personName, charge.category, charge.label,
+          eur(charge.amount_cents), eur(charge.paidCents), eur(charge.dueCents), charge.status, charge.id, event.id])
+        : [[event.title,group.name,group.people.map((p)=>p.name).join(', '),'Présence sans dette','',eur(0),eur(0),eur(0),'Inscrit','',event.id]])
+    ) },
     { name: 'Fiches sans compte', headers: ['Nom', 'E-mail', 'Notes', 'Foyer actuel', 'Statut amicaliste', 'Échéance', 'Compte lié', 'Créé le', 'ID'], rows: offline.map((p) => [p.display_name, p.email || '', p.notes || '', householdById[p.household_id]?.name || '', p.is_amicaliste ? 'Amicaliste' : 'Non-amicaliste', p.membership_valid_until || '', nameOf(people[p.linked_user_id]), asDate(p.created_at), p.id]) },
   ]
   return sheets

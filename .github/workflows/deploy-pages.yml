@@ -79,7 +79,7 @@ jobs:
           fetch_with_retry "$base/favicon-v8.png" /tmp/danz-favicon.png
           grep -q "Amicale DANZ Antilles" /tmp/danz-index.html
           grep -q "icon-192-v8.png" /tmp/danz-manifest.json
-          grep -q "danz-shell-v28" /tmp/danz-sw.js
+          grep -q "danz-shell-v29" /tmp/danz-sw.js
           test -s /tmp/danz-logo.png
           test -s /tmp/danz-favicon.png
           echo "Smoke test production réussi : page, PWA, service worker et identité visuelle sont accessibles."

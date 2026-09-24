@@ -8,6 +8,7 @@ import '../treasury-v2.css'
 
 const TABS = [
   ['overview', 'Vue d’ensemble'],
+  ['events', 'Événements & dettes'],
   ['operations', 'Opérations'],
   ['memberships', 'Cotisations & dettes'],
   ['advanced', 'Gestion avancée'],
