@@ -44,8 +44,8 @@ export default function AdminDirectory() {
     setHouseholds(results[4].data || [])
     if (selected) {
       const current = (results[2].data || []).find((person) => person.id === selected.id)
-      setSelected(current || null)
-      if (current) setOfflineDraft({ display_name: current.display_name, email: current.email || '', notes: current.notes || '', is_amicaliste: current.is_amicaliste, membership_valid_until: current.membership_valid_until || '' })
+      setSelected(current && !current.linked_user_id ? current : null)
+      if (current && !current.linked_user_id) setOfflineDraft({ display_name: current.display_name, email: current.email || '', notes: current.notes || '', is_amicaliste: current.is_amicaliste, membership_valid_until: current.membership_valid_until || '' })
     }
   }
   useEffect(() => {
