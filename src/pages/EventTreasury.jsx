@@ -20,10 +20,15 @@ const categories = [['activity','Participation'],['meal','Repas'],['drinks','Boi
 const defaultEventForm = () => ({title:'',date:dateToday()})
 const icon = (type) => type === 'child' ? '🧒' : type === 'offline' ? '○' : '●'
 const personCategory = (person) => person.type === 'child' ? 'Enfant' : person.type === 'offline' ? 'Sans compte' : 'Compte membre'
-const dueMembership = (person, subscriptions, fee) => {
+const dueMembership = (person, subscriptions, fee, charges, eventId) => {
   if (person.type === 'child') return {allowed:false,note:'Pas de cotisation enfant',fee:0}
   const pending = subscriptions.find((s) => s.user_id === person.id && person.type === 'account' && s.status === 'pending')
-  if (pending) return {allowed:true,note:'Cotisation déjà appelée',fee:pending.amount_cents}
+  if (pending) {
+    const charge = charges.find((c) => c.id === pending.charge_id)
+    if (charge?.event_id && charge.event_id !== eventId)
+      return {allowed:false,note:'Cotisation liée à une autre soirée',fee:pending.amount_cents}
+    return {allowed:true,note:'Cotisation déjà appelée',fee:pending.amount_cents}
+  }
   const cutoff = new Date();cutoff.setDate(cutoff.getDate()+60)
   const cutoffDay = [cutoff.getFullYear(),String(cutoff.getMonth()+1).padStart(2,'0'),String(cutoff.getDate()).padStart(2,'0')].join('-')
   if (person.amicaliste && person.until && person.until > cutoffDay) return {allowed:false,note:'Cotisation à jour',fee:0}
@@ -65,7 +70,7 @@ export default function EventTreasury({ data, onReload, user }) {
   const selected = Object.entries(draft).filter(([,value]) => value.selected).map(([key,value]) => ({person:byKey[key],...value})).filter((row)=>row.person)
   const selectedTotals = selected.reduce((acc,row) => {
     acc.event += Number.isFinite(parseMoney(row.amount)) ? parseMoney(row.amount) : 0
-    if (row.membership) acc.membership += dueMembership(row.person,data.subscriptions || [],fee).fee
+    if (row.membership) acc.membership += dueMembership(row.person,data.subscriptions || [],fee,data.charges || [],chosenId).fee
     acc.households.add(row.person.householdId)
     return acc
   },{event:0,membership:0,households:new Set()})
@@ -107,7 +112,7 @@ export default function EventTreasury({ data, onReload, user }) {
     if (!person?.householdId) throw new Error('Rattachez chaque personne à un foyer avant de facturer.')
     if (!Number.isSafeInteger(cents) || cents < 0 || cents > 100000000)
       throw new Error('Corrigez les montants : deux décimales maximum et montant positif.')
-    const member = membership && dueMembership(person,data.subscriptions || [],fee)
+    const member = membership && dueMembership(person,data.subscriptions || [],fee,data.charges || [],chosenId)
     if (membership && !member.allowed) throw new Error('Cotisation non disponible pour ' + person.name + '.')
     return {
       person_type:person.type,person_id:person.id,amount_cents:cents,
@@ -173,7 +178,7 @@ export default function EventTreasury({ data, onReload, user }) {
     sendRows([{person,amount:quick.amount,membership:quick.membership,chargeCategory:quick.category,chargeLabel:quick.label}],{clear:false})
   }
   const addMembership = (person) => {
-    if(!window.confirm('Appeler la cotisation de '+money(dueMembership(person,data.subscriptions || [],fee).fee)+' pour '+person.name+' sur cet événement ? Le paiement sera enregistré séparément.'))return
+    if(!window.confirm('Appeler la cotisation de '+money(dueMembership(person,data.subscriptions || [],fee,data.charges || [],chosenId).fee)+' pour '+person.name+' sur cet événement ? Le paiement sera enregistré séparément.'))return
     sendRows([{person,amount:'0',membership:true}],{clear:false})
   }
 
@@ -227,7 +232,7 @@ export default function EventTreasury({ data, onReload, user }) {
             <div className="evt-roster-head"><span>Participant / foyer</span><span>Participation (€)</span><span>＋ Cotisation</span></div>
             {filteredPeople.map((person)=>{
               const row=draft[person.key] || {selected:false,amount:amountFor(person,activeEvent,globalAmount),membership:false}
-              const member=dueMembership(person,data.subscriptions || [],fee)
+              const member=dueMembership(person,data.subscriptions || [],fee,data.charges || [],chosenId)
               return <div className={'evt-roster-row '+(row.selected?'selected':'')} key={person.key}>
                 <label className="evt-person-toggle"><input type="checkbox" checked={row.selected} onChange={(e)=>setPerson(person,{selected:e.target.checked})}/><span className="evt-avatar" aria-hidden="true">{icon(person.type)}</span><span className="evt-person-text"><strong>{person.name}</strong><small>{person.householdName} · {personCategory(person)}{participating.has(person.key)?' · Déjà inscrit':''}</small></span></label>
                 <input className="evt-money-input" inputMode="decimal" aria-label={'Montant pour '+person.name} value={row.amount} placeholder="0,00" onChange={(e)=>setPerson(person,{selected:true,amount:e.target.value})}/>
@@ -259,7 +264,7 @@ export default function EventTreasury({ data, onReload, user }) {
                 {group.charges.map((charge)=>{
                   const isDue=charge.dueCents>0&&charge.status==='open'
                   const owner=byKey[charge.personKey]
-                  const canMember=owner && dueMembership(owner,data.subscriptions || [],fee).allowed
+                  const canMember=owner && dueMembership(owner,data.subscriptions || [],fee,data.charges || [],chosenId).allowed
                   return <div className={'evt-charge '+(!isDue?'paid':'')} key={charge.id}>
                     <label className="evt-charge-check"><input type="checkbox" aria-label={'Encaisser '+charge.label+' pour '+charge.personName} checked={isDue&&checked[charge.id]!==false} disabled={!isDue} onChange={(e)=>setChecked((p)=>({...p,[charge.id]:e.target.checked}))}/>
                       <span className="evt-charge-details"><strong>{charge.personName} · {charge.label}</strong><small>{charge.category==='membership'?'Cotisation':categories.find(([id])=>id===charge.category)?.[1] || charge.category} · {money(charge.amount_cents)} facturé{charge.paidCents>0?' · '+money(charge.paidCents)+' payé':''}</small></span></label>
@@ -269,7 +274,7 @@ export default function EventTreasury({ data, onReload, user }) {
                 })}
               </div>
               {group.people.length>0 && <div className="evt-person-pills">{group.people.map((p)=>{
-                const membership=dueMembership(p,data.subscriptions || [],fee)
+                const membership=dueMembership(p,data.subscriptions || [],fee,data.charges || [],chosenId)
                 return <span className="evt-person-pill" key={p.key}><strong>{p.name.replace(' (ancienne fiche)','')}</strong><small>{p.type==='child'?'Enfant':p.amicaliste?'Amicaliste':membership.note}</small>
                   <button type="button" disabled={busy} onClick={()=>setQuick({personKey:p.key,amount:'',category:'activity',label:'Participation · '+activeEvent.title,membership:false})}>＋ Dette</button>
                   {membership.allowed&&<button type="button" disabled={busy} onClick={()=>addMembership(p)}>＋ Cotisation</button>}
