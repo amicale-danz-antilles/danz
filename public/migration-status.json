@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "updated_on": "2026-09-24",
+  "heading": "Migration progressive vers Nhost",
+  "phase": "Développement et essais fictifs",
+  "production": {
+    "provider": "Supabase",
+    "unchanged": true,
+    "real_data_migrated": false,
+    "cutover_complete": false
+  },
+  "target": {
+    "provider": "Nhost",
+    "environment": "Projet d'essai — us-east-1",
+    "real_data_allowed": false
+  },
+  "overview": "La version actuelle de DANZ reste sur Supabase. Le projet Nhost américain n'accueille que les essais fictifs ; aucune donnée réelle n'y a été importée.",
+  "milestones": [
+    {
+      "id": "connectivity",
+      "title": "Accès depuis le réseau professionnel",
+      "state": "validated",
+      "detail": "Authentification HTTP 200, GraphQL POST HTTP 200 et stockage joignable (403 attendu sans connexion).",
+      "evidence": "https://amicale-danz-antilles.github.io/danz/diagnostic-nhost.html"
+    },
+    {
+      "id": "fictitious_users",
+      "title": "Deux comptes et permissions fictives",
+      "state": "validated",
+      "detail": "Connexion, création, lecture, suppression et contrôle d'isolation déclarés réussis par l'administrateur ; ils portent uniquement sur la table de test.",
+      "evidence": "https://amicale-danz-antilles.github.io/danz/nhost-sandbox.html"
+    },
+    {
+      "id": "progress",
+      "title": "Suivi de migration intégré à DANZ",
+      "state": "validated",
+      "detail": "Tableau de bord administrateur et consultation statique du suivi ; mise à jour lors des publications GitHub, pas en temps réel.",
+      "evidence": "https://github.com/amicale-danz-antilles/danz/tree/main/docs/nhost-sandbox"
+    },
+    {
+      "id": "data_model",
+      "title": "Schéma complet et permissions Nhost",
+      "state": "in_progress",
+      "detail": "Inventaire Supabase réalisé (29 tables). Modèle fictif des foyers et paiements préparé ; déploiement et recette encore à réaliser.",
+      "evidence": "https://github.com/amicale-danz-antilles/danz/tree/main/docs/nhost-sandbox"
+    },
+    {
+      "id": "identity",
+      "title": "Import des comptes sans réinitialisation",
+      "state": "pending",
+      "detail": "Essai d'import bcrypt avec un compte exclusivement fictif, reprise des identifiants et test de connexion encore à réaliser."
+    },
+    {
+      "id": "media",
+      "title": "Fichiers, R2 et fonctions serveur",
+      "state": "pending",
+      "detail": "Vérifier les fichiers privés authentifiés, les fonctions, les notifications et l'accès R2 depuis le poste professionnel."
+    },
+    {
+      "id": "application",
+      "title": "Toutes les fonctionnalités sur Nhost",
+      "state": "pending",
+      "detail": "Adapter les appels Supabase vers Nhost sur une branche de recette, puis tester administration, recensements, foyers et trésorerie."
+    },
+    {
+      "id": "region",
+      "title": "Hébergement définitif et conformité",
+      "state": "blocked",
+      "detail": "Choisir une région et des conditions contractuelles approuvées avant toute importation de données réelles ; retester son accès réseau."
+    },
+    {
+      "id": "reconciliation",
+      "title": "Sauvegarde et comparaison sans pertes",
+      "state": "pending",
+      "detail": "Valider un export restaurable, comparer tables, UUID, relations, totaux financiers et fichiers entre source et cible."
+    },
+    {
+      "id": "cutover",
+      "title": "Basculement et retour arrière",
+      "state": "pending",
+      "detail": "Prévoir un gel court des écritures, une dernière synchronisation, les tests de production et la possibilité de revenir sur Supabase."
+    }
+  ],
+  "gates": {
+    "approved_region": false,
+    "restore_tested": false,
+    "fake_auth_import_passed": false,
+    "target_permissions_audited": false,
+    "storage_and_functions_passed": false,
+    "app_acceptance_passed": false,
+    "inventories_match": false,
+    "final_source_freeze": false,
+    "production_cutover_authorized": false
+  },
+  "notes": [
+    "Les états publiés représentent des contrôles documentés, pas un pourcentage de données transférées.",
+    "Le suivi public ne contient ni compte utilisateur, ni courriel, ni information financière, ni secret."
+  ]
+}
