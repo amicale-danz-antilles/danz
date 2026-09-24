@@ -99,3 +99,33 @@ button.tv2-metric{cursor:pointer}
 @media(max-width:1100px){.tv2-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.tv2-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:800px){.tv2-balances{grid-template-columns:repeat(2,minmax(0,1fr))}.tv2-total{grid-column:span 2}.tv2-two-cols{grid-template-columns:1fr}.tv2-page-title{padding:1rem}.tv2-role{font-size:.7rem}}
 @media(max-width:520px){.tv2-balances,.tv2-metric-grid,.tv2-field-grid,.tv2-filters{grid-template-columns:1fr}.tv2-total{grid-column:auto}.tv2-balance{padding:1rem}.tv2-panel{padding:.9rem}.tv2-page-title{border-radius:15px}.tv2-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.tv2-actions button:last-child{grid-column:span 2}.tv2-operation{flex-wrap:wrap}.tv2-operation-amount{margin-left:auto}.tv2-receipt{margin-left:auto}.tv2-advance label{width:100%}.tv2-advance .primary-button{width:100%}.tv2-debt{align-items:flex-start}}
+
+/* Vue financière dense, adaptée aux listes de plusieurs dizaines de personnes. */
+.tv2-person-panel{gap:.65rem}
+.tv2-person-table-head,.tv2-person-row{display:grid;grid-template-columns:minmax(170px,2fr) minmax(100px,1fr) minmax(98px,1fr) minmax(108px,1fr) 14px;gap:.6rem;align-items:center}
+.tv2-person-table-head{background:#f2f8f6;padding:.43rem .6rem;font-size:.65rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#67807d}
+.tv2-person-row{border:0;border-bottom:1px solid #ebf1ef;border-radius:0;background:var(--surface,#fff);width:100%;text-align:left;padding:.4rem .6rem;min-height:45px;cursor:pointer;color:var(--tv2-ink)}
+.tv2-person-row:hover,.tv2-person-row.active{background:#eaf6f2}
+.tv2-person-name{display:grid;gap:.14rem;min-width:0}.tv2-person-name strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.78rem}.tv2-person-name small{font-size:.67rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.tv2-person-row .tv2-pill{justify-self:start;font-size:.63rem}.tv2-person-money{font-size:.8rem;font-variant-numeric:tabular-nums;font-weight:780}.tv2-person-money.due{color:#aa602e}
+.tv2-person-list{display:grid;gap:0;max-height:min(65vh,780px);overflow-y:auto}
+.tv2-person-detail{border-color:#9ac8ba}
+.tv2-person-detail h3{font-size:.88rem;color:#264b4a;margin:.65rem 0}
+.tv2-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.tv2-detail-grid>div{min-width:0}
+.tv2-detail-row{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;border-bottom:1px solid #e8f0ed;padding:.5rem 0}
+.tv2-detail-row>div{display:grid;gap:.18rem;flex:1;min-width:130px}.tv2-detail-row strong{font-size:.78rem}.tv2-detail-row small{font-size:.68rem;color:var(--muted)}
+.tv2-detail-row>b{font-size:.77rem;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tv2-detail-row>select{padding:.4rem;border:1px solid #d4e0db;border-radius:8px;font-size:.74rem}
+.tv2-mini-button{padding:.4rem .55rem;border:1px solid #c9dbd5;background:#fff;border-radius:9px;color:#27655d;font-size:.73rem;font-weight:750;cursor:pointer}
+.tv2-detail-actions,.tv2-section-actions{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.tv2-detail-actions{padding:.7rem 0;flex-wrap:wrap}
+.tv2-person-detail .tv2-form{padding:.65rem;background:#f8faf9;border-radius:11px}
+.tv2-person-detail .tv2-field-grid input,.tv2-person-detail .tv2-field-grid select{padding:.55rem}
+.tv2-operation{padding:.55rem 0}
+.tv2-operation-icon{width:31px;height:31px;border-radius:9px;font-size:1rem}
+.tv2-operation-details strong{font-size:.79rem}.tv2-operation-details small{font-size:.68rem}
+.tv2-balance{padding:1rem}.tv2-metric{padding:.78rem}.tv2-panel{padding:1rem}
+@media(max-width:930px){.tv2-detail-grid{grid-template-columns:1fr}}
+@media(max-width:650px){.tv2-person-table-head,.tv2-person-row{grid-template-columns:minmax(145px,2fr) minmax(75px,1fr) minmax(80px,1fr) 13px;gap:.35rem}.tv2-person-table-head span:nth-child(4),.tv2-person-row>span:nth-child(4){display:none}.tv2-person-row{padding:.4rem .25rem}.tv2-person-name strong{font-size:.75rem}.tv2-person-row .tv2-pill{font-size:.58rem}}
+@media(max-width:410px){.tv2-person-table-head,.tv2-person-row{grid-template-columns:minmax(128px,2fr) 1fr 12px}.tv2-person-table-head span:nth-child(2),.tv2-person-row>span:nth-child(2){display:none}}

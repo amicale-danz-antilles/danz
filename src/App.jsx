@@ -22,6 +22,7 @@ import OfflineBonsPlans from './pages/offline/OfflineBonsPlans.jsx'
 const Amicale = lazy(() => import('./pages/Amicale.jsx'))
 const AdminRequests = lazy(() => import('./pages/AdminRequests.jsx'))
 const AdminContent = lazy(() => import('./pages/AdminContent.jsx'))
+const AdminDirectory = lazy(() => import('./pages/AdminDirectory.jsx'))
 const AdminUsers = lazy(() => import('./pages/AdminUsers.jsx'))
 const AdminTreasury = lazy(() => import('./pages/AdminTreasury.jsx'))
 const AdminBackup = lazy(() => import('./pages/AdminBackup.jsx'))
@@ -73,7 +74,8 @@ export default function App() {
       <Route path="amicale" element={<Navigate to="/" replace />} />
 
       <Route path="administration" element={adminOnline(<AdminRequests />)} />
-      <Route path="administration/utilisateurs" element={adminOnline(<AdminUsers />)} />
+      <Route path="administration/utilisateurs" element={adminOnline(<AdminDirectory />)} />
+      <Route path="administration/utilisateurs/gestion" element={adminOnline(<AdminUsers />)} />
       <Route path="administration/tresorerie" element={adminOnline(<AdminTreasury />)} />
       <Route path="administration/sauvegardes" element={adminOnline(<AdminBackup />)} />
       <Route path="administration/systeme" element={adminOnline(<AdminSystemStatus />)} />
@@ -83,7 +85,7 @@ export default function App() {
       <Route path="administration/bons-plans" element={adminOnline(<BonsPlans />)} />
       <Route path="administration/sondages" element={adminOnline(<Sondages />)} />
       <Route path="administration/bureau" element={adminOnline(<Amicale />)} />
-      <Route path="administration/demandes" element={<Navigate to="/administration" replace />} />
+      <Route path="administration/demandes" element={<Navigate to="/administration/utilisateurs" replace />} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>

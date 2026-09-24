@@ -9,9 +9,9 @@ import '../treasury-v2.css'
 const TABS = [
   ['overview', 'Vue d’ensemble'],
   ['operations', 'Opérations'],
-  ['memberships', 'Cotisations'],
-  ['advanced', 'Foyers & gestion avancée'],
-  ['settings', 'Réglages'],
+  ['memberships', 'Cotisations & dettes'],
+  ['advanced', 'Gestion avancée'],
+  ['settings', 'Mes comptes & export'],
 ]
 
 export default function AdminTreasury() {
