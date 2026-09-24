@@ -178,9 +178,9 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
   const selectedMember = roster.find((p) => p.personType + ':' + p.personId === selectedPerson)
   const relatedCharges = selectedMember ? charges.filter((c) => c.status === 'open' && c.household_id === selectedMember.household_id && (
     selectedMember.personType === 'offline' ? c.offline_person_id === selectedMember.id
-      : c.user_id === selectedMember.id || householdMembers.some((m) => m.id === c.household_member_id && m.user_id === selectedMember.id)
+      : c.user_id === selectedMember.id || (c.offline_person_id && offlineById[c.offline_person_id]?.linked_user_id === selectedMember.id) || householdMembers.some((m) => m.id === c.household_member_id && m.user_id === selectedMember.id)
   )) : []
-  const relatedAdvances = selectedMember ? entries.filter((e) => e.payment_method === 'personal_advance' && e.status === 'pending' && (selectedMember.personType === 'offline' ? e.advanced_by_offline === selectedMember.id : e.advanced_by === selectedMember.id)) : []
+  const relatedAdvances = selectedMember ? entries.filter((e) => e.payment_method === 'personal_advance' && e.status === 'pending' && (selectedMember.personType === 'offline' ? e.advanced_by_offline === selectedMember.id : e.advanced_by === selectedMember.id || (e.advanced_by_offline && offlineById[e.advanced_by_offline]?.linked_user_id === selectedMember.id))) : []
   const memberChargeDue = relatedCharges.reduce((s,c) => s + chargeResidualCents(c, allocations, payments), 0)
   const addDirectCharge = (event) => {
     event.preventDefault()
@@ -391,7 +391,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
         <section className="tv2-panel"><div className="tv2-section-heading"><div><span className="tv2-eyebrow">À traiter</span><h2>Mes priorités</h2></div></div>
           {pendingPayments.length === 0 && pendingAdvances.length === 0 && dueTotal === 0 ? <p className="tv2-empty">Aucune opération urgente.</p> : <div className="tv2-priority-list">
             {pendingPayments.slice(0, 3).map((p) => <div key={p.id} className="tv2-priority"><div><strong>Virement · {householdById[p.household_id]?.name || 'Foyer'}</strong><small>{p.reference}</small></div><b>{formatMoney(p.amount_cents)}</b><button type="button" disabled={busy} onClick={() => confirmPayment(p)}>Confirmer</button></div>)}
-            {pendingAdvances.slice(0, 3).map((e) => <div key={e.id} className="tv2-priority"><div><strong>Rembourser · {e.label}</strong><small>{profileById[e.advanced_by]?.full_name || offlineById[e.advanced_by_offline]?.display_name || 'Membre'}</small></div><b>{formatMoney(e.amount_cents)}</b><button type="button" onClick={() => onView('operations')}>Voir</button></div>)}
+            {pendingAdvances.slice(0, 3).map((e) => <div key={e.id} className="tv2-priority"><div><strong>Rembourser · {e.label}</strong><small>{profileById[e.advanced_by]?.full_name || profileById[offlineById[e.advanced_by_offline]?.linked_user_id]?.full_name || offlineById[e.advanced_by_offline]?.display_name || 'Membre'}</small></div><b>{formatMoney(e.amount_cents)}</b><button type="button" onClick={() => onView('operations')}>Voir</button></div>)}
             {dueTotal > 0 && <div className="tv2-priority"><div><strong>Dettes des foyers</strong><small>Relances et espèces</small></div><b>{formatMoney(dueTotal)}</b><button type="button" onClick={() => onView('memberships')}>Voir</button></div>}
           </div>}
         </section>
@@ -427,7 +427,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
         <div className="tv2-person-table-head"><span>Personne</span><span>Cotisation</span><span>Dette foyer</span><span>À rembourser</span><span></span></div>
         <div className="tv2-person-list">{roster.map((p) => {
           const indebted = dueByHousehold[p.household_id] || 0
-          const outstandingAdvances = pendingAdvances.filter((e) => p.personType === 'offline' ? e.advanced_by_offline === p.id : e.advanced_by === p.id)
+          const outstandingAdvances = pendingAdvances.filter((e) => p.personType === 'offline' ? e.advanced_by_offline === p.id : e.advanced_by === p.id || (e.advanced_by_offline && offlineById[e.advanced_by_offline]?.linked_user_id === p.id))
           const advanceDue = outstandingAdvances.reduce((s,e) => s + e.amount_cents, 0)
           const valid = p.personType === 'offline' ? p.is_amicaliste && p.membership_valid_until >= localDay() : effectiveAmicaliste(p)
           return <button key={p.personType + p.personId} type="button" className={'tv2-person-row ' + (selectedPerson === p.personType + ':' + p.personId ? 'active' : '')} onClick={() => { setSelectedPerson(p.personType + ':' + p.personId); setChargeDraft({label:'',amount:'',category:'other',event_id:''}) }}>
