@@ -60,7 +60,7 @@ export default function AdminDirectory() {
   const householdNames = Object.fromEntries(households.map((h) => [h.id, h.name]))
   const pending = requests.filter((r) => r.status === 'pending')
   const registered = profiles.filter((p) => p.active)
-  const inactive = profiles.filter((p) => !p.active)
+  const inactive = profiles.filter((p) => !p.active && !pending.some((request) => request.auth_user_id === p.id))
   const notRegistered = offline.filter((p) => !p.linked_user_id)
   const archived = requests.filter((r) => r.status === 'rejected')
   const linkedIds = new Set(offline.map((p) => p.linked_user_id).filter(Boolean))
