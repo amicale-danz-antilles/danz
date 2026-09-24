@@ -82,9 +82,9 @@ export default function EventTreasury({ data, onReload, user }) {
   const switchEvent = (id) => {
     setChosenEventId(id);setDraft({});setQuery('');setHouseholdFilter('');setChecked({});setQuick(null);setError('');setNotice('')
   }
-  const applyGlobal = () => setDraft((prev) => Object.fromEntries(Object.entries(prev).map(([key,row]) => [
-    key,row.selected ? [key,{...row,amount:globalAmount}] : [key,row]
-  ]).map(([key,row]) => [key,row])))
+  const applyGlobal = () => setDraft((prev) => Object.fromEntries(
+    Object.entries(prev).map(([key,row]) => [key,row.selected ? {...row,amount:globalAmount} : row])
+  ))
   const selectVisible = (value) => setDraft((prev) => {
     const next={...prev}
     for (const p of filteredPeople) next[p.key]={selected:value,amount:amountFor(p,activeEvent,globalAmount),membership:false,...prev[p.key],selected:value}
