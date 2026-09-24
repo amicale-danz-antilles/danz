@@ -28,6 +28,8 @@ jobs:
         env:
           VITE_SUPABASE_URL: https://axewfeanyfxkzercafen.supabase.co
           VITE_SUPABASE_ANON_KEY: sb_publishable_MknXpC-LmMbjHfv2ALiVag_km2DNMMw
+      - name: Tester les soldes banque, caisse et transferts
+        run: npm run test:treasury
       - name: Vérifier les fichiers de production
         run: npm run verify:production
       - name: Audit des dépendances

@@ -128,6 +128,7 @@ export function AuthProvider({ children }) {
     user: session?.user ?? null,
     profile,
     isAdmin: profile?.role === 'admin' && profile?.active === true,
+    isTreasurer: profile?.role === 'admin' && profile?.active === true && profile?.is_treasurer === true,
     hasAccess: profile?.active === true,
     loading,
     configured: isSupabaseConfigured,
