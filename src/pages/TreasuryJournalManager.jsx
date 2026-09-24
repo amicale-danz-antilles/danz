@@ -47,7 +47,7 @@ export default function TreasuryJournalManager({data,onReload,onReceipt}) {
   }).sort((a,b)=>new Date(b.occurred_at)-new Date(a.occurred_at) || Number(b.source_row||0)-Number(a.source_row||0))
   const unassigned=entries.filter((e)=>e.payment_method==='unassigned'&&e.status==='settled')
   const lastImport=(data.importBatches||[])[0]
-  const getCategory=(e)=>e.category || (e.kind==='income'?'autre':'autre')
+  const getCategory=(e)=>e.category ?? null
   const params=(e,changes={})=>({
     p_id:e.id,p_label:e.label,p_note:e.note || '',p_category:getCategory(e),
     p_method:e.payment_method,...personIds(personKey(e)),p_amount_cents:Number(e.amount_cents),
@@ -73,7 +73,7 @@ export default function TreasuryJournalManager({data,onReload,onReceipt}) {
   }
   const open=(e)=>{
     setError('');setNotice('')
-    setEditing({...e,editLabel:e.label,editNote:e.note||'',editCategory:getCategory(e),
+    setEditing({...e,editLabel:e.label,editNote:e.note||'',editCategory:getCategory(e)||'autre',
       editAmount:(e.amount_cents/100).toFixed(2).replace('.',','),editMethod:e.payment_method,
       editPerson:personKey(e),editDate:day(e.occurred_at),editEvent:e.event_id||''})
   }
@@ -84,9 +84,9 @@ export default function TreasuryJournalManager({data,onReload,onReceipt}) {
     const value=cents(editing.editAmount)
     if(!Number.isSafeInteger(value)||value<=0){setError('Montant invalide : deux décimales maximum.');return}
     const changes={
-      p_label:editing.editLabel.trim(),p_note:editing.editNote,p_category:editing.editCategory,
+      p_label:editing.editLabel.trim(),p_note:editing.editNote,p_category:linked?editing.category:editing.editCategory,
       p_method:editing.editMethod,p_amount_cents:value,p_occurred_on:editing.editDate,
-      p_event_id:editing.editEvent || null,...personIds(editing.editPerson)
+      p_event_id:linked?(editing.event_id||null):(editing.editEvent||null),...personIds(linked?personKey(editing):editing.editPerson)
     }
     const ok=await run(editing.id,params(editing,changes),'Écriture corrigée et modification enregistrée dans l’historique.')
     if(ok)setEditing(null)
