@@ -129,3 +129,25 @@ end;
 $$;
 revoke all on function public.admin_link_offline_person(uuid,uuid) from public, anon;
 grant execute on function public.admin_link_offline_person(uuid,uuid) to authenticated;
+
+-- Le titulaire de la trésorerie ne peut pas être supprimé, suspendu ou déclassé
+-- depuis les outils de gestion des comptes.
+create or replace function private.protect_treasurer_profile() returns trigger
+language plpgsql set search_path = ''
+as $$
+begin
+  if tg_op = 'DELETE' then
+    if old.is_treasurer then
+      raise exception 'Le compte du trésorier titulaire doit être transféré avant suppression.';
+    end if;
+    return old;
+  end if;
+  if old.is_treasurer and (new.role <> 'admin' or new.active is not true or new.is_treasurer is not true) then
+    raise exception 'Le trésorier titulaire doit conserver un compte administrateur actif.';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists protect_treasurer_profile on public.profiles;
+create trigger protect_treasurer_profile before update or delete on public.profiles
+  for each row execute function private.protect_treasurer_profile();
