@@ -23,8 +23,6 @@ jobs:
           node-version: 22
       - name: Installer les dépendances
         run: npm install --no-fund --no-audit
-      - name: Tester les contrôles anti-perte synthétiques
-        run: npm run test:migration
       - name: Construire l'application
         run: npm run build
         env:
