@@ -1,0 +1,13 @@
+# Assistant privé DANZ (V32)
+
+Accès : réservé au compte personnel désigné dans private.danz_assistant_owner ET au rôle de trésorier actif. Aucun autre administrateur ou membre ne peut ouvrir l'interface ni appeler la fonction. Vérification en base à chaque requête.
+
+Déploiement : la migration 20260925_danz_private_assistant_v32.sql est déjà appliquée sur le Supabase de production. La fonction Edge "danz-assistant" est déployée séparément avec verify_jwt=true. Clé OPENAI_API_KEY : ajouter dans Supabase > Edge Functions > Secrets. Ne jamais mettre cette clé dans Vite, GitHub Pages, localStorage, le dépôt ou la conversation. Le modèle par défaut est gpt-4.1-mini; OPENAI_MODEL peut le remplacer.
+
+Architecture : à chaque message, vérifier la session avec Supabase Auth, le rôle actif et l'inscription nominative, limiter les requêtes, préparer une vue minimale des données, appeler le modèle côté serveur. Le modèle peut seulement proposer une action parmi une liste blanche. Chaque proposition est nettoyée/vérifiée côté serveur et enregistrée comme pending avec expiration sous 15 minutes. L'exécution se fait exclusivement par un second appel confirm avec identifiant opaque de l'action, revalidation du titulaire et des contraintes métier, puis traçabilité admin_audit_log. Les écritures comptables utilisent les RPC existantes, jamais une écriture directe non auditée. L'interface n'enregistre aucune conversation personnelle dans un stockage persistant.
+
+Actions : créer/corriger des actualités et événements, changer le nom de l'association et le tarif de cotisation, changer la couleur principale et le sous-titre d'accueil, mettre à jour le bureau, modifier/annuler des écritures et transferts, rectifier les coordonnées de membres sans changer leurs droits, créer une demande technique validée. Les modifications de code et de structure nécessitent un développement GitHub, des tests et une publication ultérieure : une demande technique confirmée n'exécute PAS du code librement.
+
+La consultation de la trésorerie est exclusivement fondée sur les données internes : elle ne constitue ni un accès bancaire Revolut en direct ni une promesse de virement. Les écritures Excel 'unassigned' restent à ventiler manuellement. Les cotisations déjà liées restent protégées par les RPC métier.
+
+Tests manuels : autre administrateur -> navigation absente et RPC false; titulaire -> assistant visible. Sans clé OPENAI_API_KEY -> bandeau de configuration; clé ajoutée -> questions/réponses en français. Tester une proposition de modification, la refuser, en créer une autre, la confirmer une seule fois, constater l'audit et l'apparition sur le site. Contrôler également un compte expiré et une proposition périmée.
