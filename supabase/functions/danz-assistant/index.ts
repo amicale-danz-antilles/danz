@@ -220,7 +220,7 @@ async function snapshot(query) {
     "Les modifications de code nécessitent une demande technique puis un développement testé distinct."
   ]};
   const requests=[
-    admin.from("news").select("id,title,summary,content,published,publish_at,audience").order("created_at",{ascending:false}).limit(18),
+    admin.from("news").select("id,title,summary,content,published,publish_at,audience").order("publish_at",{ascending:false}).limit(18),
     admin.from("events").select("id,title,description,starts_at,ends_at,location,published,audience").order("starts_at",{ascending:false}).limit(24),
     admin.from("bureau_members").select("role_key,role_label,full_name").order("sort_order"),
     admin.from("association_settings").select("association_name,membership_fee_cents,child_age_categories").eq("id",1).single(),
