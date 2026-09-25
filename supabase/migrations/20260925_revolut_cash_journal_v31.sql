@@ -95,7 +95,8 @@ begin
   if not found then raise exception 'Transfert introuvable.'; end if;
   if p_action='update' then
     if v_old.cancelled_at is not null then raise exception 'Restaurez le transfert avant de le modifier.'; end if;
-    if p_from_account not in ('bank','cash') or p_to_account not in ('bank','cash')
+    if p_from_account is null or p_to_account is null or p_amount_cents is null
+      or p_from_account not in ('bank','cash') or p_to_account not in ('bank','cash')
       or p_from_account=p_to_account or p_amount_cents not between 1 and 100000000
       or p_occurred_on is null or p_occurred_on>current_date
       or char_length(coalesce(p_note,''))>1000 then
