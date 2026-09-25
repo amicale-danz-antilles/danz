@@ -59,3 +59,25 @@ test('import Excel : le solde confirmé reste à affecter sans être attribué a
   assert.deepEqual(ledgerBalances(excelOpening,imported,[],new Date('2026-09-25T00:00:00Z')),
     {bank:120750,cash:-42155,unassigned:11540})
 })
+
+test('un transfert annulé ne modifie plus la poche Revolut ou la caisse', () => {
+  const movements = [
+    { id: 'v1', from_account: 'bank', to_account: 'cash', amount_cents: 5000, occurred_at: '2026-09-25T10:00:00Z', cancelled_at: '2026-09-25T12:00:00Z' },
+    { id: 'v2', from_account: 'cash', to_account: 'bank', amount_cents: 1200, occurred_at: '2026-09-25T11:00:00Z', cancelled_at: null }
+  ]
+  assert.deepEqual(ledgerBalances(opening, [], movements, at), { bank: 91200, cash: 10800, unassigned: 0 })
+  movements[0].cancelled_at = null // Restauration
+  assert.deepEqual(ledgerBalances(opening, [], movements, at), { bank: 86200, cash: 15800, unassigned: 0 })
+})
+
+test('une sortie annulée reste au journal sans débiter le compte ni altérer la source Excel', () => {
+  const excel = { bank_cents: 0, cash_cents: 0, unassigned_cents: 11540, as_of: '2026-06-13T00:00:00Z' }
+  const income = entry('income', 'unassigned', 120750, '2026-09-22T12:00:00Z')
+  const expense = entry('expense', 'unassigned', 42155, '2026-09-24T12:00:00Z')
+  const amount = ledgerBalances(excel, [income, expense], [], at)
+  assert.equal(amount.bank + amount.cash + amount.unassigned, 90135)
+  expense.status = 'cancelled'
+  assert.equal(ledgerBalances(excel, [income, expense], [], at).unassigned, 132290)
+  expense.status = 'settled' // Restauration
+  assert.equal(ledgerBalances(excel, [income, expense], [], at).unassigned, 90135)
+})
