@@ -30,6 +30,8 @@ jobs:
           VITE_SUPABASE_ANON_KEY: sb_publishable_MknXpC-LmMbjHfv2ALiVag_km2DNMMw
       - name: Tester les soldes banque, caisse et transferts
         run: npm run test:treasury
+      - name: Vérifier la requête du chatbot
+        run: node --test scripts/assistant-query.test.mjs
       - name: Vérifier les fichiers de production
         run: npm run verify:production
       - name: Audit des dépendances
