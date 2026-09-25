@@ -161,7 +161,7 @@ export default function EventTreasury({ data, onReload, user }) {
     const unpaid=group.charges.filter((c)=>c.status==='open'&&c.dueCents>0&&checked[c.id]!==false)
     if(!unpaid.length){setError('Cochez au moins une dette de ce foyer.');return}
     const total=unpaid.reduce((sum,row)=>sum+row.dueCents,0)
-    const account=method==='cash'?'la caisse (liquide)':'le compte bancaire'
+    const account=method==='cash'?'la caisse (liquide)':'Revolut'
     if(!window.confirm('Confirmer le règlement réel de '+money(total)+' par le foyer « '+group.name+' » sur '+account+' ? Seules les dettes cochées seront réglées.'))return
     execute(async()=>{
       const {error:e}=await supabase.rpc('treasury_collect_event',{
@@ -288,13 +288,13 @@ export default function EventTreasury({ data, onReload, user }) {
                 <button type="submit" className="primary-button" disabled={busy}>Ajouter</button>
                 <button type="button" className="ghost-button" onClick={()=>setQuick(null)}>Annuler</button>
               </form>}
-              {dueCharges.length>0 && <div className="evt-pay-footer"><span><strong>{toPay.length} dette{toPay.length>1?'s':''} cochée{toPay.length>1?'s':''}</strong><b>{money(selectedTotal)}</b></span><button type="button" disabled={!toPay.length||busy} className="evt-pay-cash" onClick={()=>collect(group,'cash')}>✓ Reçu en caisse</button><button type="button" disabled={!toPay.length||busy} className="evt-pay-bank" onClick={()=>collect(group,'bank_transfer')}>✓ Reçu sur compte bancaire</button></div>}
+              {dueCharges.length>0 && <div className="evt-pay-footer"><span><strong>{toPay.length} dette{toPay.length>1?'s':''} cochée{toPay.length>1?'s':''}</strong><b>{money(selectedTotal)}</b></span><button type="button" disabled={!toPay.length||busy} className="evt-pay-cash" onClick={()=>collect(group,'cash')}>✓ Reçu en caisse</button><button type="button" disabled={!toPay.length||busy} className="evt-pay-bank" onClick={()=>collect(group,'bank_transfer')}>✓ Reçu sur Revolut</button></div>}
               {!group.charges.length && <p className="tv2-hint">Présence enregistrée, aucune dépense attribuée pour le moment.</p>}
             </div>}
           </article>
         })}
       </section>
-      <div className="evt-footer-note">Les charges et les paiements apparaissent aussi dans « Cotisations & dettes », les comptes banque/caisse et la sauvegarde Excel complète. Les paiements bancaires ne sont confirmés qu’après réception effective.</div>
+      <div className="evt-footer-note">Les charges et les paiements apparaissent aussi dans « Cotisations & dettes », les comptes Revolut/caisse et la sauvegarde Excel complète. Les paiements bancaires ne sont confirmés qu’après réception effective.</div>
     </>}
   </div>
 }
