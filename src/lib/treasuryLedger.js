@@ -24,6 +24,7 @@ export function ledgerBalances(opening, entries = [], transfers = [], at = new D
     balance[accountFor(entry)] += signedCents(entry)
   }
   for (const transfer of transfers) {
+    if (transfer.cancelled_at) continue
     const date = new Date(transfer.occurred_at).getTime()
     if (!Number.isFinite(date) || date <= from || date > until) continue
     balance[transfer.from_account] -= Number(transfer.amount_cents)
