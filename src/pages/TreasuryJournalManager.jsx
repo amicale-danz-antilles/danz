@@ -39,7 +39,7 @@ const transferArgs = (transfer, action, reason = null) => ({
 
 export default function TreasuryJournalManager({ data, onReload, onReceipt }) {
   const [query, setQuery] = useState('')
-  const [mode, setMode] = useState('unassigned')
+  const [mode, setMode] = useState('all')
   const [editing, setEditing] = useState(null)
   const [cancelling, setCancelling] = useState(null)
   const [cancelReason, setCancelReason] = useState('')
