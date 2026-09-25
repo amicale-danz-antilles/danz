@@ -8,7 +8,7 @@ import TreasuryJournalManager from './TreasuryJournalManager.jsx'
 
 const EXPENSE_CATEGORIES = {
   courses: 'Courses & alimentation', evenement: 'Événement & réception', materiel: 'Matériel',
-  transport: 'Transport', frais_bancaires: 'Frais bancaires', fonctionnement: 'Fonctionnement', autre: 'Autre dépense',
+  transport: 'Transport', frais_bancaires: 'Frais Revolut', fonctionnement: 'Fonctionnement', autre: 'Autre dépense',
 }
 const INCOME_CATEGORIES = { don: 'Don', subvention: 'Subvention', evenement: 'Recette d’événement', autre: 'Autre recette' }
 const METHOD_NAMES = { cash: 'Espèces', card: 'Revolut · carte', bank_transfer: 'Revolut · virement', personal_advance: 'Avance personnelle', unassigned: 'À répartir (Excel)' }
@@ -78,7 +78,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
   const [exporting, setExporting] = useState(false)
 
   async function reload() {
-    const [entries, transfers, households, members, profiles, charges, payments, allocations, subscriptions, events, offline, eventParticipants, importBatches, importArchive, openingResult, settingsResult] = await Promise.all([
+    const [entries, transfers, households, members, profiles, charges, payments, allocations, subscriptions, events, offline, eventParticipants, importBatches, importArchive, audit, openingResult, settingsResult] = await Promise.all([
       fetchAll('treasury_entries', 'occurred_at'),
       fetchAll('treasury_transfers', 'occurred_at'),
       fetchAll('households', 'name'),
@@ -93,12 +93,13 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
       fetchAll('treasury_event_participants'),
       fetchAll('treasury_import_batches', 'imported_at'),
       fetchAll('treasury_import_archive_lines', 'source_row'),
+      fetchAll('admin_audit_log', 'created_at'),
       supabase.from('treasury_opening').select('*').eq('id', 1).maybeSingle(),
       supabase.from('association_settings').select('*').eq('id', 1).single(),
     ])
     if (openingResult.error) throw openingResult.error
     if (settingsResult.error) throw settingsResult.error
-    setData({ entries, transfers, households, members, profiles, charges, payments, allocations, subscriptions, events, offline, eventParticipants, importBatches, importArchive, opening: openingResult.data, settings: settingsResult.data })
+    setData({ entries, transfers, households, members, profiles, charges, payments, allocations, subscriptions, events, offline, eventParticipants, importBatches, importArchive, audit, opening: openingResult.data, settings: settingsResult.data })
     setOpeningDraft({ bank: openingResult.data ? String(openingResult.data.bank_cents / 100) : '', cash: openingResult.data ? String(openingResult.data.cash_cents / 100) : '' })
   }
 
@@ -148,7 +149,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
 
   const activity = [
     ...entries.map((e) => ({ ...e, type: 'entry', date: accountingDate(e), account: accountFor(e), signed: e.status === 'pending' || e.status === 'cancelled' ? 0 : signedCents(e) })),
-    ...transfers.map((t) => ({ ...t, type: 'transfer', date: t.occurred_at, account: t.from_account, signed: 0, label: 'Virement interne · ' + (t.from_account === 'bank' ? 'Revolut → Espèces' : 'Espèces → Revolut') })),
+    ...transfers.filter((t) => !t.cancelled_at).map((t) => ({ ...t, type: 'transfer', date: t.occurred_at, account: t.from_account, signed: 0, label: 'Virement interne · ' + (t.from_account === 'bank' ? 'Revolut → Espèces' : 'Espèces → Revolut') })),
   ].sort((a, b) => new Date(b.date) - new Date(a.date))
   const activityFiltered = activity.filter((e) => {
     const text = (e.label + ' ' + (e.note || '')).toLocaleLowerCase('fr-FR')
@@ -468,10 +469,10 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
       </section>
       {selectedMember && <section className="tv2-panel tv2-person-detail"><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Dossier financier individuel</span><h2>{selectedMember.display}</h2><p className="tv2-hint">Foyer : {householdById[selectedMember.household_id]?.name || 'Non renseigné'} · Cotisation {selectedMember.membership_valid_until ? 'valable jusqu’au ' + selectedMember.membership_valid_until : 'non renseignée'}</p></div><button type="button" className="tv2-close" aria-label="Fermer la fiche" onClick={() => setSelectedPerson(null)}>×</button></div>
         <div className="tv2-detail-grid"><div><h3>Cette personne doit à l’Amicale</h3>{relatedCharges.length ? relatedCharges.map((c) => <div className="tv2-detail-row" key={c.id}><div><strong>{c.label}</strong><small>{c.category} · {formattedDate(c.created_at)}</small></div><b>{formatMoney(chargeResidualCents(c,allocations,payments))}</b><button type="button" className="tv2-mini-button" disabled={busy} onClick={() => cancelDirectCharge(c)}>Annuler</button></div>) : <p className="tv2-empty">Aucune dette attribuée personnellement.</p>}
-          {memberChargeDue > 0 && <div className="tv2-detail-actions"><button type="button" className="ghost-button" disabled={busy} onClick={() => collectDirect('cash')}>Encaisser {formatMoney(memberChargeDue)} en espèces</button><button type="button" className="ghost-button" disabled={busy} onClick={() => collectDirect('bank_transfer')}>Reçu sur compte bancaire</button></div>}
+          {memberChargeDue > 0 && <div className="tv2-detail-actions"><button type="button" className="ghost-button" disabled={busy} onClick={() => collectDirect('cash')}>Encaisser {formatMoney(memberChargeDue)} en espèces</button><button type="button" className="ghost-button" disabled={busy} onClick={() => collectDirect('bank_transfer')}>Reçu sur Revolut</button></div>}
           <h3>Attribuer une dette</h3><form className="tv2-form" onSubmit={addDirectCharge}><div className="tv2-field-grid"><label>Libellé<input required value={chargeDraft.label} onChange={(e) => setChargeDraft({...chargeDraft,label:e.target.value})} placeholder="Repas, boissons, cotisation…" /></label><label>Montant (€)<input required inputMode="decimal" value={chargeDraft.amount} onChange={(e) => setChargeDraft({...chargeDraft,amount:e.target.value})} /></label></div><div className="tv2-field-grid"><label>Nature<select value={chargeDraft.category} onChange={(e) => setChargeDraft({...chargeDraft,category:e.target.value})}><option value="other">Autre</option><option value="membership">Cotisation</option><option value="meal">Repas</option><option value="drinks">Boissons</option><option value="activity">Sortie / activité</option><option value="adjustment">Régularisation</option></select></label><label>Événement<select value={chargeDraft.event_id} onChange={(e) => setChargeDraft({...chargeDraft,event_id:e.target.value})}><option value="">Sans événement</option>{data.events.map((e) => <option value={e.id} key={e.id}>{e.title}</option>)}</select></label></div><button type="submit" className="primary-button" disabled={busy}>Attribuer la dette</button></form>
           <p className="tv2-hint">Cotisation réglée : le statut d’un compte est activé automatiquement s’il existe un abonnement correspondant. Pour une fiche sans compte, le statut se règle dans Membres & accès.</p>
-        </div><div><h3>L’Amicale doit à cette personne</h3>{relatedAdvances.length ? relatedAdvances.map((e) => <div className="tv2-detail-row" key={e.id}><div><strong>{e.label}</strong><small>{e.note || 'Avance personnelle'} · {formattedDate(e.occurred_at)}</small></div><b>{formatMoney(e.amount_cents)}</b><select aria-label="Compte de remboursement" value={reimburseBy[e.id] || 'bank_transfer'} onChange={(evt) => setReimburseBy({...reimburseBy,[e.id]:evt.target.value})}><option value="bank_transfer">Banque</option><option value="cash">Caisse</option></select><button type="button" className="tv2-mini-button" disabled={busy} onClick={() => reimburse(e)}>Remboursé</button></div>) : <p className="tv2-empty">Aucune avance à rembourser.</p>}
+        </div><div><h3>L’Amicale doit à cette personne</h3>{relatedAdvances.length ? relatedAdvances.map((e) => <div className="tv2-detail-row" key={e.id}><div><strong>{e.label}</strong><small>{e.note || 'Avance personnelle'} · {formattedDate(e.occurred_at)}</small></div><b>{formatMoney(e.amount_cents)}</b><select aria-label="Compte de remboursement" value={reimburseBy[e.id] || 'bank_transfer'} onChange={(evt) => setReimburseBy({...reimburseBy,[e.id]:evt.target.value})}><option value="bank_transfer">Revolut</option><option value="cash">Caisse</option></select><button type="button" className="tv2-mini-button" disabled={busy} onClick={() => reimburse(e)}>Remboursé</button></div>) : <p className="tv2-empty">Aucune avance à rembourser.</p>}
           <button type="button" className="ghost-button" onClick={() => { setEntryForm({...defaultEntry(),payment_method:'personal_advance',advanced_by:selectedMember.personType === 'offline' ? 'offline:' + selectedMember.id : selectedMember.id}); setFormType('expense'); window.scrollTo({top:0,behavior:'smooth'}) }}>＋ Enregistrer son achat pour l’Amicale</button></div></div>
       </section>}
       <section className="tv2-panel"><div className="tv2-section-heading"><h2>Soldes non attribués des foyers</h2><button type="button" className="ghost-button" onClick={onAdvanced}>Gestion avancée des foyers</button></div><div className="tv2-list">{households.filter((h) => dueByHousehold[h.id] > 0).map((h) => <div className="tv2-list-row tv2-debt" key={h.id}><div><strong>{h.name}</strong><small>{charges.filter((c) => c.household_id === h.id && c.status === 'open' && !c.user_id && !c.offline_person_id && !c.household_member_id).length} charge(s) du foyer non attribuées</small></div><b>{formatMoney(dueByHousehold[h.id])}</b><button type="button" className="ghost-button" disabled={busy} onClick={() => collectCash(h)}>Encaisser tout en espèces</button></div>)}{dueTotal === 0 && <p className="tv2-empty">Tous les foyers sont à jour.</p>}</div></section>
@@ -493,7 +494,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
         <div className="tv2-list-row"><div><strong>Caisse (liquide)</strong><small>Solde {opening ? formatMoney(balances.cash) : 'à initialiser'}</small></div></div>
         {Boolean(opening?.import_batch_id)&&<div className="tv2-list-row"><div><strong>À ventiler (provisoire)</strong><small>{formatMoney(balances.unassigned)} · à attribuer aux deux comptes réels</small></div></div>}
         <div className="tv2-setting-actions"><button type="button" className="primary-button" disabled={exporting} onClick={exportFullExcel}>Sauvegarde complète Excel ↓</button><button type="button" className="ghost-button" onClick={() => onView('operations')}>Consulter / exporter le journal</button></div>
-        <p className="tv2-hint">La banque et la caisse sont suivies séparément. Les avances personnelles n’impactent aucun solde avant leur remboursement.</p>
+        <p className="tv2-hint">Revolut et la caisse sont suivis séparément. Les avances personnelles n’impactent aucun solde avant leur remboursement.</p>
       </section>
     </div>}
   </div>
