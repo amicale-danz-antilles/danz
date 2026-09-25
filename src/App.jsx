@@ -2,7 +2,6 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
-import AssistantEntry from './components/AssistantEntry.jsx'
 import { useAuth } from './context/AuthContext.jsx'
 import useOnlineStatus from './hooks/useOnlineStatus.js'
 import Login from './pages/Login.jsx'
@@ -58,7 +57,7 @@ function AdminOnly({ children }) {
 const adminOnline = (element) => <AdminOnly><OnlineOnly><Suspense fallback={<PageLoader />}>{element}</Suspense></OnlineOnly></AdminOnly>
 
 export default function App() {
-  return <><Routes>
+  return <Routes>
     <Route path="/connexion" element={<Login />} />
     <Route path="/confidentialite" element={<Privacy />} />
     <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
@@ -89,5 +88,5 @@ export default function App() {
       <Route path="administration/demandes" element={<Navigate to="/administration/utilisateurs" replace />} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes><AssistantEntry /></>
+  </Routes>
 }
