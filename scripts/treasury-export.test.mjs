@@ -4,7 +4,7 @@ import { strFromU8, unzipSync } from 'fflate'
 import { createFinancialXlsx, eur } from '../src/lib/treasuryXlsx.js'
 import { buildFinancialSheets } from '../src/lib/treasuryExport.js'
 
-test('un export Excel contient les 15 feuilles et toutes les écritures, même sans solde initial', () => {
+test('un export Excel contient les 16 feuilles et toutes les écritures, même sans solde initial', () => {
   const sheets = buildFinancialSheets({
     entries: [{ id: 'e1', label: '=2+3', kind: 'expense', status: 'pending', amount_cents: 1350, note: 'Courses', category: 'courses',
       payment_method: 'personal_advance', advanced_by_offline: 'o1', occurred_at: '2026-09-20T12:00:00Z', created_at: '2026-09-20T12:00:00Z' }],
@@ -16,14 +16,15 @@ test('un export Excel contient les 15 feuilles et toutes les écritures, même s
     charges: [{ id: 'c1', household_id: 'h1', offline_person_id: 'o1', status: 'open', event_id: 'event1', category: 'membership', label: 'Cotisation',
       amount_cents: 6000, created_at: '2026-09-20T12:00:00Z' }],
   }, new Date('2026-09-24T12:00:00Z'))
-  assert.equal(sheets.length, 15)
+  assert.equal(sheets.length, 16)
   assert.equal(sheets[0].name, 'Synthèse')
-  assert.equal(sheets[0].rows.find((r) => r[0] === 'Compte bancaire')[1], 'Non initialisé')
+  assert.equal(sheets[0].rows.find((r) => r[0] === 'Revolut')[1], 'Non initialisé')
   assert.equal(sheets[0].rows.find((r) => r[0] === 'Créances foyers')[1].euros, 60)
   assert.equal(sheets[0].rows.find((r) => r[0] === 'Avances à rembourser')[1].euros, 13.5)
   assert.equal(sheets.find((s) => s.name === 'Journal complet').rows.length, 1)
   assert.ok(sheets.some((s)=>s.name==='Reprises Excel'))
   assert.ok(sheets.some((s)=>s.name==='Archives BILAN'))
+  assert.ok(sheets.some((s)=>s.name==='Historique corrections'))
   const events=sheets.find((s)=>s.name==='Bilan par événement')
   assert.equal(events.rows.length,1)
   assert.equal(events.rows[0][0],'Soirée Time’s Up')
@@ -32,7 +33,7 @@ test('un export Excel contient les 15 feuilles et toutes les écritures, même s
   const details=sheets.find((s)=>s.name==='Détail par événement')
   assert.equal(details.rows[0][2],'Jean')
   const zip = unzipSync(createFinancialXlsx(sheets))
-  assert.equal(Object.keys(zip).filter((f) => /^xl\/worksheets\/sheet\d+.xml$/.test(f)).length, 15)
+  assert.equal(Object.keys(zip).filter((f) => /^xl\/worksheets\/sheet\d+.xml$/.test(f)).length, 16)
   const journal = strFromU8(zip['xl/worksheets/sheet2.xml'])
   assert.ok(journal.includes('=2+3'))
   assert.ok(!journal.includes('<f>')) // Ne jamais exécuter des libellés issus des utilisateurs en formule Excel.
@@ -66,5 +67,28 @@ test('la reprise Excel non ventilée est préservée dans les exports avec ses p
  const journal=sheets.find((s)=>s.name==='Journal complet')
  assert.ok(journal.headers.includes('Date Excel originale'))
  assert.ok(journal.rows.some((r)=>r.includes('2026-10-10')))
- assert.equal(unzipSync(createFinancialXlsx(sheets))['xl/worksheets/sheet15.xml']!==undefined,true)
+ assert.equal(unzipSync(createFinancialXlsx(sheets))['xl/worksheets/sheet16.xml']!==undefined,true)
+})
+
+test('une annulation et une correction Revolut restent traçables dans la sauvegarde de 16 feuilles',()=>{
+  const sheets=buildFinancialSheets({
+    opening:{as_of:'2026-09-22T00:00:00Z',bank_cents:25000,cash_cents:4000,unassigned_cents:0},
+    entries:[{id:'expense-1',label:'Doublon annulé',kind:'expense',status:'cancelled',
+      cancelled_previous_status:'settled',cancel_reason:'Saisie en double',cancelled_at:'2026-09-25T08:00:00Z',
+      amount_cents:1500,payment_method:'bank_transfer',occurred_at:'2026-09-23T11:00:00Z'}],
+    transfers:[{id:'transfer-1',amount_cents:4200,from_account:'bank',to_account:'cash',
+      occurred_at:'2026-09-24T10:00:00Z',cancelled_at:'2026-09-25T08:00:00Z',cancel_reason:'Transfert saisi deux fois'}],
+    audit:[{action:'treasury_entry_cancelled',actor_id:'treasurer',created_at:'2026-09-25T08:00:00Z',
+      details:{entry_id:'expense-1',reason:'Saisie en double'}}]
+  },new Date('2026-09-25T12:00:00Z'))
+  assert.equal(sheets.length,16)
+  const journal=sheets.find(s=>s.name==='Journal complet')
+  assert.ok(journal.headers.includes('Motif annulation'))
+  assert.ok(journal.rows[0].includes('Saisie en double'))
+  const transfers=sheets.find(s=>s.name==='Transferts internes')
+  assert.equal(transfers.rows[0].includes('Annulé'),true)
+  assert.equal(sheets.find(s=>s.name==='Historique corrections').rows.length,1)
+  assert.equal(sheets.find(s=>s.name==='Synthèse').rows.find(r=>r[0]==='Revolut')[1].euros,250)
+  const zip=unzipSync(createFinancialXlsx(sheets))
+  assert.ok(zip['xl/worksheets/sheet16.xml'])
 })
