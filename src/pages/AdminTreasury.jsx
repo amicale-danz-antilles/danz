@@ -9,7 +9,7 @@ import '../treasury-v2.css'
 const TABS = [
   ['overview', 'Vue d’ensemble'],
   ['events', 'Événements & dettes'],
-  ['operations', 'Opérations'],
+  ['operations', 'Journal Revolut & caisse'],
   ['memberships', 'Cotisations & dettes'],
   ['advanced', 'Gestion avancée'],
   ['settings', 'Mes comptes & export'],
@@ -43,7 +43,7 @@ export default function AdminTreasury() {
     <div className="tv2-hero">
       <span className="tv2-eyebrow">Accès réservé · Administration</span>
       <h1>Le bureau du trésorier</h1>
-      <p>Un espace privé pour les dépenses, les cotisations et les deux caisses de l’Amicale : banque et espèces.</p>
+      <p>Un espace privé pour les dépenses, les cotisations et les deux caisses de l’Amicale : Revolut et espèces.</p>
     </div>
     <section className="tv2-panel">
       <span className="tv2-eyebrow">Compte administrateur</span>
@@ -56,7 +56,7 @@ export default function AdminTreasury() {
 
   return <div className="treasury-v2">
     <header className="tv2-page-title">
-      <div><span className="tv2-eyebrow">Amicale DANZ · Accès nominatif</span><h1>Ma trésorerie</h1><p>Banque, espèces, cotisations et justificatifs au même endroit.</p></div>
+      <div><span className="tv2-eyebrow">Amicale DANZ · Accès nominatif</span><h1>Ma trésorerie</h1><p>Revolut, espèces, cotisations et justificatifs au même endroit.</p></div>
       <span className="tv2-role">Administrateur + Trésorier</span>
     </header>
     <nav className="tv2-tabs" aria-label="Sections de la trésorerie">
