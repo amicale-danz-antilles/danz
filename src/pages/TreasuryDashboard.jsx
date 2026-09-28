@@ -188,6 +188,16 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     ...profiles.filter((p) => p.active).map((p) => ({ ...p, personType: 'account', personId: p.id, display: p.full_name || p.email, household_id: householdMembers.find((m) => m.user_id === p.id)?.household_id })),
     ...offline.filter((p) => !p.linked_user_id).map((p) => ({ ...p, personType: 'offline', personId: p.id, display: p.display_name })),
   ].sort((a,b) => a.display.localeCompare(b.display, 'fr'))
+  const openDebtRows = charges
+    .filter((charge) => charge.status === 'open' && chargeResidualCents(charge, allocations, payments) > 0)
+    .map((charge) => {
+      const member = charge.household_member_id ? householdMembers.find((item) => item.id === charge.household_member_id) : null
+      const person = charge.offline_person_id ? offlineById[charge.offline_person_id] : charge.user_id ? profileById[charge.user_id] : member
+      const display = person?.display_name || person?.full_name || person?.email || householdById[charge.household_id]?.name || 'Foyer'
+      const event = (data.events || []).find((item) => item.id === charge.event_id)
+      return { charge, display, event, due: chargeResidualCents(charge, allocations, payments) }
+    })
+    .sort((a,b) => new Date(b.charge.created_at || 0) - new Date(a.charge.created_at || 0))
   const roster = allRoster.filter((p) => (p.display + ' ' + (p.email || '')).toLocaleLowerCase('fr-FR').includes(memberFilter.toLocaleLowerCase('fr-FR')))
   const selectedMember = allRoster.find((p) => p.personType + ':' + p.personId === selectedPerson)
   const relatedCharges = selectedMember ? charges.filter((c) => c.status === 'open' && c.household_id === selectedMember.household_id && (
@@ -287,20 +297,16 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     event.preventDefault()
     const bank = centsOf(openingDraft.bank), cash = centsOf(openingDraft.cash)
     if (!Number.isSafeInteger(bank) || !Number.isSafeInteger(cash) || cash < 0) return setError('Indiquez deux soldes valides. La caisse espèces ne peut pas être négative.')
-    if (importedOpening && bank + cash > importedOpening.opening_cents) return setError('La répartition dépasse le report de ' + formatMoney(importedOpening.opening_cents) + '.')
-    if (!window.confirm(importedOpening
-      ? 'Répartir le report initial de ' + formatMoney(importedOpening.opening_cents) + ' sans modifier les opérations importées ?'
-      : opening ? 'Remplacer le point de départ par les soldes réels actuels ? Les opérations antérieures resteront dans l’historique et ne seront plus incluses dans les soldes.'
+    if (!window.confirm(opening
+      ? 'Rapprocher la comptabilité avec les soldes réels constatés maintenant ? Les anciennes opérations restent dans l’historique.'
       : 'Confirmer les deux soldes réellement constatés maintenant ?')) return
     await action(async () => {
-      const { error: saveError } = importedOpening
-        ? await supabase.rpc('treasury_split_import_opening',{p_bank_cents:bank,p_cash_cents:cash})
-        : await supabase.from('treasury_opening').upsert({
-          id: 1, bank_cents: bank, cash_cents: cash, as_of: new Date().toISOString(),
-          updated_by: user.id, updated_at: new Date().toISOString()
-        }, { onConflict: 'id' })
+      const { error: saveError } = await supabase.from('treasury_opening').upsert({
+        id: 1, bank_cents: bank, cash_cents: cash, unassigned_cents: 0, import_batch_id: null,
+        as_of: new Date().toISOString(), updated_by: user.id, updated_at: new Date().toISOString()
+      }, { onConflict: 'id' })
       if (saveError) throw saveError
-    }, 'Soldes de référence enregistrés. Les opérations suivantes ajusteront les deux comptes.')
+    }, 'Soldes Revolut et caisse rapprochés. Le poste « à ventiler » n’est plus utilisé.')
   }
 
   const confirmPayment = (payment) => {
@@ -315,6 +321,22 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
       if (e) throw e
     }, 'Espèces encaissées et dettes rapprochées.')
   }
+  const collectOneDebt = (charge, method) => {
+    const amount = chargeResidualCents(charge, allocations, payments)
+    if (!amount || !charge?.household_id) return
+    const destination = method === 'cash' ? 'la caisse espèces' : 'Revolut'
+    if (!window.confirm('Confirmer le paiement de ' + formatMoney(amount) + ' sur ' + destination + ' ?')) return
+    action(async () => {
+      const { error: e } = await supabase.rpc('admin_record_household_payment', {
+        p_household_id: charge.household_id,
+        p_charge_ids: [charge.id],
+        p_method: method,
+        p_note: 'Dette confirmée payée depuis l’accueil trésorerie',
+      })
+      if (e) throw e
+    }, 'Dette marquée payée et ' + destination + ' mis à jour.')
+  }
+
   const reimburse = (entry) => {
     const method = reimburseBy[entry.id] || 'bank_transfer'
     if (!window.confirm('Confirmer le remboursement de ' + formatMoney(entry.amount_cents) + ' par ' + (method === 'cash' ? 'la caisse espèces' : 'Revolut') + ' ?')) return
@@ -397,47 +419,31 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     {view === 'events' && <EventTreasury data={data} onReload={reload} user={user} />}
 
     {view === 'overview' && <>
-      <section className="tv2-simple-home">
-        <div className="tv2-simple-title"><div><span className="tv2-eyebrow">Compta simple</span><h2>Que voulez-vous enregistrer ?</h2><p>Dépense, dette, cotisation ou événement : une seule action suffit pour démarrer.</p></div></div>
-        <div className="tv2-simple-actions">
-          <button type="button" onClick={() => openForm('expense')}><span>−</span><strong>Dépense</strong><small>Qui ? Combien ? Pourquoi ?</small></button>
-          <button type="button" onClick={() => document.getElementById('quick-debt')?.scrollIntoView({behavior:'smooth',block:'center'})}><span>€</span><strong>Dette</strong><small>Qui me doit quoi ?</small></button>
-          <button type="button" onClick={() => onView('memberships')}><span>✓</span><strong>Cotisation</strong><small>Qui est à jour ?</small></button>
-          <button type="button" onClick={() => onView('events')}><span>＋</span><strong>Événement</strong><small>Qui doit combien ?</small></button>
-        </div>
-      </section>
-      {!opening && <div className="tv2-setup-warning"><strong>À faire une fois : initialiser les soldes</strong><span>Indiquez le montant réel sur Revolut et le liquide actuellement en caisse. Les montants ci-dessous ne seront fiables qu’après cette étape.</span><button type="button" onClick={() => onView('settings')}>Renseigner mes soldes →</button></div>}
-      <div className={'tv2-balances' + (opening?.import_batch_id ? ' tv2-balances-four' : '')}>
-        <article className="tv2-balance tv2-bank"><span>Revolut</span><strong>{opening ? formatMoney(balances.bank) : 'À initialiser'}</strong><small>Carte, virements et remboursements Revolut</small></article>
-        <article className="tv2-balance tv2-cash"><span>Caisse espèces</span><strong>{opening ? formatMoney(balances.cash) : 'À initialiser'}</strong><small>Entrées et sorties de liquide</small></article>
-        {Boolean(opening?.import_batch_id) && <article className="tv2-balance tv2-unassigned"><span>À ventiler (Excel)</span><strong>{formatMoney(balances.unassigned)}</strong><small>À affecter à Revolut ou aux espèces depuis le journal</small></article>}
-        <article className="tv2-balance tv2-total"><span>Solde comptable total</span><strong>{opening ? formatMoney(balances.bank + balances.cash + balances.unassigned) : 'À initialiser'}</strong><small>Revolut + caisse + écritures à affecter ; hors dettes et avances</small></article>
-      </div>
-      {opening && <p className="tv2-reference">{importedOpening
-        ? 'Report Excel : ' + formatMoney(importedOpening.opening_cents) + ' · Solde confirmé au terme du fichier : ' + formatMoney(importedOpening.confirmed_closing_cents) + '. Les mouvements déjà datés et importés sont inclus une fois.'
-        : 'Soldes calculés à partir du relevé du ' + new Date(opening.as_of).toLocaleString('fr-FR') + ' et des mouvements enregistrés depuis.'}</p>}
-      {opening?.import_batch_id && balances.unassigned !== 0 && <div className="tj-warning">Des opérations importées restent à affecter entre Revolut et espèces. <button type="button" onClick={()=>onView('operations')}>Ventiler mes écritures →</button></div>}
-      <div className="tv2-metric-grid">
-        <button type="button" className="tv2-metric" onClick={() => onView('memberships')}><span>Dettes à recevoir</span><strong>{formatMoney(dueTotal)}</strong><small>Dont cotisations : {formatMoney(dues)}</small></button>
-        <button type="button" className="tv2-metric" onClick={onAdvanced}><span>À rembourser</span><strong>{formatMoney(pendingAdvanceCents)}</strong><small>{pendingAdvances.length} avance{pendingAdvances.length > 1 ? 's' : ''}</small></button>
-        <article className="tv2-metric"><span>Balance activités {year}</span><strong className={annualEconomics?.currentBalance < 0 ? 'negative' : 'positive'}>{annualEconomics?.currentBalance >= 0 ? '+' : ''}{formatMoney(annualEconomics?.currentBalance || 0)}</strong><small>Cotisations lissées + événements − coûts</small></article>
-        <button type="button" className="tv2-metric" onClick={() => onView('operations')}><span>À confirmer</span><strong>{pendingPayments.length}</strong><small>Virement{pendingPayments.length > 1 ? 's' : ''} déclaré{pendingPayments.length > 1 ? 's' : ''}</small></button>
-      </div>
+      {!opening && <div className="tv2-setup-warning"><strong>À faire une fois : initialiser les soldes</strong><span>Indiquez le montant réel sur Revolut et le liquide actuellement en caisse.</span><button type="button" onClick={() => onView('settings')}>Renseigner mes soldes →</button></div>}
 
-      <section className="tv2-panel tv2-year-profit">
-        <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Pilotage annuel · {year}</span><h2>Sommes-nous rentables sur nos activités ?</h2></div><span className={'tv2-profit-status '+((annualEconomics?.currentBalance || 0)>=0?'positive':'negative')}>{(annualEconomics?.currentBalance || 0)>=0?'Balance positive':'Balance négative'}</span></div>
-        <p className="tv2-year-rule">Cotisations lissées : <strong>60 € / 12 mois = 5 €/mois</strong> et <strong>20 € / 4 mois = 5 €/mois</strong>. Les non-amicalistes restent comptés au prix réellement facturé dans les événements.</p>
-        <div className="tv2-year-profit-grid">
-          <article><small>Cotisations reconnues à date</small><strong>{formatMoney(annualEconomics?.recognizedMembership || 0)}</strong><span>Budget progressivement acquis sur l’année</span></article>
-          <article><small>Paiements d’activités encaissés</small><strong>{formatMoney(annualEconomics?.directReceived || 0)}</strong><span>Hors cotisations pour éviter le double comptage</span></article>
-          <article><small>Coût des événements</small><strong>{formatMoney(annualEconomics?.cost || 0)}</strong><span>Courses et dépenses réglées liées aux événements</span></article>
-          <article className={(annualEconomics?.currentBalance || 0)>=0?'positive':'negative'}><small>Balance de gestion à date</small><strong>{(annualEconomics?.currentBalance || 0)>=0?'+':''}{formatMoney(annualEconomics?.currentBalance || 0)}</strong><span>Cotisations lissées + paiements − coûts</span></article>
-          <article className={(annualEconomics?.projectedBalance || 0)>=0?'positive':'negative'}><small>Projection sur les événements saisis</small><strong>{(annualEconomics?.projectedBalance || 0)>=0?'+':''}{formatMoney(annualEconomics?.projectedBalance || 0)}</strong><span>Avec dettes à recevoir + cotisations connues jusqu’à fin d’année</span></article>
+      <section className="tv2-account-status">
+        <article className="tv2-balance tv2-bank"><span>Compte bancaire · Revolut</span><strong>{opening ? formatMoney(balances.bank) : 'À initialiser'}</strong><small>Argent réellement disponible sur le compte</small></article>
+        <article className="tv2-balance tv2-cash"><span>Caisse liquide</span><strong>{opening ? formatMoney(balances.cash) : 'À initialiser'}</strong><small>Espèces réellement disponibles</small></article>
+      </section>
+
+      <section className="tv2-simple-home">
+        <div className="tv2-simple-title"><div><span className="tv2-eyebrow">Accueil trésorerie</span><h2>Que voulez-vous faire ?</h2><p>Deux actions suffisent pour la gestion quotidienne.</p></div></div>
+        <div className="tv2-simple-actions tv2-simple-actions-two">
+          <button type="button" onClick={() => openForm('expense')}><span>−</span><strong>Dépense</strong><small>Qui a payé ? Combien ? Pourquoi ?</small></button>
+          <button type="button" onClick={() => document.getElementById('quick-debt')?.scrollIntoView({behavior:'smooth',block:'center'})}><span>€</span><strong>Dette</strong><small>Qui doit combien et pourquoi ?</small></button>
         </div>
       </section>
+
+      <section className="tv2-simple-follow">
+        <button type="button" onClick={() => document.getElementById('open-debts')?.scrollIntoView({behavior:'smooth',block:'start'})}><span>À recevoir</span><strong>{formatMoney(dueTotal)}</strong><small>{openDebtRows.length} dette{openDebtRows.length>1?'s':''} en cours</small></button>
+        <button type="button" onClick={onAdvanced}><span>À rembourser</span><strong>{formatMoney(pendingAdvanceCents)}</strong><small>{pendingAdvances.length} avance{pendingAdvances.length>1?'s':''}</small></button>
+        <article><span>Balance activités {year}</span><strong className={(annualEconomics?.currentBalance || 0)<0?'negative':'positive'}>{(annualEconomics?.currentBalance || 0)>=0?'+':''}{formatMoney(annualEconomics?.currentBalance || 0)}</strong><small>Cotisations lissées + activités − coûts</small></article>
+      </section>
+
+      {pendingPayments.length>0 && <div className="tj-warning">{pendingPayments.length} virement{pendingPayments.length>1?'s':''} déclaré{pendingPayments.length>1?'s':''} reste{pendingPayments.length>1?'nt':''} à confirmer. <button type="button" onClick={()=>onView('operations')}>Voir dans le journal →</button></div>}
 
       <section className="tv2-panel tv2-quick-debt" id="quick-debt">
-        <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Dette · qui ? combien ? pourquoi ?</span><h2>Ajouter une dette</h2></div><small>Elle n’impacte pas Revolut ou la caisse avant paiement.</small></div>
+        <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Nouvelle dette</span><h2>Qui doit quoi ?</h2></div><small>Une dette ne touche jamais Revolut ou la caisse avant son paiement.</small></div>
         <form className="tv2-quick-debt-form" onSubmit={addDirectCharge}>
           <label>Qui ?<select required value={selectedPerson || ''} onChange={(e) => { setSelectedPerson(e.target.value || null); setChargeDraft({...chargeDraft,category:'other'}) }}><option value="">Choisir une personne…</option>{allRoster.map((person)=><option key={person.personType+person.personId} value={person.personType+':'+person.personId}>{person.display}{person.personType==='offline'?' · sans compte':''}</option>)}</select></label>
           <label>Combien ? (€)<input required inputMode="decimal" value={chargeDraft.amount} onChange={(e)=>setChargeDraft({...chargeDraft,amount:e.target.value})} placeholder="0,00"/></label>
@@ -447,33 +453,44 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
         </form>
       </section>
 
+      <section className="tv2-panel tv2-open-debts" id="open-debts">
+        <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Argent à recevoir</span><h2>Dettes en cours</h2></div><small>Validez uniquement au moment où l’argent est réellement reçu.</small></div>
+        <div className="tv2-debt-list">
+          {openDebtRows.map(({charge,display,event,due})=><div className="tv2-debt-row" key={charge.id}>
+            <div><strong>{display}</strong><small>{charge.label}{event?' · '+event.title:''}{charge.category==='membership'?' · Cotisation':''}</small></div>
+            <b>{formatMoney(due)}</b>
+            <button type="button" className="tv2-mini-button" disabled={busy} onClick={()=>collectOneDebt(charge,'cash')}>Payé espèces</button>
+            <button type="button" className="tv2-mini-button" disabled={busy} onClick={()=>collectOneDebt(charge,'bank_transfer')}>Payé Revolut</button>
+          </div>)}
+          {!openDebtRows.length&&<p className="tv2-empty">Aucune dette en cours.</p>}
+        </div>
+      </section>
+
+      <section className="tv2-panel tv2-year-profit">
+        <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Pilotage annuel · {year}</span><h2>Rentabilité des activités</h2></div><span className={'tv2-profit-status '+((annualEconomics?.currentBalance || 0)>=0?'positive':'negative')}>{(annualEconomics?.currentBalance || 0)>=0?'Balance positive':'Balance négative'}</span></div>
+        <p className="tv2-year-rule">Cotisations lissées : <strong>60 € / 12 mois = 5 €/mois</strong> et <strong>20 € / 4 mois = 5 €/mois</strong>.</p>
+        <div className="tv2-year-profit-grid">
+          <article><small>Cotisations reconnues</small><strong>{formatMoney(annualEconomics?.recognizedMembership || 0)}</strong><span>Budget acquis progressivement</span></article>
+          <article><small>Paiements activités</small><strong>{formatMoney(annualEconomics?.directReceived || 0)}</strong><span>Hors cotisations</span></article>
+          <article><small>Coût des événements</small><strong>{formatMoney(annualEconomics?.cost || 0)}</strong><span>Courses et dépenses rattachées</span></article>
+          <article className={(annualEconomics?.currentBalance || 0)>=0?'positive':'negative'}><small>Balance actuelle</small><strong>{(annualEconomics?.currentBalance || 0)>=0?'+':''}{formatMoney(annualEconomics?.currentBalance || 0)}</strong><span>Rentabilité à date</span></article>
+          <article className={(annualEconomics?.projectedBalance || 0)>=0?'positive':'negative'}><small>Projection</small><strong>{(annualEconomics?.projectedBalance || 0)>=0?'+':''}{formatMoney(annualEconomics?.projectedBalance || 0)}</strong><span>Si les dettes saisies sont payées</span></article>
+        </div>
+      </section>
+
       <section className="tv2-panel tv2-event-balances">
-        <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Événements</span><h2>Balance + / − toujours visible</h2></div><button type="button" className="ghost-button" onClick={() => onView('events')}>Gérer les événements →</button></div>
+        <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Événements</span><h2>Balance par événement</h2></div><button type="button" className="ghost-button" onClick={() => onView('events')}>Gérer →</button></div>
         <div className="tv2-event-balance-list">{eventBalances.map(({event,directReceived,cost,due,membershipAllocation,balance,projected,memberCount,nonmemberCount})=><button type="button" key={event.id} className="tv2-event-balance-row" onClick={() => onView('events')}>
           <span><strong>{event.title}</strong><small>{formattedDate(event.starts_at)} · {memberCount} amicaliste{memberCount>1?'s':''} · {nonmemberCount} extérieur{nonmemberCount>1?'s':''}</small></span>
           <span><small>Coût</small><b>{formatMoney(cost)}</b></span>
-          <span><small>Paiements activité</small><b>{formatMoney(directReceived)}</b></span>
-          <span><small>Part cotisations</small><b>{formatMoney(membershipAllocation)}</b></span>
+          <span><small>Payé</small><b>{formatMoney(directReceived)}</b></span>
+          <span><small>Cotisations</small><b>{formatMoney(membershipAllocation)}</b></span>
           <span><small>Reste dû</small><b>{formatMoney(due)}</b></span>
-          <span className={balance<0?'negative':'positive'}><small>Balance actuelle</small><b>{balance>=0?'+':''}{formatMoney(balance)}</b></span>
-          <span className={projected<0?'negative':'positive'}><small>Si tout est payé</small><b>{projected>=0?'+':''}{formatMoney(projected)}</b></span>
+          <span className={balance<0?'negative':'positive'}><small>Balance</small><b>{balance>=0?'+':''}{formatMoney(balance)}</b></span>
+          <span className={projected<0?'negative':'positive'}><small>Projection</small><b>{projected>=0?'+':''}{formatMoney(projected)}</b></span>
         </button>)}</div>
         {!eventBalances.length&&<p className="tv2-empty">Aucun événement financier pour le moment.</p>}
       </section>
-      <div className="tv2-two-cols">
-        <section className="tv2-panel"><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Flux comptables · {year}</span><h2>Encaissements et dépenses réels</h2></div></div>
-          <div className="tv2-month-list">{monthly.map((m, i) => <div className="tv2-month" key={m.label}><span>{m.label.slice(0, 3)}</span><div className="tv2-bars"><span className="tv2-bar tv2-bar-in" style={{ width: (m.income / maxMonth * 100) + '%' }} title={'Recettes : ' + formatMoney(m.income)} /><span className="tv2-bar tv2-bar-out" style={{ width: (m.expense / maxMonth * 100) + '%' }} title={'Dépenses : ' + formatMoney(m.expense)} /></div><small>{formatMoney(m.income - m.expense)}</small></div>)}</div>
-          <div className="tv2-legend"><span className="tv2-dot tv2-dot-in" /> Recettes <span className="tv2-dot tv2-dot-out" /> Dépenses</div>
-        </section>
-        <section className="tv2-panel"><div className="tv2-section-heading"><div><span className="tv2-eyebrow">À traiter</span><h2>Mes priorités</h2></div></div>
-          {pendingPayments.length === 0 && pendingAdvances.length === 0 && dueTotal === 0 ? <p className="tv2-empty">Aucune opération urgente.</p> : <div className="tv2-priority-list">
-            {pendingPayments.slice(0, 3).map((p) => <div key={p.id} className="tv2-priority"><div><strong>Virement · {householdById[p.household_id]?.name || 'Foyer'}</strong><small>{p.reference}</small></div><b>{formatMoney(p.amount_cents)}</b><button type="button" disabled={busy} onClick={() => confirmPayment(p)}>Confirmer</button></div>)}
-            {pendingAdvances.slice(0, 3).map((e) => <div key={e.id} className="tv2-priority"><div><strong>Rembourser · {e.label}</strong><small>{profileById[e.advanced_by]?.full_name || profileById[offlineById[e.advanced_by_offline]?.linked_user_id]?.full_name || offlineById[e.advanced_by_offline]?.display_name || 'Membre'}</small></div><b>{formatMoney(e.amount_cents)}</b><button type="button" onClick={() => onView('operations')}>Voir</button></div>)}
-            {dueTotal > 0 && <div className="tv2-priority"><div><strong>Dettes des foyers</strong><small>Relances et espèces</small></div><b>{formatMoney(dueTotal)}</b><button type="button" onClick={() => onView('memberships')}>Voir</button></div>}
-          </div>}
-        </section>
-      </div>
-      <section className="tv2-panel"><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Journal</span><h2>Derniers mouvements</h2></div><button type="button" className="ghost-button" onClick={() => onView('operations')}>Tout afficher →</button></div>{renderOperations(activity.slice(0, 7), openReceipt)}</section>
     </>}
 
     {view === 'operations' && <>
@@ -482,7 +499,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
       <section><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Historique complet</span><h2>Mes opérations</h2></div><div className="tv2-section-actions"><button type="button" className="primary-button" disabled={exporting} onClick={exportFullExcel}>{exporting ? 'Préparation…' : 'Sauvegarde complète Excel ↓'}</button><button type="button" className="ghost-button" onClick={exportRows}>CSV filtré</button></div></div>
         <div className="tv2-filters"><label>Rechercher<input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Libellé ou note..." /></label>
           <label>Type<select value={kindFilter} onChange={(e) => setKindFilter(e.target.value)}><option value="all">Tout</option><option value="income">Recettes</option><option value="expense">Dépenses</option><option value="transfer">Transferts</option></select></label>
-          <label>Compte<select value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)}><option value="all">Tous</option><option value="bank">Revolut</option><option value="cash">Espèces</option><option value="unassigned">À affecter</option></select></label>
+          <label>Compte<select value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)}><option value="all">Tous</option><option value="bank">Revolut</option><option value="cash">Espèces</option></select></label>
           <label>Mois<input type="month" value={monthFilter === 'all' ? '' : monthFilter} onChange={(e) => setMonthFilter(e.target.value || 'all')} /></label>
         </div>
         <p className="tv2-hint">{activityFiltered.length} opération{activityFiltered.length > 1 ? 's' : ''} · Les transferts ne modifient pas le résultat.</p>
@@ -531,22 +548,20 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     </>}
 
     {view === 'settings' && <div className="tv2-two-cols">
-      <section className="tv2-panel"><span className="tv2-eyebrow">Position comptable</span><h2>Initialiser ou rapprocher mes deux soldes</h2>
-        <p>{importedOpening ? 'Répartissez uniquement le report initial de ' + formatMoney(importedOpening.opening_cents) + ' entre Revolut et le liquide. La part non renseignée reste « À affecter ». Les écritures Excel seront ventilées individuellement dans le journal.' : 'Relevez les montants réellement disponibles maintenant sur Revolut et dans la caisse. Ce point de départ évite de compter deux fois les anciennes écritures.'}</p>
-        {opening && <div className="tv2-reference-card"><strong>Dernière référence</strong><span>{new Date(opening.as_of).toLocaleString('fr-FR')}</span><span>Revolut : {formatMoney(opening.bank_cents)} · Espèces : {formatMoney(opening.cash_cents)}{opening.import_batch_id ? ' · Report non ventilé : ' + formatMoney(opening.unassigned_cents) : ''}</span></div>}
-        <form className="tv2-form" onSubmit={saveOpening}><label>Solde Revolut (€)<input required inputMode="decimal" value={openingDraft.bank} onChange={(e) => setOpeningDraft({ ...openingDraft, bank: e.target.value })} placeholder="Ex. 1240,50" /></label>
-          <label>Liquidités réellement en caisse (€)<input required inputMode="decimal" value={openingDraft.cash} onChange={(e) => setOpeningDraft({ ...openingDraft, cash: e.target.value })} placeholder="Ex. 185,00" /></label>
-          <p className="tv2-hint">{importedOpening ? 'Le report total reste ' + formatMoney(importedOpening.opening_cents) + '. La date d’origine est préservée, donc aucune dépense ni cotisation n’est comptée deux fois.' : 'Le nouveau point de départ est daté au moment de l’enregistrement. Une modification ultérieure repart des nouveaux soldes réels, sans supprimer l’historique.'}</p>
-          <button type="submit" className="primary-button" disabled={busy}>{importedOpening ? 'Répartir le report Excel' : opening ? 'Rapprocher les soldes actuels' : 'Initialiser mes comptes'}</button>
+      <section className="tv2-panel"><span className="tv2-eyebrow">Rapprochement</span><h2>Mes deux soldes réels</h2>
+        <p>En cas d’écart avec la banque ou la caisse physique, renseignez simplement les deux montants réellement constatés. L’ancien import Excel reste conservé dans l’historique.</p>
+        {opening && <div className="tv2-reference-card"><strong>Dernier point de référence</strong><span>{new Date(opening.as_of).toLocaleString('fr-FR')}</span><span>Revolut : {formatMoney(balances.bank)} · Espèces : {formatMoney(balances.cash)}</span></div>}
+        <form className="tv2-form" onSubmit={saveOpening}><label>Solde réel Revolut (€)<input required inputMode="decimal" value={openingDraft.bank} onChange={(e) => setOpeningDraft({ ...openingDraft, bank: e.target.value })} placeholder="Ex. 1240,50" /></label>
+          <label>Solde réel de la caisse (€)<input required inputMode="decimal" value={openingDraft.cash} onChange={(e) => setOpeningDraft({ ...openingDraft, cash: e.target.value })} placeholder="Ex. 185,00" /></label>
+          <p className="tv2-hint">Cette action crée un nouveau point de départ aujourd’hui. L’historique n’est pas supprimé.</p>
+          <button type="submit" className="primary-button" disabled={busy}>{opening ? 'Rapprocher les soldes' : 'Initialiser mes comptes'}</button>
         </form>
       </section>
-      <section className="tv2-panel"><span className="tv2-eyebrow">Organisation</span><h2>Comptabilité et sauvegardes</h2>
-        <p>Aucun RIB n’est nécessaire. Suivez uniquement Revolut et la caisse (liquide). Téléchargez une sauvegarde complète Excel, avec tous les mouvements et les dettes.</p>
+      <section className="tv2-panel"><span className="tv2-eyebrow">Sauvegarde</span><h2>Export et historique</h2>
+        <p>La gestion courante utilise uniquement Revolut et la caisse liquide. Les traces de l’ancien import Excel restent uniquement dans l’export complet.</p>
         <div className="tv2-list-row"><div><strong>Revolut</strong><small>Solde {opening ? formatMoney(balances.bank) : 'à initialiser'}</small></div></div>
-        <div className="tv2-list-row"><div><strong>Caisse (liquide)</strong><small>Solde {opening ? formatMoney(balances.cash) : 'à initialiser'}</small></div></div>
-        {Boolean(opening?.import_batch_id)&&<div className="tv2-list-row"><div><strong>À ventiler (provisoire)</strong><small>{formatMoney(balances.unassigned)} · à attribuer aux deux comptes réels</small></div></div>}
-        <div className="tv2-setting-actions"><button type="button" className="primary-button" disabled={exporting} onClick={exportFullExcel}>Sauvegarde complète Excel ↓</button><button type="button" className="ghost-button" onClick={() => onView('operations')}>Consulter / exporter le journal</button></div>
-        <p className="tv2-hint">Revolut et la caisse sont suivis séparément. Les avances personnelles n’impactent aucun solde avant leur remboursement.</p>
+        <div className="tv2-list-row"><div><strong>Caisse liquide</strong><small>Solde {opening ? formatMoney(balances.cash) : 'à initialiser'}</small></div></div>
+        <div className="tv2-setting-actions"><button type="button" className="primary-button" disabled={exporting} onClick={exportFullExcel}>Sauvegarde complète Excel ↓</button><button type="button" className="ghost-button" onClick={() => onView('operations')}>Consulter le journal</button></div>
       </section>
     </div>}
   </div>

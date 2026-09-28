@@ -7,10 +7,10 @@ import LegacyTreasury from './LegacyTreasury.jsx'
 import '../treasury-v2.css'
 
 const TABS = [
-  ['overview', 'Compta'],
+  ['overview', 'Accueil'],
   ['events', 'Événements'],
   ['operations', 'Journal'],
-  ['memberships', 'Cotisations'],
+  ['memberships', 'Dettes & cotisations'],
   ['advanced', 'Avances'],
   ['settings', 'Export'],
 ]
