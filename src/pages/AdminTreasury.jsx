@@ -8,11 +8,11 @@ import '../treasury-v2.css'
 
 const TABS = [
   ['overview', 'Vue d’ensemble'],
-  ['events', 'Événements & dettes'],
-  ['operations', 'Journal Revolut & caisse'],
-  ['memberships', 'Cotisations & dettes'],
-  ['advanced', 'Gestion avancée'],
-  ['settings', 'Mes comptes & export'],
+  ['events', 'Événements'],
+  ['operations', 'Journal'],
+  ['memberships', 'Cotisations'],
+  ['advanced', 'Avances & dépenses'],
+  ['settings', 'Export & comptes'],
 ]
 
 export default function AdminTreasury() {
@@ -56,7 +56,7 @@ export default function AdminTreasury() {
 
   return <div className="treasury-v2">
     <header className="tv2-page-title">
-      <div><span className="tv2-eyebrow">Amicale DANZ · Accès nominatif</span><h1>Ma trésorerie</h1><p>Revolut, espèces, cotisations et justificatifs au même endroit.</p></div>
+      <div><span className="tv2-eyebrow">Amicale DANZ · Accès nominatif</span><h1>Ma trésorerie</h1><p>Un suivi simple de votre argent, des événements, des dettes et des cotisations.</p></div>
       <span className="tv2-role">Administrateur + Trésorier</span>
     </header>
     <nav className="tv2-tabs" aria-label="Sections de la trésorerie">
