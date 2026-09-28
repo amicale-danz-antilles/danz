@@ -4,7 +4,7 @@ import { chargeResidualCents, effectiveAmicaliste, formatMoney, householdBalance
 import { optimizeImageFile } from '../lib/mediaStorage.js'
 import { accountFor, accountingDate, ledgerBalances, signedCents } from '../lib/treasuryLedger.js'
 import EventTreasury from './EventTreasury.jsx'
-import { eventOverview } from '../lib/eventFinance.js'
+import { annualManagementEconomics, eventManagementEconomics } from '../lib/membershipProfitability.js'
 import TreasuryJournalManager from './TreasuryJournalManager.jsx'
 
 const EXPENSE_CATEGORIES = {
@@ -147,13 +147,12 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
   const cleared = entries.filter((e) => e.status === 'settled')
   const balances = ledgerBalances(opening, entries, transfers) || { bank: 0, cash: 0, unassigned: 0 }
   const importedOpening = opening?.import_batch_id && data?.importBatches?.find((item) => item.id === opening.import_batch_id)
-  const eventBalances = useMemo(() => (data?.events || []).map((event) => {
-    const summary = eventOverview(event.id, data)
-    const eventEntries = (data?.entries || []).filter((entry) => entry.event_id === event.id && entry.status === 'settled')
-    const received = eventEntries.filter((entry) => entry.kind === 'income').reduce((sum, entry) => sum + Number(entry.amount_cents || 0), 0)
-    const cost = eventEntries.filter((entry) => entry.kind === 'expense').reduce((sum, entry) => sum + Number(entry.amount_cents || 0), 0)
-    return { event, received, cost, due: summary.due, balance: received - cost, projected: received + summary.due - cost }
-  }).sort((a,b) => new Date(b.event.starts_at || 0) - new Date(a.event.starts_at || 0)), [data])
+  const managementYear = new Date().getFullYear()
+  const annualEconomics = useMemo(() => data ? annualManagementEconomics(data, managementYear) : null, [data, managementYear])
+  const eventBalances = useMemo(() => (data?.events || []).map((event) => ({
+    event,
+    ...eventManagementEconomics(event, data),
+  })).sort((a,b) => new Date(b.event.starts_at || 0) - new Date(a.event.starts_at || 0)), [data])
 
   const activity = [
     ...entries.map((e) => ({ ...e, type: 'entry', date: accountingDate(e), account: accountFor(e), signed: e.status === 'pending' || e.status === 'cancelled' ? 0 : signedCents(e) })),
@@ -167,7 +166,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
       && (monthFilter === 'all' || month === monthFilter)
       && text.includes(query.trim().toLocaleLowerCase('fr-FR'))
   })
-  const year = new Date().getFullYear()
+  const year = managementYear
   const monthly = MONTHS.map((label, i) => {
     const matching = cleared.filter((e) => { const d = new Date(accountingDate(e)); return d.getFullYear() === year && d.getMonth() === i })
     return { label, income: matching.filter((e) => e.kind === 'income').reduce((s, e) => s + e.amount_cents, 0),
@@ -421,9 +420,21 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
       <div className="tv2-metric-grid">
         <button type="button" className="tv2-metric" onClick={() => onView('memberships')}><span>Dettes à recevoir</span><strong>{formatMoney(dueTotal)}</strong><small>Dont cotisations : {formatMoney(dues)}</small></button>
         <button type="button" className="tv2-metric" onClick={onAdvanced}><span>À rembourser</span><strong>{formatMoney(pendingAdvanceCents)}</strong><small>{pendingAdvances.length} avance{pendingAdvances.length > 1 ? 's' : ''}</small></button>
-        <article className="tv2-metric"><span>Résultat du mois</span><strong>{formatMoney(monthNow.income - monthNow.expense)}</strong><small>{formatMoney(monthNow.income)} reçus · {formatMoney(monthNow.expense)} dépensés</small></article>
+        <article className="tv2-metric"><span>Balance activités {year}</span><strong className={annualEconomics?.currentBalance < 0 ? 'negative' : 'positive'}>{annualEconomics?.currentBalance >= 0 ? '+' : ''}{formatMoney(annualEconomics?.currentBalance || 0)}</strong><small>Cotisations lissées + événements − coûts</small></article>
         <button type="button" className="tv2-metric" onClick={() => onView('operations')}><span>À confirmer</span><strong>{pendingPayments.length}</strong><small>Virement{pendingPayments.length > 1 ? 's' : ''} déclaré{pendingPayments.length > 1 ? 's' : ''}</small></button>
       </div>
+
+      <section className="tv2-panel tv2-year-profit">
+        <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Pilotage annuel · {year}</span><h2>Sommes-nous rentables sur nos activités ?</h2></div><span className={'tv2-profit-status '+((annualEconomics?.currentBalance || 0)>=0?'positive':'negative')}>{(annualEconomics?.currentBalance || 0)>=0?'Balance positive':'Balance négative'}</span></div>
+        <p className="tv2-year-rule">Cotisations lissées : <strong>60 € / 12 mois = 5 €/mois</strong> et <strong>20 € / 4 mois = 5 €/mois</strong>. Les non-amicalistes restent comptés au prix réellement facturé dans les événements.</p>
+        <div className="tv2-year-profit-grid">
+          <article><small>Cotisations reconnues à date</small><strong>{formatMoney(annualEconomics?.recognizedMembership || 0)}</strong><span>Budget progressivement acquis sur l’année</span></article>
+          <article><small>Paiements d’activités encaissés</small><strong>{formatMoney(annualEconomics?.directReceived || 0)}</strong><span>Hors cotisations pour éviter le double comptage</span></article>
+          <article><small>Coût des événements</small><strong>{formatMoney(annualEconomics?.cost || 0)}</strong><span>Courses et dépenses réglées liées aux événements</span></article>
+          <article className={(annualEconomics?.currentBalance || 0)>=0?'positive':'negative'}><small>Balance de gestion à date</small><strong>{(annualEconomics?.currentBalance || 0)>=0?'+':''}{formatMoney(annualEconomics?.currentBalance || 0)}</strong><span>Cotisations lissées + paiements − coûts</span></article>
+          <article className={(annualEconomics?.projectedBalance || 0)>=0?'positive':'negative'}><small>Projection sur les événements saisis</small><strong>{(annualEconomics?.projectedBalance || 0)>=0?'+':''}{formatMoney(annualEconomics?.projectedBalance || 0)}</strong><span>Avec dettes à recevoir + cotisations connues jusqu’à fin d’année</span></article>
+        </div>
+      </section>
 
       <section className="tv2-panel tv2-quick-debt" id="quick-debt">
         <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Dette · qui ? combien ? pourquoi ?</span><h2>Ajouter une dette</h2></div><small>Elle n’impacte pas Revolut ou la caisse avant paiement.</small></div>
@@ -438,10 +449,11 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
 
       <section className="tv2-panel tv2-event-balances">
         <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Événements</span><h2>Balance + / − toujours visible</h2></div><button type="button" className="ghost-button" onClick={() => onView('events')}>Gérer les événements →</button></div>
-        <div className="tv2-event-balance-list">{eventBalances.map(({event,received,cost,due,balance,projected})=><button type="button" key={event.id} className="tv2-event-balance-row" onClick={() => onView('events')}>
-          <span><strong>{event.title}</strong><small>{formattedDate(event.starts_at)}</small></span>
+        <div className="tv2-event-balance-list">{eventBalances.map(({event,directReceived,cost,due,membershipAllocation,balance,projected,memberCount,nonmemberCount})=><button type="button" key={event.id} className="tv2-event-balance-row" onClick={() => onView('events')}>
+          <span><strong>{event.title}</strong><small>{formattedDate(event.starts_at)} · {memberCount} amicaliste{memberCount>1?'s':''} · {nonmemberCount} extérieur{nonmemberCount>1?'s':''}</small></span>
           <span><small>Coût</small><b>{formatMoney(cost)}</b></span>
-          <span><small>Encaissé</small><b>{formatMoney(received)}</b></span>
+          <span><small>Paiements activité</small><b>{formatMoney(directReceived)}</b></span>
+          <span><small>Part cotisations</small><b>{formatMoney(membershipAllocation)}</b></span>
           <span><small>Reste dû</small><b>{formatMoney(due)}</b></span>
           <span className={balance<0?'negative':'positive'}><small>Balance actuelle</small><b>{balance>=0?'+':''}{formatMoney(balance)}</b></span>
           <span className={projected<0?'negative':'positive'}><small>Si tout est payé</small><b>{projected>=0?'+':''}{formatMoney(projected)}</b></span>
@@ -449,7 +461,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
         {!eventBalances.length&&<p className="tv2-empty">Aucun événement financier pour le moment.</p>}
       </section>
       <div className="tv2-two-cols">
-        <section className="tv2-panel"><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Évolution · {year}</span><h2>Recettes et dépenses</h2></div></div>
+        <section className="tv2-panel"><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Flux comptables · {year}</span><h2>Encaissements et dépenses réels</h2></div></div>
           <div className="tv2-month-list">{monthly.map((m, i) => <div className="tv2-month" key={m.label}><span>{m.label.slice(0, 3)}</span><div className="tv2-bars"><span className="tv2-bar tv2-bar-in" style={{ width: (m.income / maxMonth * 100) + '%' }} title={'Recettes : ' + formatMoney(m.income)} /><span className="tv2-bar tv2-bar-out" style={{ width: (m.expense / maxMonth * 100) + '%' }} title={'Dépenses : ' + formatMoney(m.expense)} /></div><small>{formatMoney(m.income - m.expense)}</small></div>)}</div>
           <div className="tv2-legend"><span className="tv2-dot tv2-dot-in" /> Recettes <span className="tv2-dot tv2-dot-out" /> Dépenses</div>
         </section>

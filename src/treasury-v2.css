@@ -151,3 +151,20 @@ button.tv2-metric{cursor:pointer}
 .tv2-event-balance-row .positive b{color:#247155}.tv2-event-balance-row .negative b{color:#a34f35}
 @media(max-width:980px){.tv2-simple-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.tv2-quick-debt-form{grid-template-columns:repeat(2,minmax(0,1fr))}.tv2-event-balance-row{grid-template-columns:minmax(150px,1.4fr) repeat(3,minmax(80px,.7fr))}.tv2-event-balance-row>span:nth-child(5),.tv2-event-balance-row>span:nth-child(6){grid-column:auto}}
 @media(max-width:620px){.tv2-simple-actions,.tv2-quick-debt-form{grid-template-columns:1fr}.tv2-event-balance-row{grid-template-columns:1fr 1fr}.tv2-event-balance-row>span:first-child{grid-column:1/-1}.tv2-event-balance-row strong{white-space:normal}}
+
+
+/* V37 · pilotage annuel avec cotisations lissées */
+.tv2-year-profit{border-color:#b7d7cd;background:linear-gradient(145deg,#f9fcfb,#f2f8f6)}
+.tv2-year-rule{margin:0;font-size:.76rem;color:#5d706c;line-height:1.5}
+.tv2-profit-status{border-radius:999px;padding:.38rem .62rem;font-size:.7rem;font-weight:850}
+.tv2-profit-status.positive{background:#e2f3ea;color:#236c50}.tv2-profit-status.negative{background:#fff0e8;color:#a05233}
+.tv2-year-profit-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.6rem}
+.tv2-year-profit-grid article{display:grid;gap:.24rem;padding:.78rem .82rem;border:1px solid #d9e6e2;border-radius:12px;background:#fff;min-width:0}
+.tv2-year-profit-grid small{font-size:.65rem;color:#6c7d78}.tv2-year-profit-grid strong{font-size:1.05rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.tv2-year-profit-grid span{font-size:.62rem;color:#778681;line-height:1.35}
+.tv2-year-profit-grid article.positive strong,.tv2-metric strong.positive{color:#247155}
+.tv2-year-profit-grid article.negative strong,.tv2-metric strong.negative{color:#a34f35}
+.tv2-event-balance-row{grid-template-columns:minmax(165px,1.6fr) repeat(6,minmax(82px,.72fr))}
+@media(max-width:1150px){.tv2-year-profit-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.tv2-event-balance-row{grid-template-columns:minmax(155px,1.5fr) repeat(3,minmax(82px,.75fr))}}
+@media(max-width:720px){.tv2-year-profit-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.tv2-year-profit-grid{grid-template-columns:1fr}.tv2-year-rule{font-size:.71rem}}
