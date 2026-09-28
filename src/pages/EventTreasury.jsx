@@ -46,6 +46,9 @@ export default function EventTreasury({ data, onReload, user }) {
   const [chosenEventId, setChosenEventId] = useState('')
   const [newEventOpen,setNewEventOpen] = useState(false)
   const [newEvent,setNewEvent] = useState(defaultEventForm)
+  const [newPersonOpen,setNewPersonOpen] = useState(false)
+  const [newPerson,setNewPerson] = useState({name:'',email:'',notes:''})
+  const [eventEntry,setEventEntry] = useState({kind:'expense',label:'',amount:'',method:'bank_transfer',date:dateToday(),note:''})
   const [draft,setDraft] = useState({})
   const [query,setQuery] = useState('')
   const [householdFilter,setHouseholdFilter] = useState('')
@@ -65,6 +68,13 @@ export default function EventTreasury({ data, onReload, user }) {
   const activeEvent = events.find((e) => e.id === chosenId)
   const groups = useMemo(() => chosenId ? buildEventGroups(chosenId,data) : [],[chosenId,data])
   const overview = useMemo(() => chosenId ? eventOverview(chosenId,data) : null,[chosenId,data])
+  const eventEntries = useMemo(() => (data.entries || [])
+    .filter((entry) => entry.event_id === chosenId && entry.status !== 'cancelled')
+    .sort((a,b) => new Date(b.occurred_at || b.created_at).getTime() - new Date(a.occurred_at || a.created_at).getTime()),[chosenId,data.entries])
+  const eventIncome = eventEntries.filter((entry)=>entry.kind==='income'&&entry.status==='settled').reduce((sum,entry)=>sum+Number(entry.amount_cents||0),0)
+  const eventExpense = eventEntries.filter((entry)=>entry.kind==='expense'&&entry.status==='settled').reduce((sum,entry)=>sum+Number(entry.amount_cents||0),0)
+  const eventPending = eventEntries.filter((entry)=>entry.kind==='expense'&&entry.status==='pending').reduce((sum,entry)=>sum+Number(entry.amount_cents||0),0)
+  const eventNet = eventIncome-eventExpense
   const participating = useMemo(() => new Set(groups.flatMap((g) => g.people.map((p) => p.key))),[groups])
   const fee = Number(data.settings?.membership_fee_cents ?? 6000)
   const selected = Object.entries(draft).filter(([,value]) => value.selected).map(([key,value]) => ({person:byKey[key],...value})).filter((row)=>row.person)
@@ -85,7 +95,8 @@ export default function EventTreasury({ data, onReload, user }) {
     ...previous,[person.key]:{selected:false,amount:amountFor(person,activeEvent,globalAmount),membership:false,...previous[person.key],...patch}
   }))
   const switchEvent = (id) => {
-    setChosenEventId(id);setDraft({});setQuery('');setHouseholdFilter('');setChecked({});setQuick(null);setError('');setNotice('')
+    setChosenEventId(id);setDraft({});setQuery('');setHouseholdFilter('');setChecked({});setQuick(null);setNewPersonOpen(false)
+    setEventEntry({kind:'expense',label:'',amount:'',method:'bank_transfer',date:dateToday(),note:''});setError('');setNotice('')
   }
   const applyGlobal = () => setDraft((prev) => Object.fromEntries(
     Object.entries(prev).map(([key,row]) => [key,row.selected ? {...row,amount:globalAmount} : row])
@@ -157,6 +168,37 @@ export default function EventTreasury({ data, onReload, user }) {
       setChosenEventId(created.id);setNewEventOpen(false);setNewEvent(defaultEventForm());setDraft({})
     },'Événement financier créé : il n’est pas publié dans l’agenda.')
   }
+  const createParticipant = async (event) => {
+    event.preventDefault()
+    if(!activeEvent)return
+    const name=newPerson.name.trim()
+    if(name.length<2){setError('Indiquez le nom du participant.');return}
+    const success=await execute(async()=>{
+      const {error:createError}=await supabase.rpc('treasury_event_create_participant',{
+        p_event_id:activeEvent.id,p_name:name,p_email:newPerson.email.trim()||null,p_notes:newPerson.notes.trim()||null
+      })
+      if(createError)throw createError
+    },name+' a été créé et ajouté à '+activeEvent.title+'.')
+    if(success){setNewPerson({name:'',email:'',notes:''});setNewPersonOpen(false);setQuery(name);setSelectionFilter('all')}
+  }
+  const saveEventEntry = async (event) => {
+    event.preventDefault()
+    if(!activeEvent)return
+    const amount=parseMoney(eventEntry.amount)
+    if(!Number.isSafeInteger(amount)||amount<=0||!eventEntry.label.trim()){
+      setError('Indiquez un libellé et un montant positif valide.');return
+    }
+    const typeLabel=eventEntry.kind==='income'?'Recette':'Dépense'
+    const success=await execute(async()=>{
+      const {error:e}=await supabase.rpc('treasury_event_record_entry',{
+        p_event_id:activeEvent.id,p_kind:eventEntry.kind,p_amount_cents:amount,
+        p_label:eventEntry.label.trim(),p_method:eventEntry.method,
+        p_occurred_on:eventEntry.date,p_note:eventEntry.note.trim()||null
+      })
+      if(e)throw e
+    },typeLabel+' enregistrée pour '+activeEvent.title+'.')
+    if(success)setEventEntry({kind:'expense',label:'',amount:'',method:'bank_transfer',date:dateToday(),note:''})
+  }
   const collect = (group,method) => {
     const unpaid=group.charges.filter((c)=>c.status==='open'&&c.dueCents>0&&checked[c.id]!==false)
     if(!unpaid.length){setError('Cochez au moins une dette de ce foyer.');return}
@@ -212,6 +254,31 @@ export default function EventTreasury({ data, onReload, user }) {
         <article><small>Déjà encaissé</small><strong>{money(overview.paid)}</strong><span>Règlements confirmés</span></article>
         <article className={overview.due>0?'evt-due':''}><small>Reste à recevoir</small><strong>{money(overview.due)}</strong><span>{overview.charges} dette(s) actives</span></article>
       </div>
+
+      <section className="tv2-panel evt-accounting">
+        <div className="evt-section-heading"><div><span className="tv2-eyebrow">Comptabilité de l’événement</span><h3>Recettes, dépenses et résultat</h3></div><small>Chaque écriture est aussi intégrée au journal général et au bon compte.</small></div>
+        <div className="evt-accounting-kpis">
+          <article><small>Recettes encaissées</small><strong>{money(eventIncome)}</strong><span>Revolut + espèces</span></article>
+          <article><small>Dépenses réglées</small><strong>{money(eventExpense)}</strong><span>Débitées des comptes</span></article>
+          <article className={eventNet<0?'negative':'positive'}><small>Résultat encaissé</small><strong>{money(eventNet)}</strong><span>Recettes − dépenses réglées</span></article>
+          <article><small>Avances à rembourser</small><strong>{money(eventPending)}</strong><span>Hors résultat encaissé</span></article>
+        </div>
+        <form className="evt-accounting-form" onSubmit={saveEventEntry}>
+          <label>Type<select value={eventEntry.kind} onChange={(e)=>setEventEntry({...eventEntry,kind:e.target.value})}><option value="expense">Dépense</option><option value="income">Recette libre</option></select></label>
+          <label>Libellé<input required maxLength={250} value={eventEntry.label} onChange={(e)=>setEventEntry({...eventEntry,label:e.target.value})} placeholder={eventEntry.kind==='expense'?'Ex. Courses pour la soirée':'Ex. Don ou participation libre'}/></label>
+          <label>Montant (€)<input required inputMode="decimal" value={eventEntry.amount} onChange={(e)=>setEventEntry({...eventEntry,amount:e.target.value})} placeholder="0,00"/></label>
+          <label>{eventEntry.kind==='expense'?'Payé avec':'Reçu sur'}<select value={eventEntry.method} onChange={(e)=>setEventEntry({...eventEntry,method:e.target.value})}><option value="bank_transfer">Revolut · virement</option><option value="card">Revolut · carte / paiement en ligne</option><option value="cash">Caisse · espèces</option></select></label>
+          <label>Date<input type="date" required max={dateToday()} value={eventEntry.date} onChange={(e)=>setEventEntry({...eventEntry,date:e.target.value})}/></label>
+          <label className="evt-accounting-note">Note (facultatif)<input maxLength={1000} value={eventEntry.note} onChange={(e)=>setEventEntry({...eventEntry,note:e.target.value})}/></label>
+          <button type="submit" className="primary-button" disabled={busy}>{busy?'Enregistrement…':eventEntry.kind==='expense'?'Ajouter la dépense':'Ajouter la recette'}</button>
+        </form>
+        {eventEntry.kind==='income'&&<p className="tv2-hint">Pour régler une dette d’un participant, utilisez les boutons « Reçu en caisse » ou « Reçu sur Revolut » plus bas : la dette sera soldée et la recette créée automatiquement. « Recette libre » sert aux dons et recettes sans dette.</p>}
+        <div className="evt-entry-list">
+          {eventEntries.slice(0,10).map((entry)=><div className="evt-entry-row" key={entry.id}><span className={'evt-entry-kind '+entry.kind}>{entry.kind==='income'?'＋':'−'}</span><div><strong>{entry.label}</strong><small>{dateLabel(entry.occurred_at||entry.created_at)} · {entry.payment_method==='cash'?'Caisse espèces':entry.payment_method==='card'?'Revolut · carte / en ligne':'Revolut · virement'}{entry.status==='pending'?' · À rembourser':''}</small></div><b>{entry.kind==='expense'?'-':'+'}{money(entry.amount_cents)}</b></div>)}
+          {!eventEntries.length&&<p className="tv2-empty">Aucune recette ou dépense comptable liée à cet événement pour le moment.</p>}
+        </div>
+      </section>
+
       <details className="tv2-panel evt-add-people" open={Object.values(draft).some((d)=>d.selected)||undefined}>
         <summary><strong>＋ Inscrire / facturer plusieurs personnes</strong><span>Choisir 15 participants, répartir automatiquement sur leurs foyers et ajouter les cotisations</span></summary>
         <div className="evt-add-content">
@@ -221,6 +288,13 @@ export default function EventTreasury({ data, onReload, user }) {
             <label>Montant commun (€)<input inputMode="decimal" value={globalAmount} onChange={(e)=>setGlobalAmount(e.target.value)} placeholder={activeEvent.pricing_enabled?'Tarif prévu ou saisie libre':'Ex. 15,00'}/></label>
             <button type="button" className="ghost-button" onClick={applyGlobal} disabled={!selected.length||!globalAmount}>Appliquer aux sélectionnés</button>
           </div>
+          <div className="evt-new-person-actions"><button type="button" className="tv2-action" onClick={()=>setNewPersonOpen((value)=>!value)}>＋ Nouveau participant</button><span>Créez directement une personne extérieure ou sans compte, sans quitter l’événement.</span></div>
+          {newPersonOpen&&<form className="evt-new-person-form" onSubmit={createParticipant}>
+            <label>Nom du participant<input required autoFocus maxLength={160} value={newPerson.name} onChange={(e)=>setNewPerson({...newPerson,name:e.target.value})} placeholder="Prénom NOM"/></label>
+            <label>E-mail (facultatif)<input type="email" maxLength={254} value={newPerson.email} onChange={(e)=>setNewPerson({...newPerson,email:e.target.value})} placeholder="adresse@email.fr"/></label>
+            <label>Note (facultatif)<input maxLength={500} value={newPerson.notes} onChange={(e)=>setNewPerson({...newPerson,notes:e.target.value})} placeholder="Invité, partenaire, extérieur…"/></label>
+            <button type="submit" className="primary-button" disabled={busy}>{busy?'Ajout…':'Créer et ajouter à l’événement'}</button>
+          </form>}
           <div className="evt-filterbar">
             <input value={query} type="search" aria-label="Rechercher une personne" onChange={(e)=>setQuery(e.target.value)} placeholder="Nom, foyer, e-mail…" />
             <select aria-label="Filtrer par foyer" value={householdFilter} onChange={(e)=>setHouseholdFilter(e.target.value)}><option value="">Tous les foyers</option>{data.households.map((h)=><option key={h.id} value={h.id}>{h.name}</option>)}</select>
@@ -240,7 +314,7 @@ export default function EventTreasury({ data, onReload, user }) {
               </div>
             })}
           </div>
-          {!filteredPeople.length && <p className="tv2-empty">Aucune personne correspondante. Ajoutez d’abord les personnes sans compte dans « Membres & accès ».</p>}
+          {!filteredPeople.length && <p className="tv2-empty">Aucune personne correspondante. Utilisez « Nouveau participant » pour la créer directement ici.</p>}
           <div className="evt-batch-footer"><div><strong>{selected.length} personne{selected.length>1?'s':''} · {selectedTotals.households.size} foyer{selectedTotals.households.size>1?'s':''}</strong><small>{money(selectedTotals.event)} de participations + {money(selectedTotals.membership)} de cotisations à appeler.</small></div>
           <button type="button" disabled={busy||!selected.length} className="primary-button" onClick={()=>sendRows(selected,{clear:true})}>{busy?'Enregistrement…':'Enregistrer les '+selected.length+' participants'}</button></div>
           <p className="tv2-hint">Sélectionner une personne déjà inscrite avec un montant non nul crée une dépense supplémentaire. Un montant de 0 € permet d’ajouter seulement sa présence ou sa cotisation. Aucun encaissement n’est créé avant de confirmer un paiement réel.</p>
@@ -294,7 +368,7 @@ export default function EventTreasury({ data, onReload, user }) {
           </article>
         })}
       </section>
-      <div className="evt-footer-note">Les charges et les paiements apparaissent aussi dans « Cotisations & dettes », les comptes Revolut/caisse et la sauvegarde Excel complète. Les paiements bancaires ne sont confirmés qu’après réception effective.</div>
+      <div className="evt-footer-note">Les charges, recettes et dépenses restent synchronisées avec le journal général. Un paiement participant confirmé sur Revolut ou en espèces solde ses dettes et crédite automatiquement le bon compte. Les dépenses liées à l’événement débitent automatiquement le compte choisi.</div>
     </>}
   </div>
 }
