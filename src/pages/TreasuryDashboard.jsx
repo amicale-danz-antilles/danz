@@ -419,78 +419,73 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     {view === 'events' && <EventTreasury data={data} onReload={reload} user={user} />}
 
     {view === 'overview' && <>
-      {!opening && <div className="tv2-setup-warning"><strong>À faire une fois : initialiser les soldes</strong><span>Indiquez le montant réel sur Revolut et le liquide actuellement en caisse.</span><button type="button" onClick={() => onView('settings')}>Renseigner mes soldes →</button></div>}
+      {!opening && <div className="tv2-setup-warning"><strong>Initialisez vos deux soldes réels</strong><span>Revolut et caisse liquide servent de point de départ à toute la trésorerie.</span><button type="button" onClick={() => onView('settings')}>Renseigner les soldes →</button></div>}
 
-      <section className="tv2-account-status">
-        <article className="tv2-balance tv2-bank"><span>Compte bancaire · Revolut</span><strong>{opening ? formatMoney(balances.bank) : 'À initialiser'}</strong><small>Argent réellement disponible sur le compte</small></article>
-        <article className="tv2-balance tv2-cash"><span>Caisse liquide</span><strong>{opening ? formatMoney(balances.cash) : 'À initialiser'}</strong><small>Espèces réellement disponibles</small></article>
+      <section className="tv2-finance-head">
+        <article className="tv2-finance-account bank"><span>Compte bancaire · Revolut</span><strong>{opening ? formatMoney(balances.bank) : 'À initialiser'}</strong><small>argent réellement disponible</small></article>
+        <article className="tv2-finance-account cash"><span>Caisse liquide</span><strong>{opening ? formatMoney(balances.cash) : 'À initialiser'}</strong><small>espèces réellement disponibles</small></article>
+        <button type="button" className="tv2-finance-action" onClick={()=>onView('events')}><span>Événements</span><strong>Gérer un repas / une activité →</strong><small>participants, tarifs, courses, paiements et balance</small></button>
       </section>
 
-      <section className="tv2-simple-home">
-        <div className="tv2-simple-title"><div><span className="tv2-eyebrow">Accueil trésorerie</span><h2>Que voulez-vous faire ?</h2><p>Deux actions suffisent pour la gestion quotidienne.</p></div></div>
-        <div className="tv2-simple-actions tv2-simple-actions-two">
-          <button type="button" onClick={() => openForm('expense')}><span>−</span><strong>Dépense</strong><small>Qui a payé ? Combien ? Pourquoi ?</small></button>
-          <button type="button" onClick={() => document.getElementById('quick-debt')?.scrollIntoView({behavior:'smooth',block:'center'})}><span>€</span><strong>Dette</strong><small>Qui doit combien et pourquoi ?</small></button>
+      <section className="tv2-attention-grid">
+        <button type="button" onClick={() => document.getElementById('open-debts')?.scrollIntoView({behavior:'smooth',block:'start'})}><span>À encaisser</span><strong>{formatMoney(dueTotal)}</strong><small>{openDebtRows.length} dette{openDebtRows.length>1?'s':''} encore ouverte{openDebtRows.length>1?'s':''}</small></button>
+        <button type="button" onClick={onAdvanced}><span>À rembourser</span><strong>{formatMoney(pendingAdvanceCents)}</strong><small>{pendingAdvances.length} avance{pendingAdvances.length>1?'s':''} personnelle{pendingAdvances.length>1?'s':''}</small></button>
+        <article><span>Cotisations reconnues {year}</span><strong>{formatMoney(annualEconomics?.recognizedMembership || 0)}</strong><small>5 € par mois de cotisation active</small></article>
+        <article className={(annualEconomics?.membershipHeadroom || 0)>=0?'positive':'negative'}><span>Marge cotisations / événements</span><strong>{(annualEconomics?.membershipHeadroom || 0)>=0?'+':''}{formatMoney(annualEconomics?.membershipHeadroom || 0)}</strong><small>{(annualEconomics?.membershipHeadroom || 0)>=0?'budget annuel encore disponible':'coût des gratuités supérieur aux cotisations connues'}</small></article>
+      </section>
+
+      {pendingPayments.length>0 && <div className="tj-warning">{pendingPayments.length} virement{pendingPayments.length>1?'s':''} déclaré{pendingPayments.length>1?'s':''} à confirmer. <button type="button" onClick={()=>onView('operations')}>Vérifier →</button></div>}
+
+      <section className="tv2-panel tv2-year-cockpit">
+        <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Pilotage {year}</span><h2>Les cotisations financent-elles nos activités ?</h2></div><span className={'tv2-profit-status '+((annualEconomics?.membershipHeadroom || 0)>=0?'positive':'negative')}>{(annualEconomics?.membershipHeadroom || 0)>=0?'Budget soutenable':'Budget à surveiller'}</span></div>
+        <p className="tv2-year-rule">Les cotisations sont lissées à <strong>5 € par mois</strong> : 60 € = 12 mois et 20 € = 4 mois. Les paiements des non-amicalistes et enfants réduisent directement le coût supporté par l’Amicale.</p>
+        <div className="tv2-year-cockpit-grid">
+          <article><small>Cotisations connues sur l’année</small><strong>{formatMoney(annualEconomics?.fullYearMembership || 0)}</strong><span>budget annuel disponible</span></article>
+          <article><small>Coût des événements</small><strong>{formatMoney(annualEconomics?.cost || 0)}</strong><span>courses et dépenses rattachées</span></article>
+          <article><small>Paiements activités</small><strong>{formatMoney((annualEconomics?.directReceived || 0)+(annualEconomics?.due || 0))}</strong><span>encaissé + encore à recevoir</span></article>
+          <article><small>À financer par l’Amicale</small><strong>{formatMoney(annualEconomics?.eventSupportNeeded || 0)}</strong><span>coût restant après les participations</span></article>
+          <article className={(annualEconomics?.membershipHeadroom || 0)>=0?'positive':'negative'}><small>Marge annuelle</small><strong>{(annualEconomics?.membershipHeadroom || 0)>=0?'+':''}{formatMoney(annualEconomics?.membershipHeadroom || 0)}</strong><span>cotisations − coût à financer</span></article>
         </div>
       </section>
 
-      <section className="tv2-simple-follow">
-        <button type="button" onClick={() => document.getElementById('open-debts')?.scrollIntoView({behavior:'smooth',block:'start'})}><span>À recevoir</span><strong>{formatMoney(dueTotal)}</strong><small>{openDebtRows.length} dette{openDebtRows.length>1?'s':''} en cours</small></button>
-        <button type="button" onClick={onAdvanced}><span>À rembourser</span><strong>{formatMoney(pendingAdvanceCents)}</strong><small>{pendingAdvances.length} avance{pendingAdvances.length>1?'s':''}</small></button>
-        <article><span>Balance activités {year}</span><strong className={(annualEconomics?.currentBalance || 0)<0?'negative':'positive'}>{(annualEconomics?.currentBalance || 0)>=0?'+':''}{formatMoney(annualEconomics?.currentBalance || 0)}</strong><small>Cotisations lissées + activités − coûts</small></article>
-      </section>
-
-      {pendingPayments.length>0 && <div className="tj-warning">{pendingPayments.length} virement{pendingPayments.length>1?'s':''} déclaré{pendingPayments.length>1?'s':''} reste{pendingPayments.length>1?'nt':''} à confirmer. <button type="button" onClick={()=>onView('operations')}>Voir dans le journal →</button></div>}
-
-      <section className="tv2-panel tv2-quick-debt" id="quick-debt">
-        <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Nouvelle dette</span><h2>Qui doit quoi ?</h2></div><small>Une dette ne touche jamais Revolut ou la caisse avant son paiement.</small></div>
-        <form className="tv2-quick-debt-form" onSubmit={addDirectCharge}>
-          <label>Qui ?<select required value={selectedPerson || ''} onChange={(e) => { setSelectedPerson(e.target.value || null); setChargeDraft({...chargeDraft,category:'other'}) }}><option value="">Choisir une personne…</option>{allRoster.map((person)=><option key={person.personType+person.personId} value={person.personType+':'+person.personId}>{person.display}{person.personType==='offline'?' · sans compte':''}</option>)}</select></label>
-          <label>Combien ? (€)<input required inputMode="decimal" value={chargeDraft.amount} onChange={(e)=>setChargeDraft({...chargeDraft,amount:e.target.value})} placeholder="0,00"/></label>
-          <label>Pourquoi ?<input required value={chargeDraft.label} onChange={(e)=>setChargeDraft({...chargeDraft,label:e.target.value})} placeholder="Repas, activité, participation…"/></label>
-          <label>Événement<select value={chargeDraft.event_id} onChange={(e)=>setChargeDraft({...chargeDraft,event_id:e.target.value})}><option value="">Aucun</option>{data.events.map((event)=><option key={event.id} value={event.id}>{event.title}</option>)}</select></label>
-          <button type="submit" className="primary-button" disabled={busy}>Ajouter la dette</button>
-        </form>
-      </section>
-
-      <section className="tv2-panel tv2-open-debts" id="open-debts">
-        <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Argent à recevoir</span><h2>Dettes en cours</h2></div><small>Validez uniquement au moment où l’argent est réellement reçu.</small></div>
-        <div className="tv2-debt-list">
-          {openDebtRows.map(({charge,display,event,due})=><div className="tv2-debt-row" key={charge.id}>
-            <div><strong>{display}</strong><small>{charge.label}{event?' · '+event.title:''}{charge.category==='membership'?' · Cotisation':''}</small></div>
-            <b>{formatMoney(due)}</b>
-            <button type="button" className="tv2-mini-button" disabled={busy} onClick={()=>collectOneDebt(charge,'cash')}>Payé espèces</button>
-            <button type="button" className="tv2-mini-button" disabled={busy} onClick={()=>collectOneDebt(charge,'bank_transfer')}>Payé Revolut</button>
-          </div>)}
-          {!openDebtRows.length&&<p className="tv2-empty">Aucune dette en cours.</p>}
-        </div>
-      </section>
-
-      <section className="tv2-panel tv2-year-profit">
-        <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Pilotage annuel · {year}</span><h2>Rentabilité des activités</h2></div><span className={'tv2-profit-status '+((annualEconomics?.currentBalance || 0)>=0?'positive':'negative')}>{(annualEconomics?.currentBalance || 0)>=0?'Balance positive':'Balance négative'}</span></div>
-        <p className="tv2-year-rule">Cotisations lissées : <strong>60 € / 12 mois = 5 €/mois</strong> et <strong>20 € / 4 mois = 5 €/mois</strong>.</p>
-        <div className="tv2-year-profit-grid">
-          <article><small>Cotisations reconnues</small><strong>{formatMoney(annualEconomics?.recognizedMembership || 0)}</strong><span>Budget acquis progressivement</span></article>
-          <article><small>Paiements activités</small><strong>{formatMoney(annualEconomics?.directReceived || 0)}</strong><span>Hors cotisations</span></article>
-          <article><small>Coût des événements</small><strong>{formatMoney(annualEconomics?.cost || 0)}</strong><span>Courses et dépenses rattachées</span></article>
-          <article className={(annualEconomics?.currentBalance || 0)>=0?'positive':'negative'}><small>Balance actuelle</small><strong>{(annualEconomics?.currentBalance || 0)>=0?'+':''}{formatMoney(annualEconomics?.currentBalance || 0)}</strong><span>Rentabilité à date</span></article>
-          <article className={(annualEconomics?.projectedBalance || 0)>=0?'positive':'negative'}><small>Projection</small><strong>{(annualEconomics?.projectedBalance || 0)>=0?'+':''}{formatMoney(annualEconomics?.projectedBalance || 0)}</strong><span>Si les dettes saisies sont payées</span></article>
-        </div>
-      </section>
-
-      <section className="tv2-panel tv2-event-balances">
-        <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Événements</span><h2>Balance par événement</h2></div><button type="button" className="ghost-button" onClick={() => onView('events')}>Gérer →</button></div>
-        <div className="tv2-event-balance-list">{eventBalances.map(({event,directReceived,cost,due,membershipAllocation,balance,projected,memberCount,nonmemberCount})=><button type="button" key={event.id} className="tv2-event-balance-row" onClick={() => onView('events')}>
-          <span><strong>{event.title}</strong><small>{formattedDate(event.starts_at)} · {memberCount} amicaliste{memberCount>1?'s':''} · {nonmemberCount} extérieur{nonmemberCount>1?'s':''}</small></span>
+      <section className="tv2-panel tv2-event-cockpit">
+        <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Événements</span><h2>Résultat de chaque repas / activité</h2></div><button type="button" className="primary-button" onClick={() => onView('events')}>Gérer les événements</button></div>
+        <div className="tv2-event-cards">{eventBalances.map(({event,directReceived,cost,due,membershipAllocation,projected,projectedAssociationCost,memberCount,nonmemberCount,childCount})=><button type="button" key={event.id} className="tv2-event-card" onClick={() => onView('events')}>
+          <div><strong>{event.title}</strong><small>{formattedDate(event.starts_at)} · {memberCount} amicaliste{memberCount>1?'s':''} · {nonmemberCount} extérieur{nonmemberCount>1?'s':''} · {childCount || 0} enfant{childCount>1?'s':''}</small></div>
           <span><small>Coût</small><b>{formatMoney(cost)}</b></span>
-          <span><small>Payé</small><b>{formatMoney(directReceived)}</b></span>
-          <span><small>Cotisations</small><b>{formatMoney(membershipAllocation)}</b></span>
-          <span><small>Reste dû</small><b>{formatMoney(due)}</b></span>
-          <span className={balance<0?'negative':'positive'}><small>Balance</small><b>{balance>=0?'+':''}{formatMoney(balance)}</b></span>
-          <span className={projected<0?'negative':'positive'}><small>Projection</small><b>{projected>=0?'+':''}{formatMoney(projected)}</b></span>
+          <span><small>Participations</small><b>{formatMoney(directReceived+due)}</b></span>
+          <span><small>Part cotisations</small><b>{formatMoney(membershipAllocation)}</b></span>
+          <span><small>À financer Amicale</small><b>{formatMoney(projectedAssociationCost || 0)}</b></span>
+          <span className={projected<0?'negative':'positive'}><small>Balance projetée</small><b>{projected>=0?'+':''}{formatMoney(projected)}</b></span>
         </button>)}</div>
         {!eventBalances.length&&<p className="tv2-empty">Aucun événement financier pour le moment.</p>}
       </section>
+
+      <section className="tv2-panel tv2-open-debts" id="open-debts">
+        <div className="tv2-section-heading"><div><span className="tv2-eyebrow">À encaisser</span><h2>Dettes encore ouvertes</h2></div><small>Le paiement ne touche le solde qu’au moment où vous le confirmez.</small></div>
+        <div className="tv2-debt-list">
+          {openDebtRows.slice(0,12).map(({charge,display,event,due})=><div className="tv2-debt-row" key={charge.id}>
+            <div><strong>{display}</strong><small>{charge.label}{event?' · '+event.title:''}{charge.category==='membership'?' · Cotisation':''}</small></div>
+            <b>{formatMoney(due)}</b>
+            <button type="button" className="tv2-mini-button" disabled={busy} onClick={()=>collectOneDebt(charge,'cash')}>Payé liquide</button>
+            <button type="button" className="tv2-mini-button" disabled={busy} onClick={()=>collectOneDebt(charge,'bank_transfer')}>Payé Revolut</button>
+          </div>)}
+          {!openDebtRows.length&&<p className="tv2-empty">Aucune dette en cours.</p>}
+          {openDebtRows.length>12&&<button type="button" className="ghost-button" onClick={()=>onView('memberships')}>Voir les {openDebtRows.length} dettes →</button>}
+        </div>
+      </section>
+
+      <details className="tv2-panel tv2-secondary-action">
+        <summary>Opérations hors événement</summary>
+        <p>À utiliser uniquement pour une dépense ou une dette qui ne concerne aucun repas / activité.</p>
+        <div className="tv2-secondary-buttons"><button type="button" className="ghost-button" onClick={()=>openForm('expense')}>Dépense hors événement</button><button type="button" className="ghost-button" onClick={()=>document.getElementById('quick-debt')?.scrollIntoView({behavior:'smooth'})}>Dette hors événement</button></div>
+        <form className="tv2-quick-debt-form" id="quick-debt" onSubmit={addDirectCharge}>
+          <label>Qui ?<select required value={selectedPerson || ''} onChange={(e) => { setSelectedPerson(e.target.value || null); setChargeDraft({...chargeDraft,category:'other',event_id:''}) }}><option value="">Choisir…</option>{allRoster.map((person)=><option key={person.personType+person.personId} value={person.personType+':'+person.personId}>{person.display}{person.personType==='offline'?' · sans compte':''}</option>)}</select></label>
+          <label>Combien ? (€)<input required inputMode="decimal" value={chargeDraft.amount} onChange={(e)=>setChargeDraft({...chargeDraft,amount:e.target.value})}/></label>
+          <label>Pourquoi ?<input required value={chargeDraft.label} onChange={(e)=>setChargeDraft({...chargeDraft,label:e.target.value})}/></label>
+          <button type="submit" className="primary-button" disabled={busy}>Créer la dette</button>
+        </form>
+      </details>
     </>}
 
     {view === 'operations' && <>
