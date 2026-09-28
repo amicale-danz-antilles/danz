@@ -152,3 +152,30 @@
 .evt-new-person-form input{width:100%;min-width:0;padding:.62rem;border:1px solid #cbdad6;border-radius:9px;background:#fff;font:inherit}
 @media(max-width:1050px){.evt-accounting-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.evt-accounting-form{grid-template-columns:repeat(2,minmax(0,1fr))}.evt-accounting-form .evt-accounting-note{grid-column:auto}.evt-new-person-form{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.evt-accounting-kpis{grid-template-columns:1fr 1fr}.evt-accounting-form,.evt-new-person-form{grid-template-columns:1fr}.evt-accounting-form .evt-accounting-note{grid-column:auto}.evt-entry-row{grid-template-columns:27px minmax(0,1fr)}.evt-entry-row>b{grid-column:2;text-align:left}.evt-new-person-actions>button{width:100%}}
+
+
+/* V35 · écran événement simplifié : argent, dette, paiement */
+.evt-money-now{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem}
+.evt-money-now article{display:grid;gap:.3rem;padding:1.05rem 1.15rem;border:1px solid #d9e5e2;border-radius:17px;background:#fff;box-shadow:0 4px 16px #173c5209}
+.evt-money-now article>span{font-size:.78rem;font-weight:800;color:#516b68}
+.evt-money-now article>strong{font-size:clamp(1.55rem,3vw,2.2rem);font-variant-numeric:tabular-nums;letter-spacing:-.04em}
+.evt-money-now article>small{font-size:.7rem;color:#71817e;line-height:1.4}
+.evt-money-bank{border-top:5px solid #29618a!important}.evt-money-cash{border-top:5px solid #b87b31!important}
+.evt-simple-picker{display:flex;align-items:end;gap:.65rem;padding:.85rem 1rem;border:1px solid #d5e3df;border-radius:14px;background:#f8fbfa}
+.evt-simple-picker label{display:grid;gap:.35rem;flex:1;font-size:.75rem;font-weight:800}
+.evt-simple-picker select{width:100%;padding:.75rem .8rem;border:1px solid #c8d8d4;border-radius:10px;background:#fff;color:inherit;font:inherit}
+.evt-simple-debt{border-color:#a7cec2;background:linear-gradient(180deg,#fff,#f8fcfa)}
+.evt-simple-debt-form{display:grid;grid-template-columns:1.4fr .65fr 1.3fr auto;gap:.6rem;align-items:end}
+.evt-simple-debt-form label{display:grid;gap:.3rem;min-width:0;font-size:.72rem;font-weight:800}
+.evt-simple-debt-form select,.evt-simple-debt-form input{width:100%;min-width:0;padding:.7rem .72rem;border:1px solid #c8d8d4;border-radius:10px;background:#fff;color:inherit;font:inherit}
+.evt-simple-debt-form>button{min-height:42px;white-space:nowrap}
+.evt-manual-participant{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;padding:.6rem .7rem;background:#eff7f4;border-radius:11px}
+.evt-manual-participant span{font-size:.7rem;color:#607872;flex:1;min-width:180px}
+details.evt-accounting>summary,details.evt-add-people>summary{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:.7rem;flex-wrap:wrap}
+details.evt-accounting>summary strong,details.evt-add-people>summary strong{font-size:.88rem;color:#244e4a}
+details.evt-accounting>summary span,details.evt-add-people>summary span{font-size:.7rem;color:#71817e}
+details.evt-accounting[open]>summary,details.evt-add-people[open]>summary{padding-bottom:.7rem;border-bottom:1px solid #e1ebe7}
+.evt-households>.evt-section-heading{padding:.2rem .1rem}
+.evt-pay-footer .evt-pay-cash,.evt-pay-footer .evt-pay-bank{min-height:40px}
+@media(max-width:850px){.evt-simple-debt-form{grid-template-columns:1fr 1fr}.evt-simple-debt-form>button{width:100%}}
+@media(max-width:560px){.evt-money-now{grid-template-columns:1fr}.evt-simple-picker{align-items:stretch;flex-direction:column}.evt-simple-picker>button{width:100%}.evt-simple-debt-form{grid-template-columns:1fr}.evt-manual-participant>button{width:100%}}
