@@ -279,7 +279,7 @@ export default function EventTreasury({ data, onReload, user }) {
           <h3>Ajouter sans compte</h3>
           <label>Nom<input required value={guest.name} onChange={(e)=>setGuest({...guest,name:e.target.value})} placeholder="Nom et prénom"/></label>
           <label>Email facultatif<input type="email" value={guest.email} onChange={(e)=>setGuest({...guest,email:e.target.value})} placeholder="facultatif"/></label>
-          <div className="evt-inline-fields"><label>Statut<select value={guest.group} onChange={(e)=>changeGuestGroup(e.target.value)}><option value="guest">Extérieur</option><option value="nonmember">Non-amicaliste</option><option value="member">Amicaliste</option></select></label><label>À payer (€)<input required inputMode="decimal" value={guest.amount} onChange={(e)=>setGuest({...guest,amount:e.target.value})}/></label></div>
+          <div className="evt-inline-fields"><label>Statut<select value={guest.group} onChange={(e)=>changeGuestGroup(e.target.value)}><option value="guest">Extérieur</option><option value="nonmember">Non-amicaliste</option><option value="child">Enfant</option><option value="member">Amicaliste</option></select></label><label>À payer (€)<input required inputMode="decimal" value={guest.amount} onChange={(e)=>setGuest({...guest,amount:e.target.value})}/></label></div>
           <button className="primary-button" disabled={busy}>{parseMoney(guest.amount)===0?'Créer gratuitement':'Créer + dette'}</button>
         </form>
       </div>
