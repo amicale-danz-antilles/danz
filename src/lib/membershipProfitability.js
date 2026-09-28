@@ -100,10 +100,12 @@ export function eventManagementEconomics(event, data) {
   const paidDirect = charges.reduce((sum, charge) => sum + chargePaidCents(charge.id, data?.allocations || [], data?.payments || []), 0)
   const dueDirect = charges.reduce((sum, charge) => sum + chargeResidualCents(charge, data?.allocations || [], data?.payments || []), 0)
 
-  const linkedEntries = (data?.entries || []).filter((entry) => entry.event_id === event.id && entry.status === 'settled')
+  const linkedEntries = (data?.entries || []).filter((entry) => entry.event_id === event.id && entry.status !== 'cancelled')
   const otherIncome = linkedEntries
-    .filter((entry) => entry.kind === 'income' && !entry.household_payment_id)
+    .filter((entry) => entry.kind === 'income' && entry.status === 'settled' && !entry.household_payment_id)
     .reduce((sum, entry) => sum + Number(entry.amount_cents || 0), 0)
+  // Une avance personnelle est déjà un coût économique de l’événement même si
+  // l’Amicale ne l’a pas encore remboursée. Elle ne touche la trésorerie qu’au remboursement.
   const cost = linkedEntries
     .filter((entry) => entry.kind === 'expense')
     .reduce((sum, entry) => sum + Number(entry.amount_cents || 0), 0)
