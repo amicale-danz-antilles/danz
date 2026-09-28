@@ -7,11 +7,11 @@ import LegacyTreasury from './LegacyTreasury.jsx'
 import '../treasury-v2.css'
 
 const TABS = [
-  ['overview', 'Accueil'],
+  ['overview', 'Vue finances'],
   ['events', 'Événements'],
   ['operations', 'Journal'],
-  ['memberships', 'Dettes & cotisations'],
-  ['advanced', 'Avances'],
+  ['memberships', 'Cotisations & autres dettes'],
+  ['advanced', 'Remboursements'],
   ['settings', 'Export'],
 ]
 
@@ -56,7 +56,7 @@ export default function AdminTreasury() {
 
   return <div className="treasury-v2">
     <header className="tv2-page-title">
-      <div><span className="tv2-eyebrow">Amicale DANZ · Accès nominatif</span><h1>Ma trésorerie</h1><p>Un suivi simple de votre argent, des événements, des dettes et des cotisations.</p></div>
+      <div><span className="tv2-eyebrow">Amicale DANZ · Accès nominatif</span><h1>Finances de l’Amicale</h1><p>Deux comptes réels, des événements complets et une vision annuelle de ce que les cotisations permettent de financer.</p></div>
       <span className="tv2-role">Administrateur + Trésorier</span>
     </header>
     <nav className="tv2-tabs" aria-label="Sections de la trésorerie">

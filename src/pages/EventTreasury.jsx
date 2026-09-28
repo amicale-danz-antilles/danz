@@ -1,414 +1,351 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
-import { eventPeople, eventOverview, buildEventGroups } from '../lib/eventFinance.js'
-import { formatMoney } from '../lib/finance.js'
+import { chargePaidCents, chargeResidualCents, formatMoney } from '../lib/finance.js'
+import { eventPeople, eventParticipationKey } from '../lib/eventFinance.js'
+import { eventManagementEconomics, isMemberForEvent } from '../lib/membershipProfitability.js'
 import { ledgerBalances } from '../lib/treasuryLedger.js'
-import { eventManagementEconomics } from '../lib/membershipProfitability.js'
 import '../treasury-events.css'
 
-const parseMoney = (value) => {
-  const text = String(value ?? '').replace(/\s/g, '').replace(',', '.')
-  if (!/^\d+(\.\d{1,2})?$/.test(text)) return NaN
-  const cents = Math.round(Number(text) * 100)
-  return Number.isSafeInteger(cents) ? cents : NaN
-}
-const dateToday = () => {
+const day = () => {
   const d = new Date()
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0')
+  return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')
 }
-const dateLabel = (value) => value ? new Date(value).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}) : 'Sans date'
-const money = (cents) => formatMoney(cents)
-const categories = [['activity','Participation'],['meal','Repas'],['drinks','Boissons'],['other','Autre'],['adjustment','Régularisation']]
-const defaultEventForm = () => ({title:'',date:dateToday()})
-const icon = (type) => type === 'child' ? '🧒' : type === 'offline' ? '○' : '●'
-const personCategory = (person) => person.type === 'child' ? 'Enfant' : person.type === 'offline' ? 'Sans compte' : 'Compte membre'
-const dueMembership = (person, subscriptions, fee, charges, eventId) => {
-  if (person.type === 'child') return {allowed:false,note:'Pas de cotisation enfant',fee:0}
-  const pending = subscriptions.find((s) => s.user_id === person.id && person.type === 'account' && s.status === 'pending')
-  if (pending) {
-    const charge = charges.find((c) => c.id === pending.charge_id)
-    if (charge?.event_id && charge.event_id !== eventId)
-      return {allowed:false,note:'Cotisation liée à une autre soirée',fee:pending.amount_cents}
-    return {allowed:true,note:'Cotisation déjà appelée',fee:pending.amount_cents}
-  }
-  const cutoff = new Date();cutoff.setDate(cutoff.getDate()+60)
-  const cutoffDay = [cutoff.getFullYear(),String(cutoff.getMonth()+1).padStart(2,'0'),String(cutoff.getDate()).padStart(2,'0')].join('-')
-  if (person.amicaliste && person.until && person.until > cutoffDay) return {allowed:false,note:'Cotisation à jour',fee:0}
-  return {allowed:true,note:person.amicaliste ? 'Renouvellement' : 'Nouvelle cotisation',fee}
+const parseMoney = (value) => {
+  const normalized=String(value ?? '').trim().replace(/\s/g,'').replace(',','.')
+  return /^\d+(\.\d{1,2})?$/.test(normalized) ? Math.round(Number(normalized)*100) : NaN
 }
-const personPrice = (person, event) => {
-  if (!event?.pricing_enabled) return ''
-  if (person.type === 'child') return event.child_prices?.[person.ageCategory] ? String(event.child_prices[person.ageCategory]/100).replace('.',',') : ''
-  return String((person.amicaliste ? event.member_meal_cents : event.nonmember_meal_cents)/100).replace('.',',')
+const euros = (cents) => String(Number(cents || 0)/100).replace('.',',')
+const eventDate = (value) => value ? new Date(value).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'}) : '—'
+const groupLabel = (group) => group==='member'?'Amicaliste':group==='child'?'Enfant':group==='guest'?'Extérieur':'Non-amicaliste'
+const accountLabel = (method) => method==='cash'?'Caisse liquide':method==='personal_advance'?'Avance personnelle':'Revolut'
+
+function priceFor(event,group){
+  if(group==='member') return Number(event?.member_meal_cents || 0)
+  if(group==='child') return Number(event?.child_prices?.default || 0)
+  return Number(event?.nonmember_meal_cents || 0)
 }
-const amountFor = (person, event, global) => global !== '' ? global : personPrice(person, event)
 
 export default function EventTreasury({ data, onReload, user }) {
-  const events = data.events || []
-  const [chosenEventId, setChosenEventId] = useState('')
-  const [newEventOpen,setNewEventOpen] = useState(false)
-  const [newEvent,setNewEvent] = useState(defaultEventForm)
-  const [newPersonOpen,setNewPersonOpen] = useState(false)
-  const [newPerson,setNewPerson] = useState({name:'',email:'',notes:''})
-  const [eventEntry,setEventEntry] = useState({kind:'expense',label:'',amount:'',method:'bank_transfer',date:dateToday(),note:''})
-  const [simpleDebt,setSimpleDebt] = useState({personKey:'',amount:'',label:''})
-  const [draft,setDraft] = useState({})
-  const [query,setQuery] = useState('')
-  const [householdFilter,setHouseholdFilter] = useState('')
-  const [selectionFilter,setSelectionFilter] = useState('all')
-  const [category,setCategory] = useState('activity')
-  const [label,setLabel] = useState('')
-  const [globalAmount,setGlobalAmount] = useState('')
-  const [expanded,setExpanded] = useState({})
-  const [checked,setChecked] = useState({})
-  const [quick,setQuick] = useState(null)
-  const [busy,setBusy] = useState(false)
-  const [error,setError] = useState('')
-  const [notice,setNotice] = useState('')
-  const batchRef=useRef({payload:'',id:''})
-  const { people, byKey } = useMemo(() => eventPeople(data),[data])
-  const chosenId = chosenEventId || events[0]?.id || ''
-  const activeEvent = events.find((e) => e.id === chosenId)
-  const groups = useMemo(() => chosenId ? buildEventGroups(chosenId,data) : [],[chosenId,data])
-  const overview = useMemo(() => chosenId ? eventOverview(chosenId,data) : null,[chosenId,data])
-  const eventEntries = useMemo(() => (data.entries || [])
-    .filter((entry) => entry.event_id === chosenId && entry.status !== 'cancelled')
-    .sort((a,b) => new Date(b.occurred_at || b.created_at).getTime() - new Date(a.occurred_at || a.created_at).getTime()),[chosenId,data.entries])
-  const eventEconomics = useMemo(() => activeEvent ? eventManagementEconomics(activeEvent,data) : null,[activeEvent,data])
-  const eventIncome = eventEconomics?.directReceived || 0
-  const eventExpense = eventEconomics?.cost || 0
-  const eventPending = eventEntries.filter((entry)=>entry.kind==='expense'&&entry.status==='pending').reduce((sum,entry)=>sum+Number(entry.amount_cents||0),0)
-  const eventNet = eventEconomics?.balance || 0
-  const eventProjected = eventEconomics?.projected || 0
-  const accountBalances = ledgerBalances(data.opening,data.entries || [],data.transfers || [])
-  const participating = useMemo(() => new Set(groups.flatMap((g) => g.people.map((p) => p.key))),[groups])
-  const fee = Number(data.settings?.membership_fee_cents ?? 6000)
-  const selected = Object.entries(draft).filter(([,value]) => value.selected).map(([key,value]) => ({person:byKey[key],...value})).filter((row)=>row.person)
-  const selectedTotals = selected.reduce((acc,row) => {
-    acc.event += Number.isFinite(parseMoney(row.amount)) ? parseMoney(row.amount) : 0
-    if (row.membership) acc.membership += dueMembership(row.person,data.subscriptions || [],fee,data.charges || [],chosenId).fee
-    acc.households.add(row.person.householdId)
-    return acc
-  },{event:0,membership:0,households:new Set()})
-  const filteredPeople = people.filter((person) => {
-    const text = (person.name + ' ' + person.householdName + ' ' + person.email).toLocaleLowerCase('fr')
-    return text.includes(query.trim().toLocaleLowerCase('fr'))
-      && (!householdFilter || person.householdId === householdFilter)
-      && (selectionFilter !== 'selected' || draft[person.key]?.selected)
-      && (selectionFilter !== 'new' || !participating.has(person.key))
-  })
-  const setPerson = (person, patch) => setDraft((previous) => ({
-    ...previous,[person.key]:{selected:false,amount:amountFor(person,activeEvent,globalAmount),membership:false,...previous[person.key],...patch}
-  }))
-  const switchEvent = (id) => {
-    setChosenEventId(id);setDraft({});setQuery('');setHouseholdFilter('');setChecked({});setQuick(null);setNewPersonOpen(false)
-    setEventEntry({kind:'expense',label:'',amount:'',method:'bank_transfer',date:dateToday(),note:''});setSimpleDebt({personKey:'',amount:'',label:''});setError('');setNotice('')
-  }
-  const applyGlobal = () => setDraft((prev) => Object.fromEntries(
-    Object.entries(prev).map(([key,row]) => [key,row.selected ? {...row,amount:globalAmount} : row])
-  ))
-  const selectVisible = (value) => setDraft((prev) => {
-    const next={...prev}
-    for (const p of filteredPeople) next[p.key]={selected:value,amount:amountFor(p,activeEvent,globalAmount),membership:false,...prev[p.key],selected:value}
-    return next
-  })
+  const events=data.events || []
+  const { people,byKey }=useMemo(()=>eventPeople(data),[data])
+  const [eventId,setEventId]=useState('')
+  const activeEvent=events.find((event)=>event.id===(eventId || events[0]?.id))
+  const activeId=activeEvent?.id || ''
+  const [busy,setBusy]=useState(false)
+  const [error,setError]=useState('')
+  const [notice,setNotice]=useState('')
+  const [panel,setPanel]=useState('')
+  const [newEvent,setNewEvent]=useState({title:'',date:day(),member:'0',nonmember:'',child:''})
+  const [rules,setRules]=useState({member:'0',nonmember:'',child:''})
+  const [participant,setParticipant]=useState({personKey:'',group:'nonmember',amount:''})
+  const [guest,setGuest]=useState({name:'',email:'',group:'guest',amount:''})
+  const [expense,setExpense]=useState({label:'Courses',amount:'',method:'bank_transfer',advancedBy:'',date:day(),note:''})
+  const [editing,setEditing]=useState(null)
+  const [editDraft,setEditDraft]=useState({group:'nonmember',amount:''})
 
-  const execute = async (callback,message) => {
-    if (busy) return false
+  useEffect(()=>{
+    if(!activeEvent)return
+    setRules({
+      member:euros(activeEvent.member_meal_cents),
+      nonmember:euros(activeEvent.nonmember_meal_cents),
+      child:euros(activeEvent.child_prices?.default || 0),
+    })
+    setParticipant({personKey:'',group:'nonmember',amount:euros(activeEvent.nonmember_meal_cents)})
+    setGuest({name:'',email:'',group:'guest',amount:euros(activeEvent.nonmember_meal_cents)})
+    setExpense({label:'Courses',amount:'',method:'bank_transfer',advancedBy:'',date:day(),note:''})
+    setEditing(null);setPanel('');setError('');setNotice('')
+  },[activeId])
+
+  const balances=ledgerBalances(data.opening,data.entries || [],data.transfers || [])
+  const economics=activeEvent ? eventManagementEconomics(activeEvent,data) : null
+  const eventEntries=(data.entries || []).filter((entry)=>entry.event_id===activeId && entry.status!=='cancelled')
+    .sort((a,b)=>new Date(b.occurred_at || b.created_at)-new Date(a.occurred_at || a.created_at))
+  const pendingAdvances=eventEntries.filter((entry)=>entry.kind==='expense' && entry.payment_method==='personal_advance' && entry.status==='pending')
+  const settledExpenses=eventEntries.filter((entry)=>entry.kind==='expense' && entry.status==='settled')
+
+  const rows=useMemo(()=>{
+    if(!activeId)return []
+    return (data.eventParticipants || []).filter((row)=>row.event_id===activeId).map((row)=>{
+      const key=eventParticipationKey(row)
+      const person=byKey[key]
+      const charge=row.charge_id ? (data.charges || []).find((item)=>item.id===row.charge_id) : (data.charges || []).find((item)=>
+        item.event_id===activeId && item.status!=='cancelled' && item.category!=='membership' &&
+        ((row.user_id && item.user_id===row.user_id)||(row.offline_person_id && item.offline_person_id===row.offline_person_id)||(row.household_member_id && item.household_member_id===row.household_member_id))
+      )
+      const paid=charge ? chargePaidCents(charge.id,data.allocations || [],data.payments || []) : 0
+      const due=charge && charge.status!=='cancelled' ? chargeResidualCents(charge,data.allocations || [],data.payments || []) : 0
+      return {row,key,person,charge,paid,due}
+    }).filter((item)=>item.person).sort((a,b)=>b.due-a.due || a.person.name.localeCompare(b.person.name,'fr'))
+  },[activeId,data.eventParticipants,data.charges,data.allocations,data.payments,byKey])
+
+  const participantKeys=new Set(rows.map((item)=>item.key))
+  const availablePeople=people.filter((person)=>!participantKeys.has(person.key)).sort((a,b)=>a.name.localeCompare(b.name,'fr'))
+  const payers=people.filter((person)=>person.type!=='child').sort((a,b)=>a.name.localeCompare(b.name,'fr'))
+
+  const isMemberAtEvent=(person)=>{
+    if(!activeEvent || !person || person.type==='child')return false
+    if(isMemberForEvent(person,data.subscriptions || [],activeEvent.starts_at))return true
+    const eventDay=String(activeEvent.starts_at || '').slice(0,10)
+    return Boolean(person.until && eventDay && person.until>=eventDay && person.amicaliste)
+  }
+  const suggestedGroup=(person)=>person?.type==='child'?'child':isMemberAtEvent(person)?'member':'nonmember'
+
+  const run=async(callback,message)=>{
+    if(busy)return false
     setBusy(true);setError('');setNotice('')
-    try {
-      await callback()
-      await onReload()
-      setNotice(message)
-      return true
-    } catch(e){setError(e.message || 'L’enregistrement a échoué.');return false}
+    try{await callback();await onReload();setNotice(message);return true}
+    catch(err){setError(err.message || 'L’enregistrement a échoué.');return false}
     finally{setBusy(false)}
   }
-  const makeRows = (rows) => rows.map(({person,amount,membership,chargeCategory,chargeLabel}) => {
-    const cents = parseMoney(amount || '0')
-    if (!person?.householdId) throw new Error('Rattachez chaque personne à un foyer avant de facturer.')
-    if (!Number.isSafeInteger(cents) || cents < 0 || cents > 100000000)
-      throw new Error('Corrigez les montants : deux décimales maximum et montant positif.')
-    const member = membership && dueMembership(person,data.subscriptions || [],fee,data.charges || [],chosenId)
-    if (membership && !member.allowed) throw new Error('Cotisation non disponible pour ' + person.name + '.')
-    return {
-      person_type:person.type,person_id:person.id,amount_cents:cents,
-      membership:Boolean(membership),category:chargeCategory || category,
-      label:(chargeLabel || label.trim() || ('Participation · ' + activeEvent.title)).slice(0,180),
-    }
-  })
-  const sendRows = async (rows,{clear=false}={}) => {
-    if(!activeEvent) return
-    let payload
-    try{payload=makeRows(rows)}catch(e){setError(e.message);return}
-    if(!payload.length)return
-    if (clear && rows.some((r)=>participating.has(r.person.key)&&parseMoney(r.amount)>0) &&
-      !window.confirm('Certaines personnes sont déjà inscrites. Confirmer la création de dépenses supplémentaires pour elles ?'))return
-    const signature=JSON.stringify({event:activeEvent.id,payload})
-    if (batchRef.current.payload!==signature)batchRef.current={payload:signature,id:crypto.randomUUID()}
-    const success=await execute(async()=>{
-      const {data:result,error:saveError}=await supabase.rpc('treasury_assign_event_charges',{
-        p_event_id:activeEvent.id,p_batch_id:batchRef.current.id,p_rows:payload
-      })
-      if(saveError)throw saveError
-      return result
-    },payload.length+' personne(s) enregistrée(s) dans '+activeEvent.title+'.')
-    // Conserver la clé de lot si l'enregistrement a réussi mais le rechargement a échoué :
-    // retenter ne créera jamais les mêmes dettes une deuxième fois.
-    if(success){
-      if(clear){setDraft({});setGlobalAmount('');setLabel('')}
-      setQuick(null)
-      batchRef.current={payload:'',id:''}
-    }
-    return success
-  }
-  const createEvent = (event) => {
+
+  const saveRules=async(event)=>{
     event.preventDefault()
-    if(newEvent.title.trim().length<3 || !newEvent.date){setError('Renseignez un titre et une date.');return}
-    execute(async()=>{
-      const {data:created,error:e}=await supabase.from('events').insert({
-        title:newEvent.title.trim(),starts_at:new Date(newEvent.date+'T18:00:00').toISOString(),created_by:user.id,
-        published:false,notify_on_publish:false,audience:'everyone',pricing_enabled:false
+    if(!activeEvent)return
+    const member=parseMoney(rules.member),nonmember=parseMoney(rules.nonmember),child=parseMoney(rules.child)
+    if([member,nonmember,child].some((value)=>!Number.isSafeInteger(value)||value<0)){
+      setError('Indiquez trois tarifs valides. Utilisez 0 pour une gratuité.');return
+    }
+    await run(async()=>{
+      const {error:e}=await supabase.from('events').update({
+        pricing_enabled:true,member_meal_cents:member,nonmember_meal_cents:nonmember,
+        child_prices:{...(activeEvent.child_prices || {}),default:child},
+        pricing_notes:'Tarifs de gestion définis dans la trésorerie',
+      }).eq('id',activeEvent.id)
+      if(e)throw e
+    },'Tarifs enregistrés. Les prochains participants utiliseront automatiquement ces montants.')
+  }
+
+  const createEvent=async(event)=>{
+    event.preventDefault()
+    const member=parseMoney(newEvent.member),nonmember=parseMoney(newEvent.nonmember),child=parseMoney(newEvent.child)
+    if(newEvent.title.trim().length<3 || !newEvent.date || [member,nonmember,child].some((v)=>!Number.isSafeInteger(v)||v<0)){
+      setError('Renseignez le nom, la date et les trois tarifs. Utilisez 0 pour une gratuité.');return
+    }
+    let created=''
+    const ok=await run(async()=>{
+      const {data:row,error:e}=await supabase.from('events').insert({
+        title:newEvent.title.trim(),starts_at:new Date(newEvent.date+'T18:00:00').toISOString(),
+        created_by:user.id,published:false,notify_on_publish:false,audience:'everyone',
+        pricing_enabled:true,member_meal_cents:member,nonmember_meal_cents:nonmember,
+        child_prices:{default:child},pricing_notes:'Événement financier créé depuis la trésorerie',
       }).select('id').single()
       if(e)throw e
-      setChosenEventId(created.id);setNewEventOpen(false);setNewEvent(defaultEventForm());setDraft({})
-    },'Événement financier créé : il n’est pas publié dans l’agenda.')
+      created=row.id
+    },'Événement créé. Vous pouvez maintenant ajouter les participants et les courses.')
+    if(ok){setEventId(created);setNewEvent({title:'',date:day(),member:'0',nonmember:'',child:''})}
   }
-  const createParticipant = async (event) => {
-    event.preventDefault()
-    if(!activeEvent)return
-    const name=newPerson.name.trim()
-    if(name.length<2){setError('Indiquez le nom du participant.');return}
-    let createdId=''
-    const success=await execute(async()=>{
-      const {data:personId,error:createError}=await supabase.rpc('treasury_event_create_participant',{
-        p_event_id:activeEvent.id,p_name:name,p_email:newPerson.email.trim()||null,p_notes:newPerson.notes.trim()||null
-      })
-      if(createError)throw createError
-      createdId=personId
-    },name+' a été créé et ajouté à '+activeEvent.title+'.')
-    if(success){
-      setNewPerson({name:'',email:'',notes:''});setNewPersonOpen(false);setQuery('')
-      if(createdId)setSimpleDebt((current)=>({...current,personKey:'offline:'+createdId}))
-    }
+
+  const choosePerson=(key)=>{
+    const person=byKey[key]
+    const group=suggestedGroup(person)
+    setParticipant({personKey:key,group,amount:euros(priceFor(activeEvent,group))})
   }
-  const addSimpleDebt = async (event) => {
+  const changeParticipantGroup=(group)=>setParticipant((current)=>({...current,group,amount:euros(priceFor(activeEvent,group))}))
+  const changeGuestGroup=(group)=>setGuest((current)=>({...current,group,amount:euros(priceFor(activeEvent,group))}))
+
+  const addParticipant=async(event)=>{
     event.preventDefault()
-    if(!activeEvent)return
-    const person=byKey[simpleDebt.personKey]
-    const amount=parseMoney(simpleDebt.amount)
-    if(!person){setError('Choisissez une personne.');return}
-    if(!Number.isSafeInteger(amount)||amount<=0){setError('Indiquez un montant positif valide.');return}
-    const success=await sendRows([{
-      person,amount:simpleDebt.amount,membership:false,chargeCategory:'activity',
-      chargeLabel:simpleDebt.label.trim()||('Participation · '+activeEvent.title)
-    }],{clear:false})
-    if(success)setSimpleDebt({personKey:'',amount:'',label:''})
-  }
-  const saveEventEntry = async (event) => {
-    event.preventDefault()
-    if(!activeEvent)return
-    const amount=parseMoney(eventEntry.amount)
-    if(!Number.isSafeInteger(amount)||amount<=0||!eventEntry.label.trim()){
-      setError('Indiquez un libellé et un montant positif valide.');return
-    }
-    const typeLabel=eventEntry.kind==='income'?'Recette':'Dépense'
-    const success=await execute(async()=>{
-      const {error:e}=await supabase.rpc('treasury_event_record_entry',{
-        p_event_id:activeEvent.id,p_kind:eventEntry.kind,p_amount_cents:amount,
-        p_label:eventEntry.label.trim(),p_method:eventEntry.method,
-        p_occurred_on:eventEntry.date,p_note:eventEntry.note.trim()||null
+    const person=byKey[participant.personKey]
+    const amount=parseMoney(participant.amount)
+    if(!person || !Number.isSafeInteger(amount)||amount<0){setError('Choisissez une personne et un montant valide.');return}
+    const ok=await run(async()=>{
+      const {error:e}=await supabase.rpc('treasury_event_set_participant_finance',{
+        p_event_id:activeId,p_person_type:person.type,p_person_id:person.id,
+        p_pricing_group:participant.group,p_price_cents:amount,p_label:'Participation · '+activeEvent.title,
       })
       if(e)throw e
-    },typeLabel+' enregistrée pour '+activeEvent.title+'.')
-    if(success)setEventEntry({kind:'expense',label:'',amount:'',method:'bank_transfer',date:dateToday(),note:''})
+    },person.name+' ajouté · '+(amount===0?'gratuit':formatMoney(amount)+' à payer')+'.')
+    if(ok){setParticipant({personKey:'',group:'nonmember',amount:euros(activeEvent.nonmember_meal_cents)});setPanel('')}
   }
-  const collect = (group,method) => {
-    const unpaid=group.charges.filter((c)=>c.status==='open'&&c.dueCents>0&&checked[c.id]!==false)
-    if(!unpaid.length){setError('Cochez au moins une dette de ce foyer.');return}
-    const total=unpaid.reduce((sum,row)=>sum+row.dueCents,0)
-    const account=method==='cash'?'la caisse (liquide)':'Revolut'
-    if(!window.confirm('Confirmer le règlement réel de '+money(total)+' par le foyer « '+group.name+' » sur '+account+' ? Seules les dettes cochées seront réglées.'))return
-    execute(async()=>{
+
+  const addGuest=async(event)=>{
+    event.preventDefault()
+    const amount=parseMoney(guest.amount)
+    if(guest.name.trim().length<2 || !Number.isSafeInteger(amount)||amount<0){setError('Indiquez le nom et un montant valide.');return}
+    const ok=await run(async()=>{
+      const {error:e}=await supabase.rpc('treasury_event_create_guest',{
+        p_event_id:activeId,p_name:guest.name.trim(),p_email:guest.email.trim()||null,
+        p_pricing_group:guest.group,p_price_cents:amount,p_label:'Participation · '+activeEvent.title,
+      })
+      if(e)throw e
+    },guest.name.trim()+' ajouté sans compte · '+(amount===0?'gratuit':formatMoney(amount)+' à payer')+'.')
+    if(ok){setGuest({name:'',email:'',group:'guest',amount:euros(activeEvent.nonmember_meal_cents)});setPanel('')}
+  }
+
+  const saveParticipantEdit=async(item)=>{
+    const amount=parseMoney(editDraft.amount)
+    if(!Number.isSafeInteger(amount)||amount<0){setError('Montant invalide.');return}
+    const ok=await run(async()=>{
+      const {error:e}=await supabase.rpc('treasury_event_set_participant_finance',{
+        p_event_id:activeId,p_person_type:item.person.type,p_person_id:item.person.id,
+        p_pricing_group:editDraft.group,p_price_cents:amount,p_label:'Participation · '+activeEvent.title,
+      })
+      if(e)throw e
+    },'Participation mise à jour.')
+    if(ok)setEditing(null)
+  }
+
+  const collect=async(item,method)=>{
+    if(!item.charge || item.due<=0)return
+    const destination=method==='cash'?'la caisse':'Revolut'
+    if(!window.confirm('Confirmer '+formatMoney(item.due)+' reçus de '+item.person.name+' sur '+destination+' ?'))return
+    await run(async()=>{
       const {error:e}=await supabase.rpc('treasury_collect_event',{
-        p_event_id:chosenId,p_household_id:group.householdId,p_charge_ids:unpaid.map((c)=>c.id),p_method:method
+        p_event_id:activeId,p_household_id:item.charge.household_id,p_charge_ids:[item.charge.id],p_method:method,
       })
       if(e)throw e
-      setChecked({})
-    },'Paiement confirmé pour '+group.name+' : '+money(total)+'.')
+    },'Paiement confirmé : la dette et le solde '+destination+' sont mis à jour.')
   }
-  const quickCharge = (event) => {
+
+  const saveExpense=async(event)=>{
     event.preventDefault()
-    if(!quick)return
-    const person=byKey[quick.personKey]
-    sendRows([{person,amount:quick.amount,membership:quick.membership,chargeCategory:quick.category,chargeLabel:quick.label}],{clear:false})
-  }
-  const addMembership = (person) => {
-    if(!window.confirm('Appeler la cotisation de '+money(dueMembership(person,data.subscriptions || [],fee,data.charges || [],chosenId).fee)+' pour '+person.name+' sur cet événement ? Le paiement sera enregistré séparément.'))return
-    sendRows([{person,amount:'0',membership:true}],{clear:false})
+    const amount=parseMoney(expense.amount)
+    if(!activeEvent || !expense.label.trim() || !Number.isSafeInteger(amount)||amount<=0){setError('Indiquez le motif et le montant de la dépense.');return}
+    if(expense.method==='personal_advance' && !expense.advancedBy){setError('Choisissez qui a avancé l’argent.');return}
+    const ok=await run(async()=>{
+      if(expense.method==='personal_advance'){
+        const offline=expense.advancedBy.startsWith('offline:')
+        const id=expense.advancedBy.split(':')[1]
+        const {error:e}=await supabase.from('treasury_entries').insert({
+          kind:'expense',amount_cents:amount,label:expense.label.trim(),category:'courses',
+          payment_method:'personal_advance',advanced_by:offline?null:id,advanced_by_offline:offline?id:null,
+          event_id:activeId,note:expense.note.trim()||null,status:'pending',
+          occurred_at:new Date(expense.date+'T12:00:00').toISOString(),created_by:user.id,
+        })
+        if(e)throw e
+      }else{
+        const {error:e}=await supabase.rpc('treasury_event_record_entry',{
+          p_event_id:activeId,p_kind:'expense',p_amount_cents:amount,p_label:expense.label.trim(),
+          p_method:expense.method,p_occurred_on:expense.date,p_note:expense.note.trim()||null,
+        })
+        if(e)throw e
+      }
+    },expense.method==='personal_advance'?'Dépense rattachée à l’événement et remboursement à faire créé.':'Dépense rattachée à l’événement et compte débité.')
+    if(ok){setExpense({label:'Courses',amount:'',method:'bank_transfer',advancedBy:'',date:day(),note:''});setPanel('')}
   }
 
-  return <div className="evt-finance">
-    {error && <div className="alert error" role="alert">{error}<button type="button" aria-label="Fermer" onClick={()=>setError('')}>×</button></div>}
-    {notice && <div className="alert success" role="status">{notice}</div>}
-    <div className="evt-headline"><div><span className="tv2-eyebrow">Trésorerie simple</span><h2>Événements & paiements</h2><p>Choisissez un événement, attribuez une dette à une personne puis validez uniquement quand l’argent est réellement reçu.</p></div></div>
-    <section className="evt-money-now" aria-label="Argent disponible">
-      <article className="evt-money-bank"><span>🏦 Revolut</span><strong>{accountBalances ? money(accountBalances.bank) : 'À initialiser'}</strong><small>Virements, carte et paiements en ligne</small></article>
-      <article className="evt-money-cash"><span>💶 Caisse espèces</span><strong>{accountBalances ? money(accountBalances.cash) : 'À initialiser'}</strong><small>Argent liquide réellement en caisse</small></article>
-    </section>
-    <section className="evt-simple-picker">
-      <label>Événement<select value={chosenId} onChange={(e)=>switchEvent(e.target.value)} disabled={!events.length}>{events.length?events.map((ev)=><option key={ev.id} value={ev.id}>{dateLabel(ev.starts_at)} · {ev.title}</option>):<option value="">Aucun événement</option>}</select></label>
-      <button type="button" className="tv2-action" onClick={()=>setNewEventOpen((v)=>!v)}>＋ Nouvel événement</button>
-    </section>
-    {newEventOpen && <form className="tv2-panel evt-create" onSubmit={createEvent}>
-      <div><h3>Créer une fiche d’événement</h3><p>Événement privé, non publié dans l’agenda et sans notification. Vous pourrez ensuite lui rattacher des participants.</p></div>
-      <label>Nom de l’événement<input required maxLength={160} autoFocus value={newEvent.title} onChange={(e)=>setNewEvent({...newEvent,title:e.target.value})} placeholder="Soirée Time’s Up" /></label>
-      <label>Date<input required type="date" value={newEvent.date} onChange={(e)=>setNewEvent({...newEvent,date:e.target.value})} /></label>
-      <button className="primary-button" disabled={busy}>Créer et ouvrir</button>
-    </form>}
-    {!events.length && <div className="tv2-panel"><h3>Aucun événement enregistré</h3><p>Créez votre première fiche pour commencer le suivi des participants et des paiements.</p></div>}
+  if(!events.length)return <section className="evt-workspace">
+    <div className="evt-empty-start"><span>Trésorerie événementielle</span><h2>Créez votre premier événement financier</h2><p>Définissez les tarifs une fois, puis ajoutez les participants et les courses.</p><button className="primary-button" onClick={()=>setPanel('new-event')}>Créer un événement</button></div>
+    {panel==='new-event'&&<NewEventForm value={newEvent} setValue={setNewEvent} onSubmit={createEvent} busy={busy}/>}
+  </section>
 
-    {activeEvent && <>
-      <header className="evt-selected-head"><div><span className="tv2-eyebrow">Événement sélectionné · {dateLabel(activeEvent.starts_at)}</span><h2>{activeEvent.title}</h2></div><span className="evt-tag">{activeEvent.published?'Dans l’agenda':'Événement interne'}</span></header>
-      <div className="evt-totals">
-        <article><small>Participants</small><strong>{overview.participants}</strong><span>{eventEconomics?.memberCount || 0} amicaliste{(eventEconomics?.memberCount || 0)>1?'s':''} · {eventEconomics?.nonmemberCount || 0} extérieur{(eventEconomics?.nonmemberCount || 0)>1?'s':''}</span></article>
-        <article><small>Coût de l’événement</small><strong>{money(eventExpense)}</strong><span>Dépenses réglées et rattachées</span></article>
-        <article><small>Paiements activité</small><strong>{money(eventIncome)}</strong><span>Hors cotisations pour éviter le double comptage</span></article>
-        <article><small>Part cotisations lissées</small><strong>{money(eventEconomics?.membershipAllocation || 0)}</strong><span>Budget mensuel de 5 € par amicaliste réparti sur les activités</span></article>
-        <article className={(eventEconomics?.due || 0)>0?'evt-due':''}><small>Reste à recevoir</small><strong>{money(eventEconomics?.due || 0)}</strong><span>Dettes d’activité, hors cotisation</span></article>
-        <article className={eventNet<0?'evt-balance-negative':'evt-balance-positive'}><small>Balance de gestion actuelle</small><strong>{eventNet>=0?'+':''}{money(eventNet)}</strong><span>Paiements + part cotisations − coût</span></article>
-        <article className={eventProjected<0?'evt-balance-negative':'evt-balance-positive'}><small>Si toutes les dettes sont payées</small><strong>{eventProjected>=0?'+':''}{money(eventProjected)}</strong><span>Projection de rentabilité de l’événement</span></article>
+  return <div className="evt-workspace">
+    <header className="evt-command">
+      <div><span className="evt-kicker">Gestion par événement</span><h2>{activeEvent?.title}</h2><p>{eventDate(activeEvent?.starts_at)} · toutes les dépenses, participants et paiements au même endroit.</p></div>
+      <div className="evt-command-picker"><select value={activeId} onChange={(e)=>setEventId(e.target.value)}>{events.map((event)=><option key={event.id} value={event.id}>{event.title} · {eventDate(event.starts_at)}</option>)}</select><button type="button" className="ghost-button" onClick={()=>setPanel(panel==='new-event'?'':'new-event')}>＋ Événement</button></div>
+    </header>
+
+    {error&&<div className="alert error" role="alert">{error}</div>}
+    {notice&&<div className="alert success" role="status">{notice}</div>}
+    {panel==='new-event'&&<NewEventForm value={newEvent} setValue={setNewEvent} onSubmit={createEvent} busy={busy}/>}
+
+    <section className="evt-cash-strip">
+      <article><small>Revolut</small><strong>{formatMoney(balances.bank || 0)}</strong><span>solde réel</span></article>
+      <article><small>Caisse liquide</small><strong>{formatMoney(balances.cash || 0)}</strong><span>solde réel</span></article>
+      <article><small>À recevoir sur cet événement</small><strong>{formatMoney(economics?.due || 0)}</strong><span>{rows.filter((item)=>item.due>0).length} paiement(s)</span></article>
+      <article><small>Avances à rembourser</small><strong>{formatMoney(pendingAdvances.reduce((sum,item)=>sum+Number(item.amount_cents||0),0))}</strong><span>{pendingAdvances.length} avance(s)</span></article>
+    </section>
+
+    <section className="evt-profit-card">
+      <div className="evt-profit-main">
+        <span>Balance de l’événement</span>
+        <strong className={(economics?.projected || 0)>=0?'positive':'negative'}>{(economics?.projected || 0)>=0?'+':''}{formatMoney(economics?.projected || 0)}</strong>
+        <small>projection si toutes les participations dues sont payées</small>
       </div>
+      <div className="evt-profit-grid">
+        <div><small>Courses / dépenses</small><b>{formatMoney(economics?.cost || 0)}</b></div>
+        <div><small>Déjà encaissé</small><b>{formatMoney(economics?.directReceived || 0)}</b></div>
+        <div><small>Reste à recevoir</small><b>{formatMoney(economics?.due || 0)}</b></div>
+        <div><small>Part cotisations</small><b>{formatMoney(economics?.membershipAllocation || 0)}</b></div>
+        <div><small>Coût financé par l’Amicale</small><b>{formatMoney(economics?.projectedAssociationCost || 0)}</b></div>
+      </div>
+    </section>
 
-      <section className="tv2-panel evt-simple-debt">
-        <div className="evt-section-heading"><div><span className="tv2-eyebrow">Étape 1 · attribuer une dette</span><h3>Ajouter une personne et ce qu’elle doit</h3></div><small>La dette n’entre pas dans Revolut ou la caisse tant que vous ne marquez pas le paiement reçu.</small></div>
-        <form className="evt-simple-debt-form" onSubmit={addSimpleDebt}>
-          <label>Personne<select required value={simpleDebt.personKey} onChange={(e)=>setSimpleDebt({...simpleDebt,personKey:e.target.value})}>
-            <option value="">Choisir une personne…</option>
-            {people.slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).map((person)=><option key={person.key} value={person.key}>{person.name}{person.type==='offline'?' · sans compte':''}</option>)}
-          </select></label>
-          <label>Montant dû (€)<input required inputMode="decimal" value={simpleDebt.amount} onChange={(e)=>setSimpleDebt({...simpleDebt,amount:e.target.value})} placeholder="Ex. 15,00"/></label>
-          <label>Motif<input maxLength={180} value={simpleDebt.label} onChange={(e)=>setSimpleDebt({...simpleDebt,label:e.target.value})} placeholder={'Participation · '+activeEvent.title}/></label>
-          <button type="submit" className="primary-button" disabled={busy}>{busy?'Ajout…':'Ajouter la dette'}</button>
+    <section className="evt-primary-actions">
+      <button type="button" onClick={()=>setPanel(panel==='participant'?'':'participant')}><span>＋</span><strong>Ajouter une personne</strong><small>Le tarif et la dette sont créés ensemble</small></button>
+      <button type="button" onClick={()=>setPanel(panel==='expense'?'':'expense')}><span>−</span><strong>Ajouter une course / dépense</strong><small>Revolut, liquide ou avance personnelle</small></button>
+    </section>
+
+    {panel==='participant'&&<section className="evt-action-panel">
+      <div className="evt-action-tabs"><button type="button" className={!guest.name?'active':''}>Personne connue</button><span>ou</span><strong>personne sans compte</strong></div>
+      <div className="evt-two-forms">
+        <form onSubmit={addParticipant}>
+          <h3>Ajouter depuis la liste</h3>
+          <label>Qui ?<select required value={participant.personKey} onChange={(e)=>choosePerson(e.target.value)}><option value="">Choisir…</option>{availablePeople.map((person)=><option key={person.key} value={person.key}>{person.name}{person.type==='child'?' · enfant':isMemberAtEvent(person)?' · amicaliste':''}</option>)}</select></label>
+          <div className="evt-inline-fields"><label>Statut<select value={participant.group} onChange={(e)=>changeParticipantGroup(e.target.value)} disabled={byKey[participant.personKey]?.type==='child'}><option value="member">Amicaliste</option><option value="nonmember">Non-amicaliste</option><option value="child">Enfant</option><option value="guest">Extérieur</option></select></label><label>À payer (€)<input required inputMode="decimal" value={participant.amount} onChange={(e)=>setParticipant({...participant,amount:e.target.value})}/></label></div>
+          <button className="primary-button" disabled={busy||!participant.personKey}>{parseMoney(participant.amount)===0?'Ajouter gratuitement':'Ajouter et créer la dette'}</button>
         </form>
-        <div className="evt-manual-participant"><button type="button" className="ghost-button" onClick={()=>setNewPersonOpen((value)=>!value)}>＋ Personne absente de la liste</button><span>Vous pouvez créer un invité sans compte et lui attribuer immédiatement une dette.</span></div>
-        {newPersonOpen&&<form className="evt-new-person-form" onSubmit={createParticipant}>
-          <label>Nom du participant<input required autoFocus maxLength={160} value={newPerson.name} onChange={(e)=>setNewPerson({...newPerson,name:e.target.value})} placeholder="Prénom NOM"/></label>
-          <label>E-mail (facultatif)<input type="email" maxLength={254} value={newPerson.email} onChange={(e)=>setNewPerson({...newPerson,email:e.target.value})} placeholder="adresse@email.fr"/></label>
-          <label>Note (facultatif)<input maxLength={500} value={newPerson.notes} onChange={(e)=>setNewPerson({...newPerson,notes:e.target.value})} placeholder="Invité, extérieur…"/></label>
-          <button type="submit" className="primary-button" disabled={busy}>{busy?'Ajout…':'Créer la personne'}</button>
-        </form>}
-      </section>
-
-      <details className="tv2-panel evt-accounting">
-        <summary><strong>Dépenses et recettes de cet événement</strong><span>Optionnel · courses, achats, dons et autres mouvements liés à l’événement</span></summary>
-        <div className="evt-section-heading"><div><span className="tv2-eyebrow">Comptabilité de l’événement</span><h3>Recettes, dépenses et résultat</h3></div><small>Chaque écriture est aussi intégrée au journal général et au bon compte.</small></div>
-        <div className="evt-accounting-kpis">
-          <article><small>Paiements activité</small><strong>{money(eventIncome)}</strong><span>Recettes directes hors cotisations</span></article>
-          <article><small>Part cotisations lissées</small><strong>{money(eventEconomics?.membershipAllocation || 0)}</strong><span>5 € par mois et par cotisation active</span></article>
-          <article><small>Dépenses réglées</small><strong>{money(eventExpense)}</strong><span>Débitées des comptes</span></article>
-          <article className={eventNet<0?'negative':'positive'}><small>Balance de gestion</small><strong>{eventNet>=0?'+':''}{money(eventNet)}</strong><span>Paiements + cotisations lissées − dépenses</span></article>
-          <article><small>Avances à rembourser</small><strong>{money(eventPending)}</strong><span>Hors balance tant qu’elles ne sont pas remboursées</span></article>
-        </div>
-        <form className="evt-accounting-form" onSubmit={saveEventEntry}>
-          <label>Type<select value={eventEntry.kind} onChange={(e)=>setEventEntry({...eventEntry,kind:e.target.value})}><option value="expense">Dépense</option><option value="income">Recette libre</option></select></label>
-          <label>Libellé<input required maxLength={250} value={eventEntry.label} onChange={(e)=>setEventEntry({...eventEntry,label:e.target.value})} placeholder={eventEntry.kind==='expense'?'Ex. Courses pour la soirée':'Ex. Don ou participation libre'}/></label>
-          <label>Montant (€)<input required inputMode="decimal" value={eventEntry.amount} onChange={(e)=>setEventEntry({...eventEntry,amount:e.target.value})} placeholder="0,00"/></label>
-          <label>{eventEntry.kind==='expense'?'Payé avec':'Reçu sur'}<select value={eventEntry.method} onChange={(e)=>setEventEntry({...eventEntry,method:e.target.value})}><option value="bank_transfer">Revolut · virement</option><option value="card">Revolut · carte / paiement en ligne</option><option value="cash">Caisse · espèces</option></select></label>
-          <label>Date<input type="date" required max={dateToday()} value={eventEntry.date} onChange={(e)=>setEventEntry({...eventEntry,date:e.target.value})}/></label>
-          <label className="evt-accounting-note">Note (facultatif)<input maxLength={1000} value={eventEntry.note} onChange={(e)=>setEventEntry({...eventEntry,note:e.target.value})}/></label>
-          <button type="submit" className="primary-button" disabled={busy}>{busy?'Enregistrement…':eventEntry.kind==='expense'?'Ajouter la dépense':'Ajouter la recette'}</button>
+        <form onSubmit={addGuest}>
+          <h3>Ajouter sans compte</h3>
+          <label>Nom<input required value={guest.name} onChange={(e)=>setGuest({...guest,name:e.target.value})} placeholder="Nom et prénom"/></label>
+          <label>Email facultatif<input type="email" value={guest.email} onChange={(e)=>setGuest({...guest,email:e.target.value})} placeholder="facultatif"/></label>
+          <div className="evt-inline-fields"><label>Statut<select value={guest.group} onChange={(e)=>changeGuestGroup(e.target.value)}><option value="guest">Extérieur</option><option value="nonmember">Non-amicaliste</option><option value="child">Enfant</option><option value="member">Amicaliste</option></select></label><label>À payer (€)<input required inputMode="decimal" value={guest.amount} onChange={(e)=>setGuest({...guest,amount:e.target.value})}/></label></div>
+          <button className="primary-button" disabled={busy}>{parseMoney(guest.amount)===0?'Créer gratuitement':'Créer + dette'}</button>
         </form>
-        {eventEntry.kind==='income'&&<p className="tv2-hint">Pour régler une dette d’un participant, utilisez les boutons « Reçu en caisse » ou « Reçu sur Revolut » plus bas : la dette sera soldée et la recette créée automatiquement. « Recette libre » sert aux dons et recettes sans dette.</p>}
-        <div className="evt-entry-list">
-          {eventEntries.slice(0,10).map((entry)=><div className="evt-entry-row" key={entry.id}><span className={'evt-entry-kind '+entry.kind}>{entry.kind==='income'?'＋':'−'}</span><div><strong>{entry.label}</strong><small>{dateLabel(entry.occurred_at||entry.created_at)} · {entry.payment_method==='cash'?'Caisse espèces':entry.payment_method==='card'?'Revolut · carte / en ligne':'Revolut · virement'}{entry.status==='pending'?' · À rembourser':''}</small></div><b>{entry.kind==='expense'?'-':'+'}{money(entry.amount_cents)}</b></div>)}
-          {!eventEntries.length&&<p className="tv2-empty">Aucune recette ou dépense comptable liée à cet événement pour le moment.</p>}
-        </div>
-      </details>
+      </div>
+    </section>}
 
-      <details className="tv2-panel evt-add-people" open={Object.values(draft).some((d)=>d.selected)||undefined}>
-        <summary><strong>Ajout en série (optionnel)</strong><span>Pour attribuer le même montant à plusieurs personnes en une seule fois</span></summary>
-        <div className="evt-add-content">
-          <div className="evt-tools">
-            <label>Libellé de la dépense<input value={label} onChange={(e)=>setLabel(e.target.value)} placeholder={'Ex. Participation · '+activeEvent.title} maxLength={180}/></label>
-            <label>Type de dépense<select value={category} onChange={(e)=>setCategory(e.target.value)}>{categories.map(([id,name])=><option value={id} key={id}>{name}</option>)}</select></label>
-            <label>Montant commun (€)<input inputMode="decimal" value={globalAmount} onChange={(e)=>setGlobalAmount(e.target.value)} placeholder={activeEvent.pricing_enabled?'Tarif prévu ou saisie libre':'Ex. 15,00'}/></label>
-            <button type="button" className="ghost-button" onClick={applyGlobal} disabled={!selected.length||!globalAmount}>Appliquer aux sélectionnés</button>
-          </div>
-          <div className="evt-filterbar">
-            <input value={query} type="search" aria-label="Rechercher une personne" onChange={(e)=>setQuery(e.target.value)} placeholder="Nom, foyer, e-mail…" />
-            <select aria-label="Filtrer par foyer" value={householdFilter} onChange={(e)=>setHouseholdFilter(e.target.value)}><option value="">Tous les foyers</option>{data.households.map((h)=><option key={h.id} value={h.id}>{h.name}</option>)}</select>
-            <select aria-label="Filtrer les participants" value={selectionFilter} onChange={(e)=>setSelectionFilter(e.target.value)}><option value="all">Toutes les personnes</option><option value="new">Pas encore inscrits</option><option value="selected">Ma sélection</option></select>
-            <button type="button" className="ghost-button" onClick={()=>selectVisible(true)}>Tout sélectionner</button>
-            <button type="button" className="ghost-button" onClick={()=>selectVisible(false)}>Tout désélectionner</button>
-          </div>
-          <div className="evt-roster">
-            <div className="evt-roster-head"><span>Participant / foyer</span><span>Participation (€)</span><span>＋ Cotisation</span></div>
-            {filteredPeople.map((person)=>{
-              const row=draft[person.key] || {selected:false,amount:amountFor(person,activeEvent,globalAmount),membership:false}
-              const member=dueMembership(person,data.subscriptions || [],fee,data.charges || [],chosenId)
-              return <div className={'evt-roster-row '+(row.selected?'selected':'')} key={person.key}>
-                <label className="evt-person-toggle"><input type="checkbox" checked={row.selected} onChange={(e)=>setPerson(person,{selected:e.target.checked})}/><span className="evt-avatar" aria-hidden="true">{icon(person.type)}</span><span className="evt-person-text"><strong>{person.name}</strong><small>{person.householdName} · {personCategory(person)}{participating.has(person.key)?' · Déjà inscrit':''}</small></span></label>
-                <input className="evt-money-input" inputMode="decimal" aria-label={'Montant pour '+person.name} value={row.amount} placeholder="0,00" onChange={(e)=>setPerson(person,{selected:true,amount:e.target.value})}/>
-                <label className="evt-member-toggle" title={member.note}><input type="checkbox" disabled={!member.allowed} checked={Boolean(row.membership)} onChange={(e)=>setPerson(person,{selected:true,membership:e.target.checked})}/><span>{member.allowed?'＋ '+money(member.fee):member.note}</span></label>
-              </div>
-            })}
-          </div>
-          {!filteredPeople.length && <p className="tv2-empty">Aucune personne correspondante. Utilisez « Nouveau participant » pour la créer directement ici.</p>}
-          <div className="evt-batch-footer"><div><strong>{selected.length} personne{selected.length>1?'s':''} · {selectedTotals.households.size} foyer{selectedTotals.households.size>1?'s':''}</strong><small>{money(selectedTotals.event)} de participations + {money(selectedTotals.membership)} de cotisations à appeler.</small></div>
-          <button type="button" disabled={busy||!selected.length} className="primary-button" onClick={()=>sendRows(selected,{clear:true})}>{busy?'Enregistrement…':'Enregistrer les '+selected.length+' participants'}</button></div>
-          <p className="tv2-hint">Sélectionner une personne déjà inscrite avec un montant non nul crée une dépense supplémentaire. Un montant de 0 € permet d’ajouter seulement sa présence ou sa cotisation. Aucun encaissement n’est créé avant de confirmer un paiement réel.</p>
-        </div>
-      </details>
+    {panel==='expense'&&<section className="evt-action-panel">
+      <form className="evt-expense-form" onSubmit={saveExpense}>
+        <div><h3>Course / dépense de l’événement</h3><p>Une seule saisie : elle alimente le journal, le bon compte et la balance de l’événement.</p></div>
+        <label>Pourquoi ?<input required value={expense.label} onChange={(e)=>setExpense({...expense,label:e.target.value})} placeholder="Courses Carrefour, boissons, location…"/></label>
+        <label>Combien ? (€)<input required inputMode="decimal" value={expense.amount} onChange={(e)=>setExpense({...expense,amount:e.target.value})}/></label>
+        <label>Qui a payé ?<select value={expense.method} onChange={(e)=>setExpense({...expense,method:e.target.value,advancedBy:''})}><option value="bank_transfer">Revolut</option><option value="cash">Caisse liquide</option><option value="personal_advance">Une personne a avancé</option></select></label>
+        {expense.method==='personal_advance'&&<label>À rembourser à<select required value={expense.advancedBy} onChange={(e)=>setExpense({...expense,advancedBy:e.target.value})}><option value="">Choisir…</option>{payers.map((person)=><option key={person.key} value={person.type+':'+person.id}>{person.name}</option>)}</select></label>}
+        <label>Date<input type="date" max={day()} required value={expense.date} onChange={(e)=>setExpense({...expense,date:e.target.value})}/></label>
+        <label className="evt-wide">Note facultative<input value={expense.note} onChange={(e)=>setExpense({...expense,note:e.target.value})}/></label>
+        <button className="primary-button" disabled={busy}>Enregistrer la dépense</button>
+      </form>
+    </section>}
 
-      <section className="evt-households"><div className="evt-section-heading"><div><span className="tv2-eyebrow">Étape 2 · valider les paiements</span><h3>Participants, dettes et règlements</h3></div><small>Cochez les dettes réellement payées puis choisissez où l’argent a été reçu.</small></div>
-        {groups.length===0 && <div className="tv2-panel evt-empty"><strong>Aucun participant ou aucune dette pour cet événement.</strong><span>Ajoutez une personne et une dette avec le formulaire simple ci-dessus.</span></div>}
-        {groups.map((group)=>{
-          const isOpen=expanded[group.householdId] !== false
-          const dueCharges=group.charges.filter((c)=>c.status==='open'&&c.dueCents>0)
-          const toPay=dueCharges.filter((c)=>checked[c.id]!==false)
-          const selectedTotal=toPay.reduce((sum,c)=>sum+c.dueCents,0)
-          return <article className={'evt-household '+(group.due===0?'evt-settled':'')} key={group.householdId}>
-            <button type="button" className="evt-household-head" onClick={()=>setExpanded((v)=>({...v,[group.householdId]:!isOpen}))} aria-expanded={isOpen}>
-              <span className="evt-chevron">{isOpen?'⌄':'›'}</span><span className="evt-household-name"><strong>{group.name}</strong><small>{group.people.map((p)=>p.name.replace(' (ancienne fiche)','')).join(' · ') || 'Dette du foyer'} · {group.charges.filter((c)=>c.status==='open').length} ligne(s)</small></span>
-              <span className="evt-household-stats"><b>{money(group.due)} restant</b><small>{money(group.paid)} / {money(group.total)} réglés</small></span><span className={'evt-household-state '+(group.due>0?'due':'ok')}>{group.due>0?'À encaisser':'À jour'}</span>
-            </button>
-            {isOpen && <div className="evt-household-body">
-              <div className="evt-charge-list">
-                {group.charges.map((charge)=>{
-                  const isDue=charge.dueCents>0&&charge.status==='open'
-                  const owner=byKey[charge.personKey]
-                  const canMember=owner && dueMembership(owner,data.subscriptions || [],fee,data.charges || [],chosenId).allowed
-                  return <div className={'evt-charge '+(!isDue?'paid':'')} key={charge.id}>
-                    <label className="evt-charge-check"><input type="checkbox" aria-label={'Encaisser '+charge.label+' pour '+charge.personName} checked={isDue&&checked[charge.id]!==false} disabled={!isDue} onChange={(e)=>setChecked((p)=>({...p,[charge.id]:e.target.checked}))}/>
-                      <span className="evt-charge-details"><strong>{charge.personName} · {charge.label}</strong><small>{charge.category==='membership'?'Cotisation':categories.find(([id])=>id===charge.category)?.[1] || charge.category} · {money(charge.amount_cents)} facturé{charge.paidCents>0?' · '+money(charge.paidCents)+' payé':''}</small></span></label>
-                    <span className="evt-charge-amount">{isDue?money(charge.dueCents):charge.status==='cancelled'?'Annulé':'Soldé'}</span>
-                    {canMember&&charge.category!=='membership'&&<button type="button" className="evt-inline" disabled={busy} onClick={()=>addMembership(owner)}>＋ Cotisation</button>}
-                  </div>
-                })}
-              </div>
-              {group.people.length>0 && <div className="evt-person-pills">{group.people.map((p)=>{
-                const membership=dueMembership(p,data.subscriptions || [],fee,data.charges || [],chosenId)
-                return <span className="evt-person-pill" key={p.key}><strong>{p.name.replace(' (ancienne fiche)','')}</strong><small>{p.type==='child'?'Enfant':p.amicaliste?'Amicaliste':membership.note}</small>
-                  <button type="button" disabled={busy} onClick={()=>setQuick({personKey:p.key,amount:'',category:'activity',label:'Participation · '+activeEvent.title,membership:false})}>＋ Dette</button>
-                  {membership.allowed&&<button type="button" disabled={busy} onClick={()=>addMembership(p)}>＋ Cotisation</button>}
-                </span>
-              })}</div>}
-              {quick && group.people.some((p)=>p.key===quick.personKey) && <form className="evt-quick-form" onSubmit={quickCharge}>
-                <strong>Nouvelle dette pour {byKey[quick.personKey]?.name}</strong>
-                <input aria-label="Libellé" required value={quick.label} maxLength={180} onChange={(e)=>setQuick({...quick,label:e.target.value})}/>
-                <input aria-label="Montant en euros" required inputMode="decimal" placeholder="€" value={quick.amount} onChange={(e)=>setQuick({...quick,amount:e.target.value})}/>
-                <select aria-label="Catégorie" value={quick.category} onChange={(e)=>setQuick({...quick,category:e.target.value})}>{categories.map(([k,v])=><option value={k} key={k}>{v}</option>)}</select>
-                <button type="submit" className="primary-button" disabled={busy}>Ajouter</button>
-                <button type="button" className="ghost-button" onClick={()=>setQuick(null)}>Annuler</button>
-              </form>}
-              {dueCharges.length>0 && <div className="evt-pay-footer"><span><strong>{toPay.length} dette{toPay.length>1?'s':''} cochée{toPay.length>1?'s':''}</strong><b>{money(selectedTotal)}</b></span><button type="button" disabled={!toPay.length||busy} className="evt-pay-cash" onClick={()=>collect(group,'cash')}>✓ Marquer payé en espèces</button><button type="button" disabled={!toPay.length||busy} className="evt-pay-bank" onClick={()=>collect(group,'bank_transfer')}>✓ Marquer payé sur Revolut / en ligne</button></div>}
-              {!group.charges.length && <p className="tv2-hint">Présence enregistrée, aucune dépense attribuée pour le moment.</p>}
-            </div>}
-          </article>
+    <section className="evt-participants-card">
+      <div className="evt-section-title"><div><span>Participants</span><h3>{rows.length} personne{rows.length>1?'s':''}</h3></div><div className="evt-mini-stats"><span>{economics?.memberCount || 0} amicaliste(s)</span><span>{economics?.nonmemberCount || 0} extérieur(s)</span><span>{economics?.childCount || 0} enfant(s)</span></div></div>
+      <div className="evt-participant-list">
+        {rows.map((item)=>{
+          const group=item.row.pricing_group || suggestedGroup(item.person)
+          const price=Number(item.row.price_cents ?? item.charge?.amount_cents ?? 0)
+          const paid=item.paid
+          const settled=price===0 || item.due===0
+          return <div className={'evt-participant-row '+(item.due>0?'due':'settled')} key={item.row.id}>
+            <div className="evt-person"><strong>{item.person.name}</strong><span>{groupLabel(group)} · {price===0?'gratuit':formatMoney(price)}</span></div>
+            <div className="evt-payment-state"><small>{price===0?'Gratuit':settled?'Payé':'À recevoir'}</small><b>{price===0?'—':item.due>0?formatMoney(item.due):formatMoney(paid)}</b></div>
+            {item.due>0&&<div className="evt-pay-buttons"><button type="button" disabled={busy} onClick={()=>collect(item,'cash')}>Payé liquide</button><button type="button" disabled={busy} onClick={()=>collect(item,'bank_transfer')}>Payé Revolut</button></div>}
+            <button type="button" className="evt-edit-link" onClick={()=>{setEditing(editing===item.row.id?null:item.row.id);setEditDraft({group,amount:euros(price)})}}>Modifier</button>
+            {editing===item.row.id&&<div className="evt-participant-edit"><label>Statut<select value={editDraft.group} onChange={(e)=>setEditDraft({...editDraft,group:e.target.value})} disabled={item.person.type==='child'}><option value="member">Amicaliste</option><option value="nonmember">Non-amicaliste</option><option value="child">Enfant</option><option value="guest">Extérieur</option></select></label><label>Prix (€)<input inputMode="decimal" value={editDraft.amount} onChange={(e)=>setEditDraft({...editDraft,amount:e.target.value})}/></label><button type="button" className="primary-button" disabled={busy} onClick={()=>saveParticipantEdit(item)}>Enregistrer</button></div>}
+          </div>
         })}
-      </section>
-      <div className="evt-footer-note">Les charges, recettes et dépenses restent synchronisées avec le journal général. Un paiement participant confirmé sur Revolut ou en espèces solde ses dettes et crédite automatiquement le bon compte. Les dépenses liées à l’événement débitent automatiquement le compte choisi.</div>
-    </>}
+        {!rows.length&&<p className="evt-empty">Ajoutez les personnes présentes. Les personnes sans compte peuvent être créées ici en quelques secondes.</p>}
+      </div>
+    </section>
+
+    <section className="evt-bottom-grid">
+      <div className="evt-panel">
+        <div className="evt-section-title"><div><span>Tarifs</span><h3>Règle de cet événement</h3></div></div>
+        <form className="evt-rules-form" onSubmit={saveRules}>
+          <label>Amicaliste (€)<input inputMode="decimal" value={rules.member} onChange={(e)=>setRules({...rules,member:e.target.value})}/><small>0 = gratuit</small></label>
+          <label>Non-amicaliste (€)<input inputMode="decimal" value={rules.nonmember} onChange={(e)=>setRules({...rules,nonmember:e.target.value})}/></label>
+          <label>Enfant (€)<input inputMode="decimal" value={rules.child} onChange={(e)=>setRules({...rules,child:e.target.value})}/></label>
+          <button className="ghost-button" disabled={busy}>Enregistrer les tarifs</button>
+        </form>
+        <p className="evt-help">Ces tarifs servent de proposition automatique. Vous pouvez toujours modifier le prix d’une personne individuellement.</p>
+      </div>
+      <div className="evt-panel">
+        <div className="evt-section-title"><div><span>Dépenses</span><h3>{settledExpenses.length} dépense(s) rattachée(s)</h3></div><b>{formatMoney(economics?.cost || 0)}</b></div>
+        <div className="evt-expense-list">{eventEntries.filter((entry)=>entry.kind==='expense').slice(0,8).map((entry)=><div key={entry.id}><span><strong>{entry.label}</strong><small>{accountLabel(entry.payment_method)} · {eventDate(entry.occurred_at || entry.created_at)}{entry.status==='pending'?' · à rembourser':''}</small></span><b>{formatMoney(entry.amount_cents)}</b></div>)}</div>
+        {!eventEntries.some((entry)=>entry.kind==='expense')&&<p className="evt-empty">Aucune course ou dépense enregistrée.</p>}
+      </div>
+    </section>
   </div>
+}
+
+function NewEventForm({value,setValue,onSubmit,busy}){
+  return <section className="evt-action-panel evt-new-event-panel"><form className="evt-new-event-form" onSubmit={onSubmit}>
+    <div><h3>Nouvel événement financier</h3><p>Les tarifs peuvent être changés ensuite pour chaque personne.</p></div>
+    <label>Nom<input required value={value.title} onChange={(e)=>setValue({...value,title:e.target.value})} placeholder="Repas octobre, sortie bateau…"/></label>
+    <label>Date<input required type="date" value={value.date} onChange={(e)=>setValue({...value,date:e.target.value})}/></label>
+    <label>Amicaliste (€)<input required inputMode="decimal" value={value.member} onChange={(e)=>setValue({...value,member:e.target.value})}/><small>0 = gratuit</small></label>
+    <label>Non-amicaliste (€)<input required inputMode="decimal" value={value.nonmember} onChange={(e)=>setValue({...value,nonmember:e.target.value})}/></label>
+    <label>Enfant (€)<input required inputMode="decimal" value={value.child} onChange={(e)=>setValue({...value,child:e.target.value})}/></label>
+    <button className="primary-button" disabled={busy}>Créer et commencer</button>
+  </form></section>
 }

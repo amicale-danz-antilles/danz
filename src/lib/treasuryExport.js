@@ -85,11 +85,11 @@ export function buildFinancialSheets(data, takenAt = new Date()) {
       asDate(e.occurred_at), nameOf(people[e.advanced_by || e.advanced_by_offline]), e.label, e.note || '', eur(e.amount_cents), e.status, e.reimbursement_method === 'cash' ? 'Caisse (liquide)' : e.reimbursement_method ? 'Revolut' : 'En attente', asDate(e.settled_at), e.receipt_file_name || '', e.id,
     ]) },
     { name: 'Transferts internes', headers: ['Date', 'Depuis', 'Vers', 'Montant EUR', 'Motif', 'Créé le', 'État', 'Annulé le', 'Motif annulation', 'ID'], rows: transfers.map((t) => [asDate(t.occurred_at), t.from_account === 'cash' ? 'Caisse (liquide)' : 'Revolut', t.to_account === 'cash' ? 'Caisse (liquide)' : 'Revolut', eur(t.amount_cents), t.note || '', asDate(t.created_at), t.cancelled_at ? 'Annulé' : 'Effectué', asDate(t.cancelled_at), t.cancel_reason || '', t.id]) },
-    { name: 'Bilan par événement', headers: ['Événement', 'Date', 'Visibilité', 'Participants', 'Amicalistes', 'Non-amicalistes / extérieurs', 'Foyers', 'Paiements activité EUR', 'Part cotisations lissées EUR', 'Reste dû activité EUR', 'Coût réglé EUR', 'Balance gestion actuelle EUR', 'Balance si tout est payé EUR', 'ID événement'], rows: (data.events || []).map((event) => {
+    { name: 'Bilan par événement', headers: ['Événement', 'Date', 'Visibilité', 'Participants', 'Amicalistes', 'Non-amicalistes / extérieurs', 'Enfants', 'Foyers', 'Paiements activité EUR', 'Part cotisations lissées EUR', 'Reste dû activité EUR', 'Coût réglé EUR', 'Coût financé par Amicale EUR', 'Balance gestion actuelle EUR', 'Balance si tout est payé EUR', 'ID événement'], rows: (data.events || []).map((event) => {
       const summary = eventOverview(event.id, data)
       const economics = eventManagementEconomics(event, data)
-      return [event.title, asDate(event.starts_at), event.published ? 'Agenda public' : 'Fiche interne', economics.participants, economics.memberCount, economics.nonmemberCount, summary.households,
-        eur(economics.directReceived), eur(economics.membershipAllocation), eur(economics.due), eur(economics.cost), eur(economics.balance), eur(economics.projected), event.id]
+      return [event.title, asDate(event.starts_at), event.published ? 'Agenda public' : 'Fiche interne', economics.participants, economics.memberCount, economics.nonmemberCount, economics.childCount || 0, summary.households,
+        eur(economics.directReceived), eur(economics.membershipAllocation), eur(economics.due), eur(economics.cost), eur(economics.projectedAssociationCost || 0), eur(economics.balance), eur(economics.projected), event.id]
     }) },
     { name: 'Pilotage annuel', headers: ['Indicateur', 'Montant EUR', 'Explication'], rows: [
       ['Année', managementYear, 'Année de pilotage au moment de l’export'],
@@ -98,14 +98,22 @@ export function buildFinancialSheets(data, takenAt = new Date()) {
       ['Paiements directs des activités', eur(annualEconomics.directReceived), 'Hors cotisations afin de ne jamais les compter deux fois'],
       ['Dettes d’activité encore à recevoir', eur(annualEconomics.due), 'Hors dettes de cotisation'],
       ['Coûts des événements', eur(annualEconomics.cost), 'Dépenses réglées et rattachées aux événements'],
+      ['Coût à financer par l’Amicale', eur(annualEconomics.eventSupportNeeded || 0), 'Coût des événements restant après paiements et dettes des participants'],
+      ['Marge cotisations / événements', eur(annualEconomics.membershipHeadroom || 0), 'Cotisations connues sur l’année moins coût à financer par l’Amicale'],
       ['Balance de gestion à date', eur(annualEconomics.currentBalance), 'Cotisations reconnues + paiements directs - coûts'],
       ['Projection sur événements saisis', eur(annualEconomics.projectedBalance), 'Cotisations connues + paiements directs + dettes restantes - coûts'],
     ] },
-    { name: 'Détail par événement', headers: ['Événement', 'Foyer', 'Participant', 'Catégorie', 'Libellé', 'Facturé EUR', 'Déjà payé EUR', 'Restant EUR', 'État', 'ID dette', 'ID événement'], rows: (data.events || []).flatMap((event) =>
+    { name: 'Détail par événement', headers: ['Événement', 'Foyer', 'Participant', 'Statut tarifaire', 'Catégorie', 'Libellé', 'Facturé EUR', 'Déjà payé EUR', 'Restant EUR', 'État', 'ID dette', 'ID événement'], rows: (data.events || []).flatMap((event) =>
       buildEventGroups(event.id, data).flatMap((group) => group.charges.length
-        ? group.charges.map((charge) => [event.title, group.name, charge.personName, charge.category, charge.label,
-          eur(charge.amount_cents), eur(charge.paidCents), eur(charge.dueCents), charge.status, charge.id, event.id])
-        : [[event.title,group.name,group.people.map((p)=>p.name).join(', '),'Présence sans dette','',eur(0),eur(0),eur(0),'Inscrit','',event.id]])
+        ? group.charges.map((charge) => {
+          const participant=(data.eventParticipants || []).find((row)=>row.event_id===event.id && (
+            (charge.user_id && row.user_id===charge.user_id) || (charge.offline_person_id && row.offline_person_id===charge.offline_person_id) || (charge.household_member_id && row.household_member_id===charge.household_member_id)
+          ))
+          const pricing=participant?.pricing_group==='member'?'Amicaliste':participant?.pricing_group==='child'?'Enfant':participant?.pricing_group==='guest'?'Extérieur':participant?.pricing_group==='nonmember'?'Non-amicaliste':''
+          return [event.title, group.name, charge.personName, pricing, charge.category, charge.label,
+            eur(charge.amount_cents), eur(charge.paidCents), eur(charge.dueCents), charge.status, charge.id, event.id]
+        })
+        : [[event.title,group.name,group.people.map((p)=>p.name).join(', '),'','Présence sans dette','',eur(0),eur(0),eur(0),'Inscrit','',event.id]])
     ) },
     { name: 'Reprises Excel', headers: ['Fichier','SHA256','Exercice','Report EUR','Recettes EUR','Dépenses EUR','Solde confirmé EUR','Cotisations','Date import','Note','ID'], rows: importBatches.map((b) => [b.source_filename,b.sha256,b.exercise,eur(b.opening_cents),eur(b.income_cents),eur(b.expense_cents),eur(b.confirmed_closing_cents),b.membership_count,asDate(b.imported_at),b.source_note||'',b.id]) },
     { name: 'Archives BILAN', headers: ['Fichier','Ligne source','Libellé recette','Recette EUR','Libellé dépense','Dépense EUR'], rows: importArchive.map((a) => [importBatches.find((b)=>b.id===a.batch_id)?.source_filename||'',a.source_row,a.income_label||'',a.income_cents==null?'':eur(a.income_cents),a.expense_label||'',a.expense_cents==null?'':eur(a.expense_cents)]) },
