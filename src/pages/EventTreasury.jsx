@@ -174,17 +174,10 @@ export default function EventTreasury({ data, onReload, user }) {
     const name=newPerson.name.trim()
     if(name.length<2){setError('Indiquez le nom du participant.');return}
     const success=await execute(async()=>{
-      const {data:personId,error:createError}=await supabase.rpc('admin_create_offline_person',{
-        p_name:name,p_email:newPerson.email.trim()||null,p_notes:newPerson.notes.trim()||null
+      const {error:createError}=await supabase.rpc('treasury_event_create_participant',{
+        p_event_id:activeEvent.id,p_name:name,p_email:newPerson.email.trim()||null,p_notes:newPerson.notes.trim()||null
       })
       if(createError)throw createError
-      const {error:participantError}=await supabase.rpc('treasury_assign_event_charges',{
-        p_event_id:activeEvent.id,p_batch_id:crypto.randomUUID(),p_rows:[{
-          person_type:'offline',person_id:personId,amount_cents:0,membership:false,
-          category:'activity',label:'Participation · '+activeEvent.title
-        }]
-      })
-      if(participantError)throw participantError
     },name+' a été créé et ajouté à '+activeEvent.title+'.')
     if(success){setNewPerson({name:'',email:'',notes:''});setNewPersonOpen(false);setQuery(name);setSelectionFilter('all')}
   }
