@@ -455,7 +455,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
           <span><small>Participations</small><b>{formatMoney(directReceived+due)}</b></span>
           <span><small>Part cotisations</small><b>{formatMoney(membershipAllocation)}</b></span>
           <span><small>À financer Amicale</small><b>{formatMoney(projectedAssociationCost || 0)}</b></span>
-          <span className={projected<0?'negative':'positive'}><small>Balance projetée</small><b>{projected>=0?'+':''}{formatMoney(projected)}</b></span>
+          <span className={projected<0?'negative':'positive'}><small>Après paiements</small><b>{projected>=0?'+':''}{formatMoney(projected)}</b></span>
         </button>)}</div>
         {!eventBalances.length&&<p className="tv2-empty">Aucun événement financier pour le moment.</p>}
       </section>
