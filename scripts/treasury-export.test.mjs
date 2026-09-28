@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { strFromU8, unzipSync } from 'fflate'
 import { createFinancialXlsx, eur } from '../src/lib/treasuryXlsx.js'
 import { buildFinancialSheets } from '../src/lib/treasuryExport.js'
-import { membershipMonthlyCents, membershipPlanMonths, membershipRecognitionForYear } from '../src/lib/membershipProfitability.js'
+import { eventManagementEconomics, membershipMonthlyCents, membershipPlanMonths, membershipRecognitionForYear } from '../src/lib/membershipProfitability.js'
 
 test('un export Excel contient les 17 feuilles et toutes les écritures, même sans solde initial', () => {
   const sheets = buildFinancialSheets({
@@ -61,6 +61,16 @@ test('le lissage de cotisation applique 5 euros par mois aux formules DANZ', () 
   assert.equal(membershipPlanMonths(short),4)
   assert.equal(membershipMonthlyCents(short),500)
   assert.equal(membershipRecognitionForYear([short],2026,11),2000)
+})
+
+test('une avance personnelle compte immédiatement dans le coût économique de l’événement', () => {
+  const event={id:'evt',title:'Repas',starts_at:'2026-09-20T18:00:00Z'}
+  const result=eventManagementEconomics(event,{
+    events:[event],entries:[{id:'a1',event_id:'evt',kind:'expense',status:'pending',payment_method:'personal_advance',amount_cents:4200}],
+    charges:[],allocations:[],payments:[],eventParticipants:[],households:[],members:[],profiles:[],offline:[],subscriptions:[]
+  })
+  assert.equal(result.cost,4200)
+  assert.equal(result.projectedAssociationCost,4200)
 })
 
 test('les cellules financières sont des nombres EUR et non des chaînes approximatives', () => {
