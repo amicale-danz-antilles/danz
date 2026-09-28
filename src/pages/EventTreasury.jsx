@@ -77,6 +77,7 @@ export default function EventTreasury({ data, onReload, user }) {
   const eventExpense = eventEntries.filter((entry)=>entry.kind==='expense'&&entry.status==='settled').reduce((sum,entry)=>sum+Number(entry.amount_cents||0),0)
   const eventPending = eventEntries.filter((entry)=>entry.kind==='expense'&&entry.status==='pending').reduce((sum,entry)=>sum+Number(entry.amount_cents||0),0)
   const eventNet = eventIncome-eventExpense
+  const eventProjected = eventNet + Number(overview?.due || 0)
   const accountBalances = ledgerBalances(data.opening,data.entries || [],data.transfers || [])
   const participating = useMemo(() => new Set(groups.flatMap((g) => g.people.map((p) => p.key))),[groups])
   const fee = Number(data.settings?.membership_fee_cents ?? 6000)
@@ -269,9 +270,11 @@ export default function EventTreasury({ data, onReload, user }) {
       <header className="evt-selected-head"><div><span className="tv2-eyebrow">Événement sélectionné · {dateLabel(activeEvent.starts_at)}</span><h2>{activeEvent.title}</h2></div><span className="evt-tag">{activeEvent.published?'Dans l’agenda':'Événement interne'}</span></header>
       <div className="evt-totals">
         <article><small>Participants</small><strong>{overview.participants}</strong><span>{overview.households} foyers</span></article>
-        <article><small>Total facturé</small><strong>{money(overview.total)}</strong><span>Participation + cotisations liées</span></article>
-        <article><small>Déjà encaissé</small><strong>{money(overview.paid)}</strong><span>Règlements confirmés</span></article>
+        <article><small>Coût de l’événement</small><strong>{money(eventExpense)}</strong><span>Dépenses réglées et rattachées</span></article>
+        <article><small>Déjà encaissé</small><strong>{money(eventIncome)}</strong><span>Paiements réellement reçus</span></article>
         <article className={overview.due>0?'evt-due':''}><small>Reste à recevoir</small><strong>{money(overview.due)}</strong><span>{overview.charges} dette(s) actives</span></article>
+        <article className={eventNet<0?'evt-balance-negative':'evt-balance-positive'}><small>Balance actuelle</small><strong>{eventNet>=0?'+':''}{money(eventNet)}</strong><span>Encaissé − dépenses</span></article>
+        <article className={eventProjected<0?'evt-balance-negative':'evt-balance-positive'}><small>Si toutes les dettes sont payées</small><strong>{eventProjected>=0?'+':''}{money(eventProjected)}</strong><span>Projection finale de l’événement</span></article>
       </div>
 
       <section className="tv2-panel evt-simple-debt">
