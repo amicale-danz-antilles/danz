@@ -5,6 +5,7 @@ import { optimizeImageFile } from '../lib/mediaStorage.js'
 import { accountFor, accountingDate, ledgerBalances, signedCents } from '../lib/treasuryLedger.js'
 import EventTreasury from './EventTreasury.jsx'
 import { annualManagementEconomics, eventManagementEconomics } from '../lib/membershipProfitability.js'
+import { financialPositionForPerson } from '../lib/personFinance.js'
 import TreasuryJournalManager from './TreasuryJournalManager.jsx'
 
 const EXPENSE_CATEGORIES = {
@@ -200,12 +201,10 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     .sort((a,b) => new Date(b.charge.created_at || 0) - new Date(a.charge.created_at || 0))
   const roster = allRoster.filter((p) => (p.display + ' ' + (p.email || '')).toLocaleLowerCase('fr-FR').includes(memberFilter.toLocaleLowerCase('fr-FR')))
   const selectedMember = allRoster.find((p) => p.personType + ':' + p.personId === selectedPerson)
-  const relatedCharges = selectedMember ? charges.filter((c) => c.status === 'open' && c.household_id === selectedMember.household_id && (
-    selectedMember.personType === 'offline' ? c.offline_person_id === selectedMember.id
-      : c.user_id === selectedMember.id || (c.offline_person_id && offlineById[c.offline_person_id]?.linked_user_id === selectedMember.id) || householdMembers.some((m) => m.id === c.household_member_id && m.user_id === selectedMember.id)
-  )) : []
-  const relatedAdvances = selectedMember ? entries.filter((e) => e.payment_method === 'personal_advance' && e.status === 'pending' && (selectedMember.personType === 'offline' ? e.advanced_by_offline === selectedMember.id : e.advanced_by === selectedMember.id || (e.advanced_by_offline && offlineById[e.advanced_by_offline]?.linked_user_id === selectedMember.id))) : []
-  const memberChargeDue = relatedCharges.reduce((s,c) => s + chargeResidualCents(c, allocations, payments), 0)
+  const selectedPosition = selectedMember ? financialPositionForPerson(selectedMember, data) : { debtCents: 0, advanceCents: 0, netCents: 0, charges: [], advances: [] }
+  const relatedCharges = selectedPosition.charges
+  const relatedAdvances = selectedPosition.advances
+  const memberChargeDue = selectedPosition.debtCents
   const addDirectCharge = (event) => {
     event.preventDefault()
     if (!selectedMember?.household_id) return setError('Cette personne n’a pas encore de foyer associé.')
@@ -456,7 +455,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
           <span><small>Participations</small><b>{formatMoney(directReceived+due)}</b></span>
           <span><small>Part cotisations</small><b>{formatMoney(membershipAllocation)}</b></span>
           <span><small>À financer Amicale</small><b>{formatMoney(projectedAssociationCost || 0)}</b></span>
-          <span className={projected<0?'negative':'positive'}><small>Balance projetée</small><b>{projected>=0?'+':''}{formatMoney(projected)}</b></span>
+          <span className={projected<0?'negative':'positive'}><small>Après paiements</small><b>{projected>=0?'+':''}{formatMoney(projected)}</b></span>
         </button>)}</div>
         {!eventBalances.length&&<p className="tv2-empty">Aucun événement financier pour le moment.</p>}
       </section>
@@ -515,23 +514,25 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
       {pendingPayments.length > 0 && <section className="tv2-panel"><div className="tv2-section-heading"><h2>{pendingPayments.length} virement(s) à confirmer</h2></div><div className="tv2-list">{pendingPayments.map((p) => <div className="tv2-list-row" key={p.id}><div><strong>{householdById[p.household_id]?.name || 'Foyer'}</strong><small>{p.reference} · {formattedDate(p.declared_at)}</small></div><b>{formatMoney(p.amount_cents)}</b><button type="button" className="ghost-button" disabled={busy} onClick={() => confirmPayment(p)}>Confirmer</button></div>)}</div></section>}
       <section className="tv2-panel tv2-person-panel"><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Annuaire financier</span><h2>Qui doit quoi ? À qui dois-je rembourser ?</h2></div><button type="button" className="ghost-button" onClick={exportFullExcel} disabled={exporting}>{exporting ? 'Préparation…' : 'Sauvegarde Excel complète ↓'}</button></div>
         <label className="tv2-search">Rechercher une personne<input value={memberFilter} onChange={(e) => setMemberFilter(e.target.value)} placeholder="Nom ou e-mail" /></label>
-        <div className="tv2-person-table-head"><span>Personne</span><span>Cotisation</span><span>Dette foyer</span><span>À rembourser</span><span></span></div>
+        <div className="tv2-person-table-head"><span>Personne</span><span>Cotisation</span><span>Doit à l’Amicale</span><span>Amicale lui doit</span><span>Solde net</span><span></span></div>
         <div className="tv2-person-list">{roster.map((p) => {
-          const indebted = dueByHousehold[p.household_id] || 0
-          const outstandingAdvances = pendingAdvances.filter((e) => p.personType === 'offline' ? e.advanced_by_offline === p.id : e.advanced_by === p.id || (e.advanced_by_offline && offlineById[e.advanced_by_offline]?.linked_user_id === p.id))
-          const advanceDue = outstandingAdvances.reduce((s,e) => s + e.amount_cents, 0)
+          const position = financialPositionForPerson(p, data)
           const valid = p.personType === 'offline' ? p.is_amicaliste && p.membership_valid_until >= localDay() : effectiveAmicaliste(p)
+          const netLabel = position.netCents > 0 ? 'À rembourser ' + formatMoney(position.netCents) : position.netCents < 0 ? 'À encaisser ' + formatMoney(Math.abs(position.netCents)) : 'Équilibré'
           return <button key={p.personType + p.personId} type="button" className={'tv2-person-row ' + (selectedPerson === p.personType + ':' + p.personId ? 'active' : '')} onClick={() => { setSelectedPerson(p.personType + ':' + p.personId); setChargeDraft({label:'',amount:'',category:'other',event_id:''}) }}>
             <span className="tv2-person-name"><strong>{p.display}</strong><small>{p.personType === 'offline' ? 'Sans compte' : p.email || 'Compte actif'}</small></span>
             <span className={'tv2-pill ' + (valid ? 'good' : 'alert')}>{valid ? 'À jour' : 'Non-amicaliste'}</span>
-            <span className={'tv2-person-money ' + (indebted ? 'due' : '')}>{formatMoney(indebted)}</span>
-            <span className={'tv2-person-money ' + (advanceDue ? 'due' : '')}>{formatMoney(advanceDue)}</span><span>›</span>
+            <span className={'tv2-person-money ' + (position.debtCents ? 'due' : '')}>{formatMoney(position.debtCents)}</span>
+            <span className={'tv2-person-money ' + (position.advanceCents ? 'due' : '')}>{formatMoney(position.advanceCents)}</span>
+            <span className={'tv2-net-position ' + (position.netCents > 0 ? 'association-owes' : position.netCents < 0 ? 'person-owes' : 'balanced')}>{netLabel}</span><span>›</span>
           </button>
         })}</div>
         {roster.length === 0 && <p className="tv2-empty">Aucune personne trouvée.</p>}
-        <p className="tv2-hint">La colonne dette indique le solde du foyer, qui peut être partagé entre plusieurs personnes. Ouvrez une fiche pour voir les dettes attribuées individuellement.</p>
+        <p className="tv2-hint">Le solde net est calculé automatiquement par personne : avances à rembourser − dettes personnelles. Les écritures restent séparées et tracées ; le net vous indique immédiatement qui doit payer qui.</p>
       </section>
       {selectedMember && <section className="tv2-panel tv2-person-detail"><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Dossier financier individuel</span><h2>{selectedMember.display}</h2><p className="tv2-hint">Foyer : {householdById[selectedMember.household_id]?.name || 'Non renseigné'} · Cotisation {selectedMember.membership_valid_until ? 'valable jusqu’au ' + selectedMember.membership_valid_until : 'non renseignée'}</p></div><button type="button" className="tv2-close" aria-label="Fermer la fiche" onClick={() => setSelectedPerson(null)}>×</button></div>
+        <div className="tv2-net-summary"><div><small>Cette personne doit</small><strong>{formatMoney(selectedPosition.debtCents)}</strong></div><div><small>L’Amicale lui doit</small><strong>{formatMoney(selectedPosition.advanceCents)}</strong></div><div className={selectedPosition.netCents > 0 ? 'association-owes' : selectedPosition.netCents < 0 ? 'person-owes' : 'balanced'}><small>Solde net</small><strong>{selectedPosition.netCents > 0 ? 'À lui rembourser ' + formatMoney(selectedPosition.netCents) : selectedPosition.netCents < 0 ? 'À encaisser ' + formatMoney(Math.abs(selectedPosition.netCents)) : 'Équilibré'}</strong></div></div>
+        <p className="tv2-hint">Le calcul net ne supprime aucune dette et ne transforme aucune avance : il rapproche seulement les deux montants pour vous donner la position réelle de la personne.</p>
         <div className="tv2-detail-grid"><div><h3>Cette personne doit à l’Amicale</h3>{relatedCharges.length ? relatedCharges.map((c) => <div className="tv2-detail-row" key={c.id}><div><strong>{c.label}</strong><small>{c.category} · {formattedDate(c.created_at)}</small></div><b>{formatMoney(chargeResidualCents(c,allocations,payments))}</b><button type="button" className="tv2-mini-button" disabled={busy} onClick={() => cancelDirectCharge(c)}>Annuler</button></div>) : <p className="tv2-empty">Aucune dette attribuée personnellement.</p>}
           {memberChargeDue > 0 && <div className="tv2-detail-actions"><button type="button" className="ghost-button" disabled={busy} onClick={() => collectDirect('cash')}>Encaisser {formatMoney(memberChargeDue)} en espèces</button><button type="button" className="ghost-button" disabled={busy} onClick={() => collectDirect('bank_transfer')}>Reçu sur Revolut</button></div>}
           <h3>Attribuer une dette</h3><form className="tv2-form" onSubmit={addDirectCharge}><div className="tv2-field-grid"><label>Libellé<input required value={chargeDraft.label} onChange={(e) => setChargeDraft({...chargeDraft,label:e.target.value})} placeholder="Repas, boissons, cotisation…" /></label><label>Montant (€)<input required inputMode="decimal" value={chargeDraft.amount} onChange={(e) => setChargeDraft({...chargeDraft,amount:e.target.value})} /></label></div><div className="tv2-field-grid"><label>Nature<select value={chargeDraft.category} onChange={(e) => setChargeDraft({...chargeDraft,category:e.target.value})}><option value="other">Autre</option><option value="membership">Cotisation</option><option value="meal">Repas</option><option value="drinks">Boissons</option><option value="activity">Sortie / activité</option><option value="adjustment">Régularisation</option></select></label><label>Événement<select value={chargeDraft.event_id} onChange={(e) => setChargeDraft({...chargeDraft,event_id:e.target.value})}><option value="">Sans événement</option>{data.events.map((e) => <option value={e.id} key={e.id}>{e.title}</option>)}</select></label></div><button type="submit" className="primary-button" disabled={busy}>Attribuer la dette</button></form>

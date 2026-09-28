@@ -61,7 +61,9 @@ export default function EventTreasury({ data, onReload, user }) {
   const eventEntries=(data.entries || []).filter((entry)=>entry.event_id===activeId && entry.status!=='cancelled')
     .sort((a,b)=>new Date(b.occurred_at || b.created_at)-new Date(a.occurred_at || a.created_at))
   const pendingAdvances=eventEntries.filter((entry)=>entry.kind==='expense' && entry.payment_method==='personal_advance' && entry.status==='pending')
-  const settledExpenses=eventEntries.filter((entry)=>entry.kind==='expense' && entry.status==='settled')
+  const eventExpenses=eventEntries.filter((entry)=>entry.kind==='expense')
+  const allExpenses=(data.entries || []).filter((entry)=>entry.kind==='expense' && entry.status!=='cancelled')
+    .sort((a,b)=>new Date(b.occurred_at || b.created_at)-new Date(a.occurred_at || a.created_at))
 
   const rows=useMemo(()=>{
     if(!activeId)return []
@@ -197,6 +199,29 @@ export default function EventTreasury({ data, onReload, user }) {
     },'Paiement confirmé : la dette et le solde '+destination+' sont mis à jour.')
   }
 
+  const reassignExpense=async(entry,nextEventId)=>{
+    const target=nextEventId || null
+    if((entry.event_id || null)===target)return
+    await run(async()=>{
+      if(entry.payment_method==='personal_advance' && entry.status==='settled'){
+        const {error:e}=await supabase.from('treasury_entries').update({event_id:target}).eq('id',entry.id).eq('kind','expense')
+        if(e)throw e
+        return
+      }
+      const isAdvance=entry.payment_method==='personal_advance'
+      const {error:e}=await supabase.rpc('treasury_update_entry',{
+        p_id:entry.id,p_label:entry.label,p_note:entry.note || '',p_category:entry.category ?? null,
+        p_method:entry.payment_method,
+        p_user_id:isAdvance ? entry.advanced_by : entry.beneficiary_user_id,
+        p_offline_id:isAdvance ? entry.advanced_by_offline : entry.beneficiary_offline_id,
+        p_amount_cents:Number(entry.amount_cents),
+        p_occurred_on:String(entry.occurred_at || entry.created_at).slice(0,10),
+        p_event_id:target,
+      })
+      if(e)throw e
+    },target?'Dépense rattachée à l’événement. Les soldes Revolut / caisse ne changent pas.':'Dépense retirée de l’événement. Les soldes Revolut / caisse ne changent pas.')
+  }
+
   const saveExpense=async(event)=>{
     event.preventDefault()
     const amount=parseMoney(expense.amount)
@@ -248,9 +273,9 @@ export default function EventTreasury({ data, onReload, user }) {
 
     <section className="evt-profit-card">
       <div className="evt-profit-main">
-        <span>Balance de l’événement</span>
+        <span>Balance prévue après paiements</span>
         <strong className={(economics?.projected || 0)>=0?'positive':'negative'}>{(economics?.projected || 0)>=0?'+':''}{formatMoney(economics?.projected || 0)}</strong>
-        <small>projection si toutes les participations dues sont payées</small>
+        <small>encaissé + à recevoir + cotisations attribuées − dépenses</small>
       </div>
       <div className="evt-profit-grid">
         <div><small>Courses / dépenses</small><b>{formatMoney(economics?.cost || 0)}</b></div>
@@ -330,10 +355,20 @@ export default function EventTreasury({ data, onReload, user }) {
         <p className="evt-help">Ces tarifs servent de proposition automatique. Vous pouvez toujours modifier le prix d’une personne individuellement.</p>
       </div>
       <div className="evt-panel">
-        <div className="evt-section-title"><div><span>Dépenses</span><h3>{settledExpenses.length} dépense(s) rattachée(s)</h3></div><b>{formatMoney(economics?.cost || 0)}</b></div>
-        <div className="evt-expense-list">{eventEntries.filter((entry)=>entry.kind==='expense').slice(0,8).map((entry)=><div key={entry.id}><span><strong>{entry.label}</strong><small>{accountLabel(entry.payment_method)} · {eventDate(entry.occurred_at || entry.created_at)}{entry.status==='pending'?' · à rembourser':''}</small></span><b>{formatMoney(entry.amount_cents)}</b></div>)}</div>
-        {!eventEntries.some((entry)=>entry.kind==='expense')&&<p className="evt-empty">Aucune course ou dépense enregistrée.</p>}
+        <div className="evt-section-title"><div><span>Dépenses</span><h3>{eventExpenses.length} dépense(s) rattachée(s)</h3></div><b>{formatMoney(economics?.cost || 0)}</b></div>
+        <div className="evt-expense-list">{eventExpenses.slice(0,8).map((entry)=><div key={entry.id}><span><strong>{entry.label}</strong><small>{accountLabel(entry.payment_method)} · {eventDate(entry.occurred_at || entry.created_at)}{entry.status==='pending'?' · à rembourser':''}</small></span><b>{formatMoney(entry.amount_cents)}</b></div>)}</div>
+        {!eventExpenses.length&&<p className="evt-empty">Aucune course ou dépense enregistrée.</p>}
       </div>
+    </section>
+
+    <section className="evt-panel evt-expense-linker">
+      <div className="evt-section-title"><div><span>Rattachement</span><h3>Associer ou déplacer une dépense</h3></div><small>Possible même après publication de l’événement</small></div>
+      <p className="evt-help">Changer l’événement ne modifie ni le montant ni Revolut / la caisse : seule la balance de l’événement est recalculée.</p>
+      <div className="evt-expense-link-list">{allExpenses.map((entry)=><div key={entry.id}>
+        <span><strong>{entry.label}</strong><small>{formatMoney(entry.amount_cents)} · {eventDate(entry.occurred_at || entry.created_at)} · {accountLabel(entry.payment_method)}</small></span>
+        <label>Événement<select value={entry.event_id || ''} disabled={busy} onChange={(e)=>reassignExpense(entry,e.target.value)}><option value="">Sans événement</option>{events.map((event)=><option key={event.id} value={event.id}>{event.title}</option>)}</select></label>
+      </div>)}</div>
+      {!allExpenses.length&&<p className="evt-empty">Aucune dépense enregistrée.</p>}
     </section>
   </div>
 }
