@@ -229,3 +229,21 @@ details.evt-accounting[open]>summary,details.evt-add-people[open]>summary{paddin
 .evt-expense-link-list{display:grid}.evt-expense-link-list>div{display:grid;grid-template-columns:minmax(180px,1fr) minmax(210px,.7fr);gap:.7rem;align-items:center;padding:.55rem 0;border-top:1px solid #e7efec}.evt-expense-link-list>div:first-child{border-top:0}
 .evt-expense-link-list>div>span{display:grid;gap:.12rem}.evt-expense-link-list strong{font-size:.73rem}.evt-expense-link-list small{font-size:.62rem;color:#788783}.evt-expense-link-list label{display:grid;grid-template-columns:auto 1fr;gap:.45rem;align-items:center;font-size:.62rem;font-weight:800;color:#58716a}.evt-expense-link-list select{min-width:0;width:100%;padding:.52rem .58rem;border:1px solid #cbdad6;border-radius:8px;background:#fff;color:inherit;font:inherit}
 @media(max-width:620px){.evt-expense-link-list>div{grid-template-columns:1fr}.evt-expense-link-list label{grid-template-columns:1fr}}
+
+
+/* V41 · rentabilité événement et rattachement immédiat des dépenses */
+.evt-profit-card{grid-template-columns:1fr;gap:.7rem}
+.evt-profit-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem}
+.evt-profit-main{border:1px solid #dbe7e3;border-radius:12px;padding:.72rem .8rem;background:#fff}
+.evt-profit-main.projected{background:#f8fbfa}
+.evt-profit-main>strong.neutral{color:#55716a}
+.evt-profit-formula{margin:0;padding:.55rem .65rem;border-radius:9px;background:#eef7f3;color:#55716a;font-size:.64rem;line-height:1.45}
+.evt-primary-actions{grid-template-columns:repeat(3,minmax(0,1fr))}
+.evt-existing-expenses{display:grid;gap:.65rem}
+.evt-existing-head{display:flex;align-items:flex-start;justify-content:space-between;gap:.8rem;flex-wrap:wrap}
+.evt-existing-head h3{margin:0 0 .18rem;font-size:1rem}.evt-existing-head p{margin:0;color:#6c7f79;font-size:.7rem;line-height:1.45;max-width:720px}.evt-existing-head>strong{font-size:.68rem;padding:.36rem .55rem;border-radius:999px;background:#eaf5f1;color:#2b6b59}
+.evt-existing-list{display:grid;border-top:1px solid #e3ece9}
+.evt-existing-list>div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.75rem;align-items:center;padding:.62rem .1rem;border-bottom:1px solid #e8efed}
+.evt-existing-list>div>span{display:grid;gap:.14rem;min-width:0}.evt-existing-list>div strong{font-size:.76rem}.evt-existing-list>div small{font-size:.63rem;color:#74847f;line-height:1.4}.evt-existing-list button{white-space:nowrap}
+@media(max-width:900px){.evt-primary-actions{grid-template-columns:1fr 1fr}.evt-primary-actions button:last-child{grid-column:1/-1}}
+@media(max-width:620px){.evt-profit-summary,.evt-primary-actions{grid-template-columns:1fr}.evt-primary-actions button:last-child{grid-column:auto}.evt-existing-list>div{grid-template-columns:1fr}.evt-existing-list button{width:100%}}

@@ -91,6 +91,16 @@ test('le solde net d’une personne rapproche automatiquement dette et avance sa
   assert.equal(result.advances.length,1)
 })
 
+test('une dépense rattachée à un événement entre immédiatement dans son résultat', () => {
+  const eventA={id:'evt-a',title:'Repas A',starts_at:'2026-09-20T18:00:00Z'}
+  const eventB={id:'evt-b',title:'Repas B',starts_at:'2026-09-21T18:00:00Z'}
+  const base={events:[eventA,eventB],charges:[],allocations:[],payments:[],eventParticipants:[],households:[],members:[],profiles:[],offline:[],subscriptions:[]}
+  const expense={id:'x1',kind:'expense',status:'settled',payment_method:'bank_transfer',amount_cents:7300,event_id:'evt-a'}
+  assert.equal(eventManagementEconomics(eventA,{...base,entries:[expense]}).cost,7300)
+  assert.equal(eventManagementEconomics(eventB,{...base,entries:[expense]}).cost,0)
+  assert.equal(eventManagementEconomics(eventB,{...base,entries:[{...expense,event_id:'evt-b'}]}).cost,7300)
+})
+
 test('une avance personnelle compte immédiatement dans le coût économique de l’événement', () => {
   const event={id:'evt',title:'Repas',starts_at:'2026-09-20T18:00:00Z'}
   const result=eventManagementEconomics(event,{
