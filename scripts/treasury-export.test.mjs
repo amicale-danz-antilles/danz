@@ -3,8 +3,9 @@ import assert from 'node:assert/strict'
 import { strFromU8, unzipSync } from 'fflate'
 import { createFinancialXlsx, eur } from '../src/lib/treasuryXlsx.js'
 import { buildFinancialSheets } from '../src/lib/treasuryExport.js'
+import { membershipMonthlyCents, membershipPlanMonths, membershipRecognitionForYear } from '../src/lib/membershipProfitability.js'
 
-test('un export Excel contient les 16 feuilles et toutes les écritures, même sans solde initial', () => {
+test('un export Excel contient les 17 feuilles et toutes les écritures, même sans solde initial', () => {
   const sheets = buildFinancialSheets({
     entries: [{ id: 'e1', label: '=2+3', kind: 'expense', status: 'pending', amount_cents: 1350, note: 'Courses', category: 'courses',
       payment_method: 'personal_advance', advanced_by_offline: 'o1', occurred_at: '2026-09-20T12:00:00Z', created_at: '2026-09-20T12:00:00Z' }],
@@ -15,8 +16,10 @@ test('un export Excel contient les 16 feuilles et toutes les écritures, même s
     eventParticipants: [{event_id:'event1',offline_person_id:'o1'}],
     charges: [{ id: 'c1', household_id: 'h1', offline_person_id: 'o1', status: 'open', event_id: 'event1', category: 'membership', label: 'Cotisation',
       amount_cents: 6000, created_at: '2026-09-20T12:00:00Z' }],
+    subscriptions: [{ id: 's1', offline_person_id: 'o1', household_id: 'h1', starts_on: '2026-09-01', ends_on: '2027-08-31',
+      amount_cents: 6000, status: 'paid', activated_at: '2026-09-01T10:00:00Z' }],
   }, new Date('2026-09-24T12:00:00Z'))
-  assert.equal(sheets.length, 16)
+  assert.equal(sheets.length, 17)
   assert.equal(sheets[0].name, 'Synthèse')
   assert.equal(sheets[0].rows.find((r) => r[0] === 'Revolut')[1], 'Non initialisé')
   assert.equal(sheets[0].rows.find((r) => r[0] === 'Créances foyers')[1].euros, 60)
@@ -29,17 +32,33 @@ test('un export Excel contient les 16 feuilles et toutes les écritures, même s
   assert.equal(events.rows.length,1)
   assert.equal(events.rows[0][0],'Soirée Time’s Up')
   assert.equal(events.rows[0][3],1)
-  assert.equal(events.rows[0][9].euros,60)
+  assert.equal(events.rows[0][4],1)
+  assert.equal(events.rows[0][5],0)
+  assert.equal(events.rows[0][8].euros,5)
+  assert.equal(events.rows[0][9].euros,0)
+  assert.equal(events.rows[0][11].euros,5)
+  const annual=sheets.find((s)=>s.name==='Pilotage annuel')
+  assert.equal(annual.rows.find((r)=>r[0]==='Cotisations lissées reconnues à date')[1].euros,5)
   const details=sheets.find((s)=>s.name==='Détail par événement')
   assert.equal(details.rows[0][2],'Jean')
   const zip = unzipSync(createFinancialXlsx(sheets))
-  assert.equal(Object.keys(zip).filter((f) => /^xl\/worksheets\/sheet\d+.xml$/.test(f)).length, 16)
+  assert.equal(Object.keys(zip).filter((f) => /^xl\/worksheets\/sheet\d+.xml$/.test(f)).length, 17)
   const journal = strFromU8(zip['xl/worksheets/sheet2.xml'])
   assert.ok(journal.includes('=2+3'))
   assert.ok(!journal.includes('<f>')) // Ne jamais exécuter des libellés issus des utilisateurs en formule Excel.
   assert.ok(journal.includes('Courses'))
   assert.ok(strFromU8(zip['xl/workbook.xml']).includes('Cotisations et membres'))
   assert.ok(strFromU8(zip['xl/styles.xml']).includes('numFmtId="164"'))
+})
+
+test('le lissage de cotisation applique 5 euros par mois aux formules DANZ', () => {
+  const annual={amount_cents:6000,starts_on:'2026-01-01',ends_on:'2026-12-31',status:'paid'}
+  const short={amount_cents:2000,starts_on:'2026-09-01',ends_on:'2027-09-16',status:'paid'}
+  assert.equal(membershipPlanMonths(annual),12)
+  assert.equal(membershipMonthlyCents(annual),500)
+  assert.equal(membershipPlanMonths(short),4)
+  assert.equal(membershipMonthlyCents(short),500)
+  assert.equal(membershipRecognitionForYear([short],2026,11),2000)
 })
 
 test('les cellules financières sont des nombres EUR et non des chaînes approximatives', () => {
@@ -67,10 +86,10 @@ test('la reprise Excel non ventilée est préservée dans les exports avec ses p
  const journal=sheets.find((s)=>s.name==='Journal complet')
  assert.ok(journal.headers.includes('Date Excel originale'))
  assert.ok(journal.rows.some((r)=>r.includes('2026-10-10')))
- assert.equal(unzipSync(createFinancialXlsx(sheets))['xl/worksheets/sheet16.xml']!==undefined,true)
+ assert.equal(unzipSync(createFinancialXlsx(sheets))['xl/worksheets/sheet17.xml']!==undefined,true)
 })
 
-test('une annulation et une correction Revolut restent traçables dans la sauvegarde de 16 feuilles',()=>{
+test('une annulation et une correction Revolut restent traçables dans la sauvegarde de 17 feuilles',()=>{
   const sheets=buildFinancialSheets({
     opening:{as_of:'2026-09-22T00:00:00Z',bank_cents:25000,cash_cents:4000,unassigned_cents:0},
     entries:[{id:'expense-1',label:'Doublon annulé',kind:'expense',status:'cancelled',
@@ -81,7 +100,7 @@ test('une annulation et une correction Revolut restent traçables dans la sauveg
     audit:[{action:'treasury_entry_cancelled',actor_id:'treasurer',created_at:'2026-09-25T08:00:00Z',
       details:{entry_id:'expense-1',reason:'Saisie en double'}}]
   },new Date('2026-09-25T12:00:00Z'))
-  assert.equal(sheets.length,16)
+  assert.equal(sheets.length,17)
   const journal=sheets.find(s=>s.name==='Journal complet')
   assert.ok(journal.headers.includes('Motif annulation'))
   assert.ok(journal.rows[0].includes('Saisie en double'))
@@ -90,5 +109,5 @@ test('une annulation et une correction Revolut restent traçables dans la sauveg
   assert.equal(sheets.find(s=>s.name==='Historique corrections').rows.length,1)
   assert.equal(sheets.find(s=>s.name==='Synthèse').rows.find(r=>r[0]==='Revolut')[1].euros,250)
   const zip=unzipSync(createFinancialXlsx(sheets))
-  assert.ok(zip['xl/worksheets/sheet16.xml'])
+  assert.ok(zip['xl/worksheets/sheet17.xml'])
 })
