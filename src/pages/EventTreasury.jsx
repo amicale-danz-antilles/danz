@@ -64,6 +64,8 @@ export default function EventTreasury({ data, onReload, user }) {
   const eventExpenses=eventEntries.filter((entry)=>entry.kind==='expense')
   const allExpenses=(data.entries || []).filter((entry)=>entry.kind==='expense' && entry.status!=='cancelled')
     .sort((a,b)=>new Date(b.occurred_at || b.created_at)-new Date(a.occurred_at || a.created_at))
+  const attachableExpenses=allExpenses.filter((entry)=>entry.event_id!==activeId)
+  const eventTitleById=Object.fromEntries(events.map((event)=>[event.id,event.title]))
 
   const rows=useMemo(()=>{
     if(!activeId)return []
@@ -272,11 +274,19 @@ export default function EventTreasury({ data, onReload, user }) {
     </section>
 
     <section className="evt-profit-card">
-      <div className="evt-profit-main">
-        <span>Balance prévue après paiements</span>
-        <strong className={(economics?.projected || 0)>=0?'positive':'negative'}>{(economics?.projected || 0)>=0?'+':''}{formatMoney(economics?.projected || 0)}</strong>
-        <small>encaissé + à recevoir + cotisations attribuées − dépenses</small>
+      <div className="evt-profit-summary">
+        <div className="evt-profit-main">
+          <span>Résultat actuel</span>
+          <strong className={(economics?.balance || 0)>0?'positive':(economics?.balance || 0)<0?'negative':'neutral'}>{(economics?.balance || 0)>0?'+':''}{formatMoney(economics?.balance || 0)}</strong>
+          <small>{(economics?.balance || 0)>0?'Bénéficiaire à ce jour':(economics?.balance || 0)<0?'Déficitaire à ce jour':'À l’équilibre à ce jour'}</small>
+        </div>
+        <div className="evt-profit-main projected">
+          <span>Résultat final prévu</span>
+          <strong className={(economics?.projected || 0)>0?'positive':(economics?.projected || 0)<0?'negative':'neutral'}>{(economics?.projected || 0)>0?'+':''}{formatMoney(economics?.projected || 0)}</strong>
+          <small>{(economics?.projected || 0)>0?'Événement rentable si tout est payé':(economics?.projected || 0)<0?'Événement déficitaire même après encaissements':'Équilibre prévu après encaissements'}</small>
+        </div>
       </div>
+      <p className="evt-profit-formula">Résultat = encaissements + dettes à recevoir + part de cotisations attribuée − toutes les dépenses rattachées.</p>
       <div className="evt-profit-grid">
         <div><small>Courses / dépenses</small><b>{formatMoney(economics?.cost || 0)}</b></div>
         <div><small>Déjà encaissé</small><b>{formatMoney(economics?.directReceived || 0)}</b></div>
@@ -288,7 +298,8 @@ export default function EventTreasury({ data, onReload, user }) {
 
     <section className="evt-primary-actions">
       <button type="button" onClick={()=>setPanel(panel==='participant'?'':'participant')}><span>＋</span><strong>Ajouter une personne</strong><small>Le tarif et la dette sont créés ensemble</small></button>
-      <button type="button" onClick={()=>setPanel(panel==='expense'?'':'expense')}><span>−</span><strong>Ajouter une course / dépense</strong><small>Revolut, liquide ou avance personnelle</small></button>
+      <button type="button" onClick={()=>setPanel(panel==='expense'?'':'expense')}><span>−</span><strong>Nouvelle dépense</strong><small>Elle sera rattachée automatiquement à cet événement</small></button>
+      <button type="button" onClick={()=>setPanel(panel==='existing-expense'?'':'existing-expense')}><span>↳</span><strong>Rattacher une dépense existante</strong><small>{attachableExpenses.length} dépense{attachableExpenses.length>1?'s':''} disponible{attachableExpenses.length>1?'s':''}</small></button>
     </section>
 
     {panel==='participant'&&<section className="evt-action-panel">
@@ -312,7 +323,7 @@ export default function EventTreasury({ data, onReload, user }) {
 
     {panel==='expense'&&<section className="evt-action-panel">
       <form className="evt-expense-form" onSubmit={saveExpense}>
-        <div><h3>Course / dépense de l’événement</h3><p>Une seule saisie : elle alimente le journal, le bon compte et la balance de l’événement.</p></div>
+        <div><h3>Nouvelle dépense · {activeEvent?.title}</h3><p>Elle sera automatiquement rattachée à cet événement et son résultat sera recalculé dès l’enregistrement.</p></div>
         <label>Pourquoi ?<input required value={expense.label} onChange={(e)=>setExpense({...expense,label:e.target.value})} placeholder="Courses Carrefour, boissons, location…"/></label>
         <label>Combien ? (€)<input required inputMode="decimal" value={expense.amount} onChange={(e)=>setExpense({...expense,amount:e.target.value})}/></label>
         <label>Qui a payé ?<select value={expense.method} onChange={(e)=>setExpense({...expense,method:e.target.value,advancedBy:''})}><option value="bank_transfer">Revolut</option><option value="cash">Caisse liquide</option><option value="personal_advance">Une personne a avancé</option></select></label>
@@ -321,6 +332,15 @@ export default function EventTreasury({ data, onReload, user }) {
         <label className="evt-wide">Note facultative<input value={expense.note} onChange={(e)=>setExpense({...expense,note:e.target.value})}/></label>
         <button className="primary-button" disabled={busy}>Enregistrer la dépense</button>
       </form>
+    </section>}
+
+    {panel==='existing-expense'&&<section className="evt-action-panel evt-existing-expenses">
+      <div className="evt-existing-head"><div><h3>Rattacher une dépense existante</h3><p>Choisissez une dépense déjà saisie. Son montant et son compte ne changent pas ; seule son affectation à l’événement est modifiée.</p></div><strong>{activeEvent?.title}</strong></div>
+      <div className="evt-existing-list">{attachableExpenses.map((entry)=><div key={entry.id}>
+        <span><strong>{entry.label}</strong><small>{formatMoney(entry.amount_cents)} · {eventDate(entry.occurred_at || entry.created_at)} · {accountLabel(entry.payment_method)}{entry.event_id?' · actuellement : '+(eventTitleById[entry.event_id] || 'autre événement'):' · sans événement'}</small></span>
+        <button type="button" className="primary-button" disabled={busy} onClick={()=>reassignExpense(entry,activeId)}>{entry.event_id?'Déplacer ici':'Rattacher ici'}</button>
+      </div>)}</div>
+      {!attachableExpenses.length&&<p className="evt-empty">Toutes les dépenses existantes sont déjà rattachées à cet événement.</p>}
     </section>}
 
     <section className="evt-participants-card">
@@ -361,15 +381,6 @@ export default function EventTreasury({ data, onReload, user }) {
       </div>
     </section>
 
-    <section className="evt-panel evt-expense-linker">
-      <div className="evt-section-title"><div><span>Rattachement</span><h3>Associer ou déplacer une dépense</h3></div><small>Possible même après publication de l’événement</small></div>
-      <p className="evt-help">Changer l’événement ne modifie ni le montant ni Revolut / la caisse : seule la balance de l’événement est recalculée.</p>
-      <div className="evt-expense-link-list">{allExpenses.map((entry)=><div key={entry.id}>
-        <span><strong>{entry.label}</strong><small>{formatMoney(entry.amount_cents)} · {eventDate(entry.occurred_at || entry.created_at)} · {accountLabel(entry.payment_method)}</small></span>
-        <label>Événement<select value={entry.event_id || ''} disabled={busy} onChange={(e)=>reassignExpense(entry,e.target.value)}><option value="">Sans événement</option>{events.map((event)=><option key={event.id} value={event.id}>{event.title}</option>)}</select></label>
-      </div>)}</div>
-      {!allExpenses.length&&<p className="evt-empty">Aucune dépense enregistrée.</p>}
-    </section>
   </div>
 }
 
