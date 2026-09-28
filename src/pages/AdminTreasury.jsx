@@ -7,12 +7,12 @@ import LegacyTreasury from './LegacyTreasury.jsx'
 import '../treasury-v2.css'
 
 const TABS = [
-  ['overview', 'Vue d’ensemble'],
+  ['overview', 'Compta'],
   ['events', 'Événements'],
   ['operations', 'Journal'],
   ['memberships', 'Cotisations'],
-  ['advanced', 'Avances & dépenses'],
-  ['settings', 'Export & comptes'],
+  ['advanced', 'Avances'],
+  ['settings', 'Export'],
 ]
 
 export default function AdminTreasury() {
