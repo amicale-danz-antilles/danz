@@ -90,7 +90,9 @@ export function eventMembershipAllocation(event, data) {
     const eventWeight = weights.find((row) => row.id === event.id)?.count || 0
     return Math.round(pool * eventWeight / totalParticipation)
   }
-  return Math.round(pool / sameMonth.length)
+  // Aucun amicaliste réellement rattaché : ne pas inventer une recette de cotisations.
+  // L'ancien partage égal entre événements vides créait notamment des projections fantômes de 55 €.
+  return 0
 }
 
 export function eventManagementEconomics(event, data) {
