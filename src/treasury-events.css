@@ -179,3 +179,11 @@ details.evt-accounting[open]>summary,details.evt-add-people[open]>summary{paddin
 .evt-pay-footer .evt-pay-cash,.evt-pay-footer .evt-pay-bank{min-height:40px}
 @media(max-width:850px){.evt-simple-debt-form{grid-template-columns:1fr 1fr}.evt-simple-debt-form>button{width:100%}}
 @media(max-width:560px){.evt-money-now{grid-template-columns:1fr}.evt-simple-picker{align-items:stretch;flex-direction:column}.evt-simple-picker>button{width:100%}.evt-simple-debt-form{grid-template-columns:1fr}.evt-manual-participant>button{width:100%}}
+
+
+/* V36 · balance événement visible sans ouvrir les détails */
+.evt-totals{grid-template-columns:repeat(3,minmax(0,1fr))}
+.evt-totals .evt-balance-positive{background:#eef8f3;border-color:#c9e4d6}.evt-totals .evt-balance-positive strong{color:#247155}
+.evt-totals .evt-balance-negative{background:#fff1eb;border-color:#efd0c2}.evt-totals .evt-balance-negative strong{color:#a34f35}
+@media(max-width:900px){.evt-totals{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.evt-totals{grid-template-columns:1fr 1fr}}
