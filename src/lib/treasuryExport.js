@@ -2,6 +2,7 @@ import { createFinancialXlsx, eur } from './treasuryXlsx.js'
 import { ledgerBalances, accountFor, accountingDate, signedCents } from './treasuryLedger.js'
 import { chargeResidualCents, effectiveAmicaliste, householdBalanceCents } from './finance.js'
 import { buildEventGroups, eventOverview } from './eventFinance.js'
+import { annualManagementEconomics, eventManagementEconomics, membershipPlanMonths, membershipMonthlyCents } from './membershipProfitability.js'
 
 const date = (value) => value ? new Date(value).toISOString().slice(0, 10) : ''
 const asDate = (value) => value ? new Date(value).toLocaleString('fr-FR') : ''
@@ -21,6 +22,8 @@ export function buildFinancialSheets(data, takenAt = new Date()) {
   const pendingAdvances = entries.filter((e) => e.status === 'pending' && e.payment_method === 'personal_advance')
   const outstanding = Object.fromEntries(households.map((h) => [h.id, householdBalanceCents(charges.filter((c) => c.household_id === h.id), allocations, payments)]))
   const balances = ledgerBalances(opening, entries, transfers, takenAt)
+  const managementYear = takenAt.getFullYear()
+  const annualEconomics = annualManagementEconomics(data, managementYear, takenAt)
   const memberSubscriptions = profiles.filter((p) => p.active).map((p) => [
     nameOf(p), p.email || '', 'Compte actif', effectiveAmicaliste(p, takenAt) ? 'À jour' : 'Non-amicaliste',
     p.membership_valid_until || '', householdById[profileHousehold[p.id]]?.name || '', p.id,
@@ -47,6 +50,9 @@ export function buildFinancialSheets(data, takenAt = new Date()) {
       ['Personnes sans compte', offline.filter((p) => !p.linked_user_id).length, 'Associables plus tard à leur compte'],
       ['Import Excel', importBatches[0]?.source_filename || 'Aucun', importBatches[0] ? 'Somme du classeur au moment de la reprise : '+(importBatches[0].confirmed_closing_cents/100).toFixed(2)+' EUR' : ''],
       ['Virements à confirmer', payments.filter((p) => p.status === 'declared').length, 'Non encore comptabilisés sur Revolut'],
+      ['Cotisations lissées reconnues '+managementYear, eur(annualEconomics.recognizedMembership), '60 €/12 mois et 20 €/4 mois = 5 €/mois ; indépendant de la date technique de fin'],
+      ['Balance activités '+managementYear, eur(annualEconomics.currentBalance), 'Cotisations lissées + paiements directs des activités - coûts des événements'],
+      ['Projection activités '+managementYear, eur(annualEconomics.projectedBalance), 'Ajoute les dettes d’activité restantes et les cotisations connues jusqu’à fin d’année'],
       ['Méthode', 'Comptes séparés', 'Transferts internes exclus du résultat ; une avance non remboursée ne débite pas la caisse'],
     ] },
     { name: 'Journal complet', headers: ['Date opération', 'Type', 'Libellé', 'Description et notes', 'Catégorie', 'Montant EUR', 'Sens EUR', 'Payé par', 'Compte concerné', 'État', 'Personne avance', 'Bénéficiaire / personne attribuée', 'Événement', 'Référence foyer', 'Justificatif nom', 'Justificatif chemin', 'Créé le', 'Remboursé le', 'Classeur importé', 'Ligne Excel', 'Date Excel originale', 'À vérifier', 'Annulé le', 'Motif annulation', 'Statut avant annulation', 'ID'], rows: entries.slice().sort((a,b) => new Date(accountingDate(a))-new Date(accountingDate(b))).map((e) => [
@@ -74,20 +80,27 @@ export function buildFinancialSheets(data, takenAt = new Date()) {
       return [p?.reference || '', householdById[p?.household_id]?.name || '', c?.label || '', eur(a.amount_cents), p?.status || '', a.payment_id, a.charge_id]
     }) },
     { name: 'Cotisations et membres', headers: ['Nom', 'E-mail', 'Type de fiche', 'Statut cotisation', 'Échéance', 'Foyer', 'ID'], rows: [...memberSubscriptions, ...offlineSubscriptions] },
-    { name: 'Abonnements cotisation', headers: ['Nom du membre', 'Foyer', 'Début', 'Fin', 'Montant EUR', 'État', 'Activé le', 'ID dette', 'ID abonnement'], rows: subscriptions.map((s) => [nameOf(people[s.user_id || s.offline_person_id]), householdById[s.household_id]?.name || '', s.starts_on || '', s.ends_on || '', eur(s.amount_cents), s.status, asDate(s.activated_at), s.charge_id || '', s.id]) },
+    { name: 'Abonnements cotisation', headers: ['Nom du membre', 'Foyer', 'Début', 'Fin technique', 'Montant EUR', 'Durée gestion mois', 'Montant lissé mensuel EUR', 'État', 'Activé le', 'ID dette', 'ID abonnement'], rows: subscriptions.map((s) => [nameOf(people[s.user_id || s.offline_person_id]), householdById[s.household_id]?.name || '', s.starts_on || '', s.ends_on || '', eur(s.amount_cents), membershipPlanMonths(s), eur(Math.round(membershipMonthlyCents(s))), s.status, asDate(s.activated_at), s.charge_id || '', s.id]) },
     { name: 'Avances et remboursements', headers: ['Date de dépense', 'Membre ayant avancé', 'Libellé', 'Description', 'Montant EUR', 'État', 'Mode remboursement', 'Remboursé le', 'Justificatif', 'ID'], rows: entries.filter((e) => e.payment_method === 'personal_advance').map((e) => [
       asDate(e.occurred_at), nameOf(people[e.advanced_by || e.advanced_by_offline]), e.label, e.note || '', eur(e.amount_cents), e.status, e.reimbursement_method === 'cash' ? 'Caisse (liquide)' : e.reimbursement_method ? 'Revolut' : 'En attente', asDate(e.settled_at), e.receipt_file_name || '', e.id,
     ]) },
     { name: 'Transferts internes', headers: ['Date', 'Depuis', 'Vers', 'Montant EUR', 'Motif', 'Créé le', 'État', 'Annulé le', 'Motif annulation', 'ID'], rows: transfers.map((t) => [asDate(t.occurred_at), t.from_account === 'cash' ? 'Caisse (liquide)' : 'Revolut', t.to_account === 'cash' ? 'Caisse (liquide)' : 'Revolut', eur(t.amount_cents), t.note || '', asDate(t.created_at), t.cancelled_at ? 'Annulé' : 'Effectué', asDate(t.cancelled_at), t.cancel_reason || '', t.id]) },
-    { name: 'Bilan par événement', headers: ['Événement', 'Date', 'Visibilité', 'Participants', 'Foyers', 'Dettes attribuées', 'Dont cotisations', 'Total facturé EUR', 'Encaissé EUR', 'Reste dû EUR', 'Coût réglé EUR', 'Balance actuelle EUR', 'Balance si tout est payé EUR', 'ID événement'], rows: (data.events || []).map((event) => {
+    { name: 'Bilan par événement', headers: ['Événement', 'Date', 'Visibilité', 'Participants', 'Amicalistes', 'Non-amicalistes / extérieurs', 'Foyers', 'Paiements activité EUR', 'Part cotisations lissées EUR', 'Reste dû activité EUR', 'Coût réglé EUR', 'Balance gestion actuelle EUR', 'Balance si tout est payé EUR', 'ID événement'], rows: (data.events || []).map((event) => {
       const summary = eventOverview(event.id, data)
-      const linked = entries.filter((entry) => entry.event_id === event.id && entry.status === 'settled')
-      const received = linked.filter((entry) => entry.kind === 'income').reduce((sum, entry) => sum + Number(entry.amount_cents || 0), 0)
-      const cost = linked.filter((entry) => entry.kind === 'expense').reduce((sum, entry) => sum + Number(entry.amount_cents || 0), 0)
-      const balance = received - cost
-      return [event.title, asDate(event.starts_at), event.published ? 'Agenda public' : 'Fiche interne', summary.participants, summary.households,
-        summary.charges, summary.memberships, eur(summary.total), eur(received), eur(summary.due), eur(cost), eur(balance), eur(balance + summary.due), event.id]
+      const economics = eventManagementEconomics(event, data)
+      return [event.title, asDate(event.starts_at), event.published ? 'Agenda public' : 'Fiche interne', economics.participants, economics.memberCount, economics.nonmemberCount, summary.households,
+        eur(economics.directReceived), eur(economics.membershipAllocation), eur(economics.due), eur(economics.cost), eur(economics.balance), eur(economics.projected), event.id]
     }) },
+    { name: 'Pilotage annuel', headers: ['Indicateur', 'Montant EUR', 'Explication'], rows: [
+      ['Année', managementYear, 'Année de pilotage au moment de l’export'],
+      ['Cotisations lissées reconnues à date', eur(annualEconomics.recognizedMembership), '5 €/mois pour les formules 60 €/12 mois et 20 €/4 mois'],
+      ['Cotisations lissées connues sur l’année', eur(annualEconomics.fullYearMembership), 'Part de toutes les cotisations payées correspondant aux mois de cette année'],
+      ['Paiements directs des activités', eur(annualEconomics.directReceived), 'Hors cotisations afin de ne jamais les compter deux fois'],
+      ['Dettes d’activité encore à recevoir', eur(annualEconomics.due), 'Hors dettes de cotisation'],
+      ['Coûts des événements', eur(annualEconomics.cost), 'Dépenses réglées et rattachées aux événements'],
+      ['Balance de gestion à date', eur(annualEconomics.currentBalance), 'Cotisations reconnues + paiements directs - coûts'],
+      ['Projection sur événements saisis', eur(annualEconomics.projectedBalance), 'Cotisations connues + paiements directs + dettes restantes - coûts'],
+    ] },
     { name: 'Détail par événement', headers: ['Événement', 'Foyer', 'Participant', 'Catégorie', 'Libellé', 'Facturé EUR', 'Déjà payé EUR', 'Restant EUR', 'État', 'ID dette', 'ID événement'], rows: (data.events || []).flatMap((event) =>
       buildEventGroups(event.id, data).flatMap((group) => group.charges.length
         ? group.charges.map((charge) => [event.title, group.name, charge.personName, charge.category, charge.label,
