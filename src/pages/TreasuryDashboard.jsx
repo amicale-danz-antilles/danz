@@ -4,6 +4,7 @@ import { chargeResidualCents, effectiveAmicaliste, formatMoney, householdBalance
 import { optimizeImageFile } from '../lib/mediaStorage.js'
 import { accountFor, accountingDate, ledgerBalances, signedCents } from '../lib/treasuryLedger.js'
 import EventTreasury from './EventTreasury.jsx'
+import { eventOverview } from '../lib/eventFinance.js'
 import TreasuryJournalManager from './TreasuryJournalManager.jsx'
 
 const EXPENSE_CATEGORIES = {
@@ -146,6 +147,13 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
   const cleared = entries.filter((e) => e.status === 'settled')
   const balances = ledgerBalances(opening, entries, transfers) || { bank: 0, cash: 0, unassigned: 0 }
   const importedOpening = opening?.import_batch_id && data?.importBatches?.find((item) => item.id === opening.import_batch_id)
+  const eventBalances = useMemo(() => (data?.events || []).map((event) => {
+    const summary = eventOverview(event.id, data)
+    const eventEntries = (data?.entries || []).filter((entry) => entry.event_id === event.id && entry.status === 'settled')
+    const received = eventEntries.filter((entry) => entry.kind === 'income').reduce((sum, entry) => sum + Number(entry.amount_cents || 0), 0)
+    const cost = eventEntries.filter((entry) => entry.kind === 'expense').reduce((sum, entry) => sum + Number(entry.amount_cents || 0), 0)
+    return { event, received, cost, due: summary.due, balance: received - cost, projected: received + summary.due - cost }
+  }).sort((a,b) => new Date(b.event.starts_at || 0) - new Date(a.event.starts_at || 0)), [data])
 
   const activity = [
     ...entries.map((e) => ({ ...e, type: 'entry', date: accountingDate(e), account: accountFor(e), signed: e.status === 'pending' || e.status === 'cancelled' ? 0 : signedCents(e) })),
@@ -354,7 +362,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     {error && <div className="alert error" role="alert">{error}<button type="button" onClick={() => setError('')} aria-label="Fermer l’erreur">×</button></div>}
     {notice && <div className="alert success" role="status">{notice}<button type="button" onClick={() => setNotice('')} aria-label="Fermer la confirmation">×</button></div>}
 
-    {view !== 'settings' && view !== 'events' && <div className="tv2-actions">
+    {view !== 'settings' && view !== 'events' && view !== 'overview' && <div className="tv2-actions">
       <button type="button" className="tv2-action tv2-action-primary" onClick={() => openForm('expense')}>− Dépense</button>
       <button type="button" className="tv2-action" onClick={() => openForm('income')}>＋ Recette</button>
       <button type="button" className="tv2-action" onClick={() => openForm('transfer')}>⇄ Transfert Revolut / caisse</button>
@@ -362,22 +370,22 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     </div>}
 
     {formType && <section className="tv2-panel tv2-editor">
-      <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Saisie rapide</span><h2>{formType === 'transfer' ? 'Transférer entre deux comptes' : formType === 'income' ? 'Nouvelle recette' : 'Nouvelle dépense'}</h2></div><button type="button" className="tv2-close" aria-label="Fermer le formulaire" onClick={() => setFormType('')}>×</button></div>
+      <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Saisie simple</span><h2>{formType === 'transfer' ? 'Transférer entre deux comptes' : formType === 'income' ? 'Nouvelle recette' : 'Dépense · qui ? combien ? pourquoi ?'}</h2></div><button type="button" className="tv2-close" aria-label="Fermer le formulaire" onClick={() => setFormType('')}>×</button></div>
       {formType === 'transfer' ? <form className="tv2-form" onSubmit={submitTransfer}>
         <div className="tv2-field-grid"><label>Depuis<select value={transferForm.from_account} onChange={(e) => setTransferForm({ ...transferForm, from_account: e.target.value })}><option value="bank">Revolut → Caisse (liquide)</option><option value="cash">Caisse (liquide) → Revolut</option></select></label>
           <label>Montant (€)<input required inputMode="decimal" value={transferForm.amount} onChange={(e) => setTransferForm({ ...transferForm, amount: e.target.value })} placeholder="100,00" /></label></div>
         <div className="tv2-field-grid"><label>Date<input type="date" required max={localDay()} value={transferForm.date} onChange={(e) => setTransferForm({ ...transferForm, date: e.target.value })} /></label><label>Note (facultatif)<input value={transferForm.note} onChange={(e) => setTransferForm({ ...transferForm, note: e.target.value })} placeholder="Retrait pour la caisse..." /></label></div>
         <p className="tv2-hint">Le montant passe d’un compte à l’autre. Le total de l’Amicale ne change pas.</p><button type="submit" className="primary-button" disabled={busy}>{busy ? 'Enregistrement…' : 'Enregistrer le transfert'}</button>
       </form> : <form className="tv2-form" onSubmit={submitEntry}>
-        <div className="tv2-field-grid"><label>Libellé<input required maxLength={200} value={entryForm.label} onChange={(e) => setEntryForm({ ...entryForm, label: e.target.value })} placeholder={formType === 'income' ? 'Ex. Don lors du repas' : 'Ex. Courses pour le repas'} /></label>
-          <label>Montant (€)<input required inputMode="decimal" value={entryForm.amount} onChange={(e) => setEntryForm({ ...entryForm, amount: e.target.value })} placeholder="0,00" /></label></div>
+        <div className="tv2-field-grid"><label>{formType === 'income' ? 'Pourquoi ?' : 'Pourquoi cette dépense ?'}<input required maxLength={200} value={entryForm.label} onChange={(e) => setEntryForm({ ...entryForm, label: e.target.value })} placeholder={formType === 'income' ? 'Ex. Don lors du repas' : 'Ex. Courses pour le repas'} /></label>
+          <label>Combien ? (€)<input required inputMode="decimal" value={entryForm.amount} onChange={(e) => setEntryForm({ ...entryForm, amount: e.target.value })} placeholder="0,00" /></label></div>
         <div className="tv2-field-grid"><label>Catégorie<select value={entryForm.category} onChange={(e) => setEntryForm({ ...entryForm, category: e.target.value })}>{Object.entries(formType === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-          <label>{formType === 'income' ? 'Reçu sur' : 'Payé avec'}<select value={entryForm.payment_method} onChange={(e) => setEntryForm({ ...entryForm, payment_method: e.target.value })}>
-            <option value="bank_transfer">Revolut (virement ou carte)</option><option value="cash">Caisse (liquide)</option><option value="unassigned">À répartir (provisoire)</option>
-            {formType === 'expense' && <option value="personal_advance">Avance d’un membre</option>}
+          <label>{formType === 'income' ? 'Argent reçu sur' : 'Qui a payé ?'}<select value={entryForm.payment_method} onChange={(e) => setEntryForm({ ...entryForm, payment_method: e.target.value })}>
+            <option value="bank_transfer">{formType === 'income' ? 'Revolut' : 'Amicale · Revolut'}</option><option value="cash">{formType === 'income' ? 'Caisse espèces' : 'Amicale · caisse espèces'}</option>
+            {formType === 'expense' && <option value="personal_advance">Une personne a avancé · à rembourser</option>}
           </select></label></div>
         {entryForm.payment_method !== 'personal_advance' && <label>Personne associée (facultatif)<select value={entryForm.beneficiary} onChange={(e) => setEntryForm({ ...entryForm, beneficiary: e.target.value })}><option value="">Non attribuée</option>{profiles.filter((p) => p.active).map((p) => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}{offline.filter((p) => !p.linked_user_id).map((p) => <option key={p.id} value={'offline:' + p.id}>{p.display_name} · sans compte</option>)}</select></label>}
-        {entryForm.payment_method === 'personal_advance' && <label>Avancé par<select required value={entryForm.advanced_by} onChange={(e) => setEntryForm({ ...entryForm, advanced_by: e.target.value })}><option value="">Sélectionner une personne</option>{profiles.filter((p) => p.active).map((p) => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}{offline.filter((p) => !p.linked_user_id).map((p) => <option key={p.id} value={'offline:' + p.id}>{p.display_name} · sans compte</option>)}</select></label>}
+        {entryForm.payment_method === 'personal_advance' && <label>Qui dois-je rembourser ?<select required value={entryForm.advanced_by} onChange={(e) => setEntryForm({ ...entryForm, advanced_by: e.target.value })}><option value="">Sélectionner une personne</option>{profiles.filter((p) => p.active).map((p) => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}{offline.filter((p) => !p.linked_user_id).map((p) => <option key={p.id} value={'offline:' + p.id}>{p.display_name} · sans compte</option>)}</select></label>}
         <div className="tv2-field-grid"><label>Date de l’opération<input type="date" required max={localDay()} value={entryForm.date} onChange={(e) => setEntryForm({ ...entryForm, date: e.target.value })} /></label>
           <label>Événement (facultatif)<select value={entryForm.event_id} onChange={(e) => setEntryForm({ ...entryForm, event_id: e.target.value })}><option value="">Sans événement</option>{(data.events || []).map((ev) => <option key={ev.id} value={ev.id}>{ev.title}</option>)}</select></label></div>
         <label>Note (facultatif)<textarea rows="2" value={entryForm.note} onChange={(e) => setEntryForm({ ...entryForm, note: e.target.value })} /></label>
@@ -390,7 +398,15 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     {view === 'events' && <EventTreasury data={data} onReload={reload} user={user} />}
 
     {view === 'overview' && <>
-      <div className="evt-overview-cta"><div><strong>Une soirée à organiser ?</strong><span>Inscrire les participants, attribuer les dettes aux foyers et encaisser les cotisations.</span></div><button type="button" className="tv2-action tv2-action-primary" onClick={() => onView('events')}>Ouvrir mes événements →</button></div>
+      <section className="tv2-simple-home">
+        <div className="tv2-simple-title"><div><span className="tv2-eyebrow">Compta simple</span><h2>Que voulez-vous enregistrer ?</h2><p>Dépense, dette, cotisation ou événement : une seule action suffit pour démarrer.</p></div></div>
+        <div className="tv2-simple-actions">
+          <button type="button" onClick={() => openForm('expense')}><span>−</span><strong>Dépense</strong><small>Qui ? Combien ? Pourquoi ?</small></button>
+          <button type="button" onClick={() => document.getElementById('quick-debt')?.scrollIntoView({behavior:'smooth',block:'center'})}><span>€</span><strong>Dette</strong><small>Qui me doit quoi ?</small></button>
+          <button type="button" onClick={() => onView('memberships')}><span>✓</span><strong>Cotisation</strong><small>Qui est à jour ?</small></button>
+          <button type="button" onClick={() => onView('events')}><span>＋</span><strong>Événement</strong><small>Qui doit combien ?</small></button>
+        </div>
+      </section>
       {!opening && <div className="tv2-setup-warning"><strong>À faire une fois : initialiser les soldes</strong><span>Indiquez le montant réel sur Revolut et le liquide actuellement en caisse. Les montants ci-dessous ne seront fiables qu’après cette étape.</span><button type="button" onClick={() => onView('settings')}>Renseigner mes soldes →</button></div>}
       <div className={'tv2-balances' + (opening?.import_batch_id ? ' tv2-balances-four' : '')}>
         <article className="tv2-balance tv2-bank"><span>Revolut</span><strong>{opening ? formatMoney(balances.bank) : 'À initialiser'}</strong><small>Carte, virements et remboursements Revolut</small></article>
@@ -403,11 +419,35 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
         : 'Soldes calculés à partir du relevé du ' + new Date(opening.as_of).toLocaleString('fr-FR') + ' et des mouvements enregistrés depuis.'}</p>}
       {opening?.import_batch_id && balances.unassigned !== 0 && <div className="tj-warning">Des opérations importées restent à affecter entre Revolut et espèces. <button type="button" onClick={()=>onView('operations')}>Ventiler mes écritures →</button></div>}
       <div className="tv2-metric-grid">
-        <button type="button" className="tv2-metric" onClick={() => onView('memberships')}><span>À recevoir des foyers</span><strong>{formatMoney(dueTotal)}</strong><small>Dont cotisations : {formatMoney(dues)}</small></button>
-        <button type="button" className="tv2-metric" onClick={() => onView('memberships')}><span>Virements à confirmer</span><strong>{pendingPayments.length}</strong><small>À rapprocher</small></button>
-        <article className="tv2-metric"><span>Avances à rembourser</span><strong>{formatMoney(pendingAdvanceCents)}</strong><small>{pendingAdvances.length} avance{pendingAdvances.length > 1 ? 's' : ''} en attente</small></article>
-        <article className="tv2-metric"><span>Ce mois-ci</span><strong>{formatMoney(monthNow.income - monthNow.expense)}</strong><small>{formatMoney(monthNow.income)} reçus · {formatMoney(monthNow.expense)} dépensés</small></article>
+        <button type="button" className="tv2-metric" onClick={() => onView('memberships')}><span>Dettes à recevoir</span><strong>{formatMoney(dueTotal)}</strong><small>Dont cotisations : {formatMoney(dues)}</small></button>
+        <button type="button" className="tv2-metric" onClick={onAdvanced}><span>À rembourser</span><strong>{formatMoney(pendingAdvanceCents)}</strong><small>{pendingAdvances.length} avance{pendingAdvances.length > 1 ? 's' : ''}</small></button>
+        <article className="tv2-metric"><span>Résultat du mois</span><strong>{formatMoney(monthNow.income - monthNow.expense)}</strong><small>{formatMoney(monthNow.income)} reçus · {formatMoney(monthNow.expense)} dépensés</small></article>
+        <button type="button" className="tv2-metric" onClick={() => onView('operations')}><span>À confirmer</span><strong>{pendingPayments.length}</strong><small>Virement{pendingPayments.length > 1 ? 's' : ''} déclaré{pendingPayments.length > 1 ? 's' : ''}</small></button>
       </div>
+
+      <section className="tv2-panel tv2-quick-debt" id="quick-debt">
+        <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Dette · qui ? combien ? pourquoi ?</span><h2>Ajouter une dette</h2></div><small>Elle n’impacte pas Revolut ou la caisse avant paiement.</small></div>
+        <form className="tv2-quick-debt-form" onSubmit={addDirectCharge}>
+          <label>Qui ?<select required value={selectedPerson || ''} onChange={(e) => { setSelectedPerson(e.target.value || null); setChargeDraft({...chargeDraft,category:'other'}) }}><option value="">Choisir une personne…</option>{roster.map((person)=><option key={person.personType+person.personId} value={person.personType+':'+person.personId}>{person.display}{person.personType==='offline'?' · sans compte':''}</option>)}</select></label>
+          <label>Combien ? (€)<input required inputMode="decimal" value={chargeDraft.amount} onChange={(e)=>setChargeDraft({...chargeDraft,amount:e.target.value})} placeholder="0,00"/></label>
+          <label>Pourquoi ?<input required value={chargeDraft.label} onChange={(e)=>setChargeDraft({...chargeDraft,label:e.target.value})} placeholder="Repas, activité, participation…"/></label>
+          <label>Événement<select value={chargeDraft.event_id} onChange={(e)=>setChargeDraft({...chargeDraft,event_id:e.target.value})}><option value="">Aucun</option>{data.events.map((event)=><option key={event.id} value={event.id}>{event.title}</option>)}</select></label>
+          <button type="submit" className="primary-button" disabled={busy}>Ajouter la dette</button>
+        </form>
+      </section>
+
+      <section className="tv2-panel tv2-event-balances">
+        <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Événements</span><h2>Balance + / − toujours visible</h2></div><button type="button" className="ghost-button" onClick={() => onView('events')}>Gérer les événements →</button></div>
+        <div className="tv2-event-balance-list">{eventBalances.map(({event,received,cost,due,balance,projected})=><button type="button" key={event.id} className="tv2-event-balance-row" onClick={() => onView('events')}>
+          <span><strong>{event.title}</strong><small>{formattedDate(event.starts_at)}</small></span>
+          <span><small>Coût</small><b>{formatMoney(cost)}</b></span>
+          <span><small>Encaissé</small><b>{formatMoney(received)}</b></span>
+          <span><small>Reste dû</small><b>{formatMoney(due)}</b></span>
+          <span className={balance<0?'negative':'positive'}><small>Balance actuelle</small><b>{balance>=0?'+':''}{formatMoney(balance)}</b></span>
+          <span className={projected<0?'negative':'positive'}><small>Si tout est payé</small><b>{projected>=0?'+':''}{formatMoney(projected)}</b></span>
+        </button>)}</div>
+        {!eventBalances.length&&<p className="tv2-empty">Aucun événement financier pour le moment.</p>}
+      </section>
       <div className="tv2-two-cols">
         <section className="tv2-panel"><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Évolution · {year}</span><h2>Recettes et dépenses</h2></div></div>
           <div className="tv2-month-list">{monthly.map((m, i) => <div className="tv2-month" key={m.label}><span>{m.label.slice(0, 3)}</span><div className="tv2-bars"><span className="tv2-bar tv2-bar-in" style={{ width: (m.income / maxMonth * 100) + '%' }} title={'Recettes : ' + formatMoney(m.income)} /><span className="tv2-bar tv2-bar-out" style={{ width: (m.expense / maxMonth * 100) + '%' }} title={'Dépenses : ' + formatMoney(m.expense)} /></div><small>{formatMoney(m.income - m.expense)}</small></div>)}</div>
