@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { strFromU8, unzipSync } from 'fflate'
 import { createFinancialXlsx, eur } from '../src/lib/treasuryXlsx.js'
 import { buildFinancialSheets } from '../src/lib/treasuryExport.js'
-import { eventManagementEconomics, membershipMonthlyCents, membershipPlanMonths, membershipRecognitionForYear } from '../src/lib/membershipProfitability.js'
+import { eventManagementEconomics, eventMembershipAllocation, membershipMonthlyCents, membershipPlanMonths, membershipRecognitionForYear } from '../src/lib/membershipProfitability.js'
+import { financialPositionForPerson } from '../src/lib/personFinance.js'
 
 test('un export Excel contient les 17 feuilles et toutes les écritures, même sans solde initial', () => {
   const sheets = buildFinancialSheets({
@@ -61,6 +62,33 @@ test('le lissage de cotisation applique 5 euros par mois aux formules DANZ', () 
   assert.equal(membershipPlanMonths(short),4)
   assert.equal(membershipMonthlyCents(short),500)
   assert.equal(membershipRecognitionForYear([short],2026,11),2000)
+})
+
+test('un événement vide ne reçoit aucune cotisation et ne crée plus de projection fantôme', () => {
+  const events=[
+    {id:'oct-1',title:'Oktoberfest',starts_at:'2026-10-09T18:00:00Z'},
+    {id:'oct-2',title:'Journée familles',starts_at:'2026-10-17T18:00:00Z'},
+  ]
+  const subscriptions=Array.from({length:22},(_,i)=>({id:'s'+i,amount_cents:i<5?2000:6000,starts_on:'2026-09-01',ends_on:'2027-09-01',status:'paid'}))
+  const data={events,subscriptions,eventParticipants:[],charges:[],entries:[],allocations:[],payments:[],households:[],members:[],profiles:[],offline:[]}
+  assert.equal(eventMembershipAllocation(events[0],data),0)
+  assert.equal(eventMembershipAllocation(events[1],data),0)
+  assert.equal(eventManagementEconomics(events[0],data).projected,0)
+})
+
+test('le solde net d’une personne rapproche automatiquement dette et avance sans les effacer', () => {
+  const person={id:'u1',personId:'u1',personType:'account'}
+  const data={
+    charges:[{id:'c1',user_id:'u1',status:'open',amount_cents:3000}],
+    payments:[],allocations:[],offline:[],members:[],
+    entries:[{id:'e1',payment_method:'personal_advance',advanced_by:'u1',status:'pending',amount_cents:5000}],
+  }
+  const result=financialPositionForPerson(person,data)
+  assert.equal(result.debtCents,3000)
+  assert.equal(result.advanceCents,5000)
+  assert.equal(result.netCents,2000)
+  assert.equal(result.charges.length,1)
+  assert.equal(result.advances.length,1)
 })
 
 test('une avance personnelle compte immédiatement dans le coût économique de l’événement', () => {
