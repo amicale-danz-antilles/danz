@@ -185,12 +185,12 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
   const expiringCount = profiles.filter((p) => p.active && effectiveAmicaliste(p) && p.membership_valid_until && new Date(p.membership_valid_until + 'T23:59:59').getTime() < Date.now() + 60 * 86400000).length + offline.filter((p) => !p.linked_user_id && p.is_amicaliste && p.membership_valid_until >= localDay() && new Date(p.membership_valid_until + 'T23:59:59').getTime() < Date.now() + 60 * 86400000).length
 
 
-  const roster = [
+  const allRoster = [
     ...profiles.filter((p) => p.active).map((p) => ({ ...p, personType: 'account', personId: p.id, display: p.full_name || p.email, household_id: householdMembers.find((m) => m.user_id === p.id)?.household_id })),
     ...offline.filter((p) => !p.linked_user_id).map((p) => ({ ...p, personType: 'offline', personId: p.id, display: p.display_name })),
-  ].filter((p) => (p.display + ' ' + (p.email || '')).toLocaleLowerCase('fr-FR').includes(memberFilter.toLocaleLowerCase('fr-FR')))
-   .sort((a,b) => a.display.localeCompare(b.display, 'fr'))
-  const selectedMember = roster.find((p) => p.personType + ':' + p.personId === selectedPerson)
+  ].sort((a,b) => a.display.localeCompare(b.display, 'fr'))
+  const roster = allRoster.filter((p) => (p.display + ' ' + (p.email || '')).toLocaleLowerCase('fr-FR').includes(memberFilter.toLocaleLowerCase('fr-FR')))
+  const selectedMember = allRoster.find((p) => p.personType + ':' + p.personId === selectedPerson)
   const relatedCharges = selectedMember ? charges.filter((c) => c.status === 'open' && c.household_id === selectedMember.household_id && (
     selectedMember.personType === 'offline' ? c.offline_person_id === selectedMember.id
       : c.user_id === selectedMember.id || (c.offline_person_id && offlineById[c.offline_person_id]?.linked_user_id === selectedMember.id) || householdMembers.some((m) => m.id === c.household_member_id && m.user_id === selectedMember.id)
@@ -428,7 +428,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
       <section className="tv2-panel tv2-quick-debt" id="quick-debt">
         <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Dette · qui ? combien ? pourquoi ?</span><h2>Ajouter une dette</h2></div><small>Elle n’impacte pas Revolut ou la caisse avant paiement.</small></div>
         <form className="tv2-quick-debt-form" onSubmit={addDirectCharge}>
-          <label>Qui ?<select required value={selectedPerson || ''} onChange={(e) => { setSelectedPerson(e.target.value || null); setChargeDraft({...chargeDraft,category:'other'}) }}><option value="">Choisir une personne…</option>{roster.map((person)=><option key={person.personType+person.personId} value={person.personType+':'+person.personId}>{person.display}{person.personType==='offline'?' · sans compte':''}</option>)}</select></label>
+          <label>Qui ?<select required value={selectedPerson || ''} onChange={(e) => { setSelectedPerson(e.target.value || null); setChargeDraft({...chargeDraft,category:'other'}) }}><option value="">Choisir une personne…</option>{allRoster.map((person)=><option key={person.personType+person.personId} value={person.personType+':'+person.personId}>{person.display}{person.personType==='offline'?' · sans compte':''}</option>)}</select></label>
           <label>Combien ? (€)<input required inputMode="decimal" value={chargeDraft.amount} onChange={(e)=>setChargeDraft({...chargeDraft,amount:e.target.value})} placeholder="0,00"/></label>
           <label>Pourquoi ?<input required value={chargeDraft.label} onChange={(e)=>setChargeDraft({...chargeDraft,label:e.target.value})} placeholder="Repas, activité, participation…"/></label>
           <label>Événement<select value={chargeDraft.event_id} onChange={(e)=>setChargeDraft({...chargeDraft,event_id:e.target.value})}><option value="">Aucun</option>{data.events.map((event)=><option key={event.id} value={event.id}>{event.title}</option>)}</select></label>
