@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase.js'
 import { eventPeople, eventOverview, buildEventGroups } from '../lib/eventFinance.js'
 import { formatMoney } from '../lib/finance.js'
 import { ledgerBalances } from '../lib/treasuryLedger.js'
+import { eventManagementEconomics } from '../lib/membershipProfitability.js'
 import '../treasury-events.css'
 
 const parseMoney = (value) => {
@@ -73,11 +74,12 @@ export default function EventTreasury({ data, onReload, user }) {
   const eventEntries = useMemo(() => (data.entries || [])
     .filter((entry) => entry.event_id === chosenId && entry.status !== 'cancelled')
     .sort((a,b) => new Date(b.occurred_at || b.created_at).getTime() - new Date(a.occurred_at || a.created_at).getTime()),[chosenId,data.entries])
-  const eventIncome = eventEntries.filter((entry)=>entry.kind==='income'&&entry.status==='settled').reduce((sum,entry)=>sum+Number(entry.amount_cents||0),0)
-  const eventExpense = eventEntries.filter((entry)=>entry.kind==='expense'&&entry.status==='settled').reduce((sum,entry)=>sum+Number(entry.amount_cents||0),0)
+  const eventEconomics = useMemo(() => activeEvent ? eventManagementEconomics(activeEvent,data) : null,[activeEvent,data])
+  const eventIncome = eventEconomics?.directReceived || 0
+  const eventExpense = eventEconomics?.cost || 0
   const eventPending = eventEntries.filter((entry)=>entry.kind==='expense'&&entry.status==='pending').reduce((sum,entry)=>sum+Number(entry.amount_cents||0),0)
-  const eventNet = eventIncome-eventExpense
-  const eventProjected = eventNet + Number(overview?.due || 0)
+  const eventNet = eventEconomics?.balance || 0
+  const eventProjected = eventEconomics?.projected || 0
   const accountBalances = ledgerBalances(data.opening,data.entries || [],data.transfers || [])
   const participating = useMemo(() => new Set(groups.flatMap((g) => g.people.map((p) => p.key))),[groups])
   const fee = Number(data.settings?.membership_fee_cents ?? 6000)
@@ -269,12 +271,13 @@ export default function EventTreasury({ data, onReload, user }) {
     {activeEvent && <>
       <header className="evt-selected-head"><div><span className="tv2-eyebrow">Événement sélectionné · {dateLabel(activeEvent.starts_at)}</span><h2>{activeEvent.title}</h2></div><span className="evt-tag">{activeEvent.published?'Dans l’agenda':'Événement interne'}</span></header>
       <div className="evt-totals">
-        <article><small>Participants</small><strong>{overview.participants}</strong><span>{overview.households} foyers</span></article>
+        <article><small>Participants</small><strong>{overview.participants}</strong><span>{eventEconomics?.memberCount || 0} amicaliste{(eventEconomics?.memberCount || 0)>1?'s':''} · {eventEconomics?.nonmemberCount || 0} extérieur{(eventEconomics?.nonmemberCount || 0)>1?'s':''}</span></article>
         <article><small>Coût de l’événement</small><strong>{money(eventExpense)}</strong><span>Dépenses réglées et rattachées</span></article>
-        <article><small>Déjà encaissé</small><strong>{money(eventIncome)}</strong><span>Paiements réellement reçus</span></article>
-        <article className={overview.due>0?'evt-due':''}><small>Reste à recevoir</small><strong>{money(overview.due)}</strong><span>{overview.charges} dette(s) actives</span></article>
-        <article className={eventNet<0?'evt-balance-negative':'evt-balance-positive'}><small>Balance actuelle</small><strong>{eventNet>=0?'+':''}{money(eventNet)}</strong><span>Encaissé − dépenses</span></article>
-        <article className={eventProjected<0?'evt-balance-negative':'evt-balance-positive'}><small>Si toutes les dettes sont payées</small><strong>{eventProjected>=0?'+':''}{money(eventProjected)}</strong><span>Projection finale de l’événement</span></article>
+        <article><small>Paiements activité</small><strong>{money(eventIncome)}</strong><span>Hors cotisations pour éviter le double comptage</span></article>
+        <article><small>Part cotisations lissées</small><strong>{money(eventEconomics?.membershipAllocation || 0)}</strong><span>Budget mensuel de 5 € par amicaliste réparti sur les activités</span></article>
+        <article className={(eventEconomics?.due || 0)>0?'evt-due':''}><small>Reste à recevoir</small><strong>{money(eventEconomics?.due || 0)}</strong><span>Dettes d’activité, hors cotisation</span></article>
+        <article className={eventNet<0?'evt-balance-negative':'evt-balance-positive'}><small>Balance de gestion actuelle</small><strong>{eventNet>=0?'+':''}{money(eventNet)}</strong><span>Paiements + part cotisations − coût</span></article>
+        <article className={eventProjected<0?'evt-balance-negative':'evt-balance-positive'}><small>Si toutes les dettes sont payées</small><strong>{eventProjected>=0?'+':''}{money(eventProjected)}</strong><span>Projection de rentabilité de l’événement</span></article>
       </div>
 
       <section className="tv2-panel evt-simple-debt">
@@ -301,10 +304,11 @@ export default function EventTreasury({ data, onReload, user }) {
         <summary><strong>Dépenses et recettes de cet événement</strong><span>Optionnel · courses, achats, dons et autres mouvements liés à l’événement</span></summary>
         <div className="evt-section-heading"><div><span className="tv2-eyebrow">Comptabilité de l’événement</span><h3>Recettes, dépenses et résultat</h3></div><small>Chaque écriture est aussi intégrée au journal général et au bon compte.</small></div>
         <div className="evt-accounting-kpis">
-          <article><small>Recettes encaissées</small><strong>{money(eventIncome)}</strong><span>Revolut + espèces</span></article>
+          <article><small>Paiements activité</small><strong>{money(eventIncome)}</strong><span>Recettes directes hors cotisations</span></article>
+          <article><small>Part cotisations lissées</small><strong>{money(eventEconomics?.membershipAllocation || 0)}</strong><span>5 € par mois et par cotisation active</span></article>
           <article><small>Dépenses réglées</small><strong>{money(eventExpense)}</strong><span>Débitées des comptes</span></article>
-          <article className={eventNet<0?'negative':'positive'}><small>Résultat encaissé</small><strong>{money(eventNet)}</strong><span>Recettes − dépenses réglées</span></article>
-          <article><small>Avances à rembourser</small><strong>{money(eventPending)}</strong><span>Hors résultat encaissé</span></article>
+          <article className={eventNet<0?'negative':'positive'}><small>Balance de gestion</small><strong>{eventNet>=0?'+':''}{money(eventNet)}</strong><span>Paiements + cotisations lissées − dépenses</span></article>
+          <article><small>Avances à rembourser</small><strong>{money(eventPending)}</strong><span>Hors balance tant qu’elles ne sont pas remboursées</span></article>
         </div>
         <form className="evt-accounting-form" onSubmit={saveEventEntry}>
           <label>Type<select value={eventEntry.kind} onChange={(e)=>setEventEntry({...eventEntry,kind:e.target.value})}><option value="expense">Dépense</option><option value="income">Recette libre</option></select></label>
