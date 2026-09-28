@@ -58,6 +58,10 @@ export function isMemberForEvent(person, subscriptions = [], eventDate) {
 }
 
 function eventMemberParticipationCount(event, data) {
+  const participantRows = (data?.eventParticipants || []).filter((row) => row.event_id === event.id)
+  if (participantRows.some((row) => row.pricing_group)) {
+    return participantRows.filter((row) => row.pricing_group === 'member').length
+  }
   const subscriptions = data?.subscriptions || []
   const people = buildEventGroups(event.id, data).flatMap((group) => group.people)
   const unique = new Map(people.map((person) => [person.key, person]))
@@ -111,7 +115,16 @@ export function eventManagementEconomics(event, data) {
 
   const groups = buildEventGroups(event.id, data)
   const people = [...new Map(groups.flatMap((group) => group.people).map((person) => [person.key, person])).values()]
-  const memberCount = people.filter((person) => isMemberForEvent(person, data?.subscriptions || [], event.starts_at)).length
+  const participantRows = (data?.eventParticipants || []).filter((row) => row.event_id === event.id)
+  const hasPricingSnapshot = participantRows.some((row) => row.pricing_group)
+  const memberCount = hasPricingSnapshot
+    ? participantRows.filter((row) => row.pricing_group === 'member').length
+    : people.filter((person) => isMemberForEvent(person, data?.subscriptions || [], event.starts_at)).length
+  const childCount = hasPricingSnapshot ? participantRows.filter((row) => row.pricing_group === 'child').length : people.filter((person) => person.type === 'child').length
+  const nonmemberCount = hasPricingSnapshot
+    ? participantRows.filter((row) => row.pricing_group === 'nonmember' || row.pricing_group === 'guest').length
+    : Math.max(0, people.length - memberCount - childCount)
+  const projectedAssociationCost = Math.max(0, cost - directReceived - dueDirect)
 
   return {
     cost,
@@ -120,9 +133,11 @@ export function eventManagementEconomics(event, data) {
     membershipAllocation,
     balance,
     projected,
+    projectedAssociationCost,
     participants: people.length,
     memberCount,
-    nonmemberCount: Math.max(0, people.length - memberCount),
+    childCount,
+    nonmemberCount,
   }
 }
 
@@ -135,6 +150,7 @@ export function annualManagementEconomics(data, year, takenAt = new Date()) {
   const directReceived = rows.reduce((sum, row) => sum + row.directReceived, 0)
   const due = rows.reduce((sum, row) => sum + row.due, 0)
   const cost = rows.reduce((sum, row) => sum + row.cost, 0)
+  const eventSupportNeeded = rows.reduce((sum, row) => sum + row.projectedAssociationCost, 0)
 
   const currentYear = takenAt.getUTCFullYear()
   const throughMonth = year < currentYear ? 11 : year > currentYear ? -1 : takenAt.getUTCMonth()
@@ -149,6 +165,8 @@ export function annualManagementEconomics(data, year, takenAt = new Date()) {
     cost,
     recognizedMembership,
     fullYearMembership,
+    eventSupportNeeded,
+    membershipHeadroom: fullYearMembership - eventSupportNeeded,
     currentBalance: directReceived + recognizedMembership - cost,
     projectedBalance: directReceived + due + fullYearMembership - cost,
   }
