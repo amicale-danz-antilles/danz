@@ -79,10 +79,14 @@ export function buildFinancialSheets(data, takenAt = new Date()) {
       asDate(e.occurred_at), nameOf(people[e.advanced_by || e.advanced_by_offline]), e.label, e.note || '', eur(e.amount_cents), e.status, e.reimbursement_method === 'cash' ? 'Caisse (liquide)' : e.reimbursement_method ? 'Revolut' : 'En attente', asDate(e.settled_at), e.receipt_file_name || '', e.id,
     ]) },
     { name: 'Transferts internes', headers: ['Date', 'Depuis', 'Vers', 'Montant EUR', 'Motif', 'Créé le', 'État', 'Annulé le', 'Motif annulation', 'ID'], rows: transfers.map((t) => [asDate(t.occurred_at), t.from_account === 'cash' ? 'Caisse (liquide)' : 'Revolut', t.to_account === 'cash' ? 'Caisse (liquide)' : 'Revolut', eur(t.amount_cents), t.note || '', asDate(t.created_at), t.cancelled_at ? 'Annulé' : 'Effectué', asDate(t.cancelled_at), t.cancel_reason || '', t.id]) },
-    { name: 'Bilan par événement', headers: ['Événement', 'Date', 'Visibilité', 'Participants', 'Foyers', 'Dettes attribuées', 'Dont cotisations', 'Total facturé EUR', 'Encaissé EUR', 'Reste dû EUR', 'ID événement'], rows: (data.events || []).map((event) => {
+    { name: 'Bilan par événement', headers: ['Événement', 'Date', 'Visibilité', 'Participants', 'Foyers', 'Dettes attribuées', 'Dont cotisations', 'Total facturé EUR', 'Encaissé EUR', 'Reste dû EUR', 'Coût réglé EUR', 'Balance actuelle EUR', 'Balance si tout est payé EUR', 'ID événement'], rows: (data.events || []).map((event) => {
       const summary = eventOverview(event.id, data)
+      const linked = entries.filter((entry) => entry.event_id === event.id && entry.status === 'settled')
+      const received = linked.filter((entry) => entry.kind === 'income').reduce((sum, entry) => sum + Number(entry.amount_cents || 0), 0)
+      const cost = linked.filter((entry) => entry.kind === 'expense').reduce((sum, entry) => sum + Number(entry.amount_cents || 0), 0)
+      const balance = received - cost
       return [event.title, asDate(event.starts_at), event.published ? 'Agenda public' : 'Fiche interne', summary.participants, summary.households,
-        summary.charges, summary.memberships, eur(summary.total), eur(summary.paid), eur(summary.due), event.id]
+        summary.charges, summary.memberships, eur(summary.total), eur(received), eur(summary.due), eur(cost), eur(balance), eur(balance + summary.due), event.id]
     }) },
     { name: 'Détail par événement', headers: ['Événement', 'Foyer', 'Participant', 'Catégorie', 'Libellé', 'Facturé EUR', 'Déjà payé EUR', 'Restant EUR', 'État', 'ID dette', 'ID événement'], rows: (data.events || []).flatMap((event) =>
       buildEventGroups(event.id, data).flatMap((group) => group.charges.length
