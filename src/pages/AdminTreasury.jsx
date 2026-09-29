@@ -7,12 +7,11 @@ import LegacyTreasury from './LegacyTreasury.jsx'
 import '../treasury-v2.css'
 
 const TABS = [
-  ['overview', 'Vue finances'],
-  ['events', 'Événements'],
-  ['operations', 'Journal'],
-  ['memberships', 'Cotisations & autres dettes'],
-  ['advanced', 'Remboursements'],
-  ['settings', 'Export'],
+  ['overview', 'Accueil'],
+  ['events', 'Événements & dettes'],
+  ['memberships', 'Dettes & remboursements'],
+  ['operations', 'Corriger'],
+  ['settings', 'Export hebdomadaire'],
 ]
 
 export default function AdminTreasury() {
@@ -43,7 +42,7 @@ export default function AdminTreasury() {
     <div className="tv2-hero">
       <span className="tv2-eyebrow">Accès réservé · Administration</span>
       <h1>Le bureau du trésorier</h1>
-      <p>Un espace privé pour les dépenses, les cotisations et les deux caisses de l’Amicale : Revolut et espèces.</p>
+      <p>Un espace privé et simple pour les dépenses, les dettes par événement, les remboursements et les deux comptes réels : Revolut et espèces.</p>
     </div>
     <section className="tv2-panel">
       <span className="tv2-eyebrow">Compte administrateur</span>
@@ -56,7 +55,7 @@ export default function AdminTreasury() {
 
   return <div className="treasury-v2">
     <header className="tv2-page-title">
-      <div><span className="tv2-eyebrow">Amicale DANZ · Accès nominatif</span><h1>Finances de l’Amicale</h1><p>Deux comptes réels, des événements complets et une vision annuelle de ce que les cotisations permettent de financer.</p></div>
+      <div><span className="tv2-eyebrow">Amicale DANZ · Accès nominatif</span><h1>Finances de l’Amicale</h1><p>Dépenses, dettes par événement, remboursements, corrections et export hebdomadaire au même endroit.</p></div>
       <span className="tv2-role">Administrateur + Trésorier</span>
     </header>
     <nav className="tv2-tabs" aria-label="Sections de la trésorerie">
