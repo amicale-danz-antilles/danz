@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { chargePaidCents, chargeResidualCents, formatMoney } from '../lib/finance.js'
-import './treasury-corrections.css'
+import '../treasury-corrections.css'
 
 const CATEGORY_LABELS = {
   meal: 'Repas', drinks: 'Boissons', activity: 'Activité / sortie',
