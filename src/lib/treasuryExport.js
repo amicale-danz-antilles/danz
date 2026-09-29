@@ -133,3 +133,70 @@ export function downloadFinancialBackup(data) {
   anchor.click(); anchor.remove()
   window.setTimeout(() => URL.revokeObjectURL(url), 1200)
 }
+
+const isoWeek = (value = new Date()) => {
+  const d = new Date(Date.UTC(value.getFullYear(), value.getMonth(), value.getDate()))
+  const dayNumber = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNumber)
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  const week = Math.ceil((((d - yearStart) / 86400000) + 1) / 7)
+  return { year: d.getUTCFullYear(), week, label: d.getUTCFullYear() + '-S' + String(week).padStart(2, '0') }
+}
+const weekBounds = (value = new Date()) => {
+  const start = new Date(value)
+  start.setHours(0, 0, 0, 0)
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7))
+  const end = new Date(start)
+  end.setDate(end.getDate() + 7)
+  return { start, end }
+}
+export function buildWeeklyFinancialSheets(data, takenAt = new Date()) {
+  const { start, end } = weekBounds(takenAt)
+  const eventById = Object.fromEntries((data.events || []).map((event) => [event.id, event]))
+  const weeklyEntries = (data.entries || []).filter((entry) => {
+    const value = new Date(accountingDate(entry))
+    return Number.isFinite(value.getTime()) && value >= start && value < end
+  }).map((entry) => [
+    asDate(accountingDate(entry)),
+    entry.kind === 'income' ? 'Recette' : 'Dépense',
+    entry.label,
+    eventById[entry.event_id]?.title || '',
+    entry.status === 'pending' ? 'Avance à rembourser' : entry.status === 'cancelled' ? 'Annulée' : accountFor(entry) === 'cash' ? 'Caisse' : accountFor(entry) === 'unassigned' ? 'À ventiler' : 'Revolut',
+    eur(entry.status === 'settled' ? signedCents(entry) : 0),
+    entry.status,
+    entry.note || '',
+  ])
+  const weeklyTransfers = (data.transfers || []).filter((transfer) => {
+    const value = new Date(transfer.occurred_at)
+    return Number.isFinite(value.getTime()) && value >= start && value < end
+  }).map((transfer) => [
+    asDate(transfer.occurred_at),
+    'Transfert interne',
+    (transfer.from_account === 'cash' ? 'Caisse' : 'Revolut') + ' → ' + (transfer.to_account === 'cash' ? 'Caisse' : 'Revolut'),
+    '',
+    'Interne',
+    eur(0),
+    transfer.cancelled_at ? 'Annulé' : 'Effectué',
+    transfer.note || '',
+  ])
+  const week = isoWeek(takenAt)
+  const weeklySheet = {
+    name: 'Semaine ' + String(week.week).padStart(2, '0'),
+    headers: ['Date', 'Type', 'Libellé', 'Événement', 'Compte', 'Impact EUR', 'État', 'Note'],
+    rows: [...weeklyEntries, ...weeklyTransfers].sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+  }
+  return [weeklySheet, ...buildFinancialSheets(data, takenAt)]
+}
+export function downloadWeeklyFinancialBackup(data) {
+  const now = new Date()
+  const week = isoWeek(now)
+  const sheets = buildWeeklyFinancialSheets(data, now)
+  const bytes = createFinancialXlsx(sheets)
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = 'DANZ-tresorerie-' + week.label + '-' + now.toISOString().slice(0, 10) + '.xlsx'
+  document.body.appendChild(anchor)
+  anchor.click(); anchor.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1200)
+}
