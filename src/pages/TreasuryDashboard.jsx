@@ -6,7 +6,7 @@ import { accountFor, accountingDate, ledgerBalances, signedCents } from '../lib/
 import EventTreasury from './EventTreasury.jsx'
 import { annualManagementEconomics, eventManagementEconomics } from '../lib/membershipProfitability.js'
 import { financialPositionForPerson } from '../lib/personFinance.js'
-import TreasuryJournalManager from './TreasuryJournalManager.jsx'
+import TreasuryJournalManager from './TreasuryJournalManager.jsx'\nimport TreasuryCorrections from './TreasuryCorrections.jsx'
 
 const EXPENSE_CATEGORIES = {
   courses: 'Courses & alimentation', evenement: 'Événement & réception', materiel: 'Matériel',
@@ -340,9 +340,9 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     const method = reimburseBy[entry.id] || 'bank_transfer'
     if (!window.confirm('Confirmer le remboursement de ' + formatMoney(entry.amount_cents) + ' par ' + (method === 'cash' ? 'la caisse espèces' : 'Revolut') + ' ?')) return
     action(async () => {
-      const { error: e } = await supabase.from('treasury_entries').update({
-        status: 'settled', reimbursement_method: method, settled_by: user.id, settled_at: new Date().toISOString(),
-      }).eq('id', entry.id).eq('status', 'pending')
+      const { error: e } = await supabase.rpc('treasury_set_advance_reimbursement', {
+        p_id: entry.id, p_reimbursed: true, p_method: method, p_settled_on: localDay(),
+      })
       if (e) throw e
     }, 'Avance remboursée et débit affecté au bon compte.')
   }
@@ -366,8 +366,11 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
   const exportFullExcel = async () => {
     if (exporting || !data) return
     setExporting(true); setError('')
-    try { const { downloadFinancialBackup } = await import('../lib/treasuryExport.js'); downloadFinancialBackup(data); setNotice('Sauvegarde Excel complète téléchargée sur votre appareil.') }
-    catch (err) { setError(err.message || 'L’export Excel a échoué.') }
+    try {
+      const { downloadWeeklyFinancialBackup } = await import('../lib/treasuryExport.js')
+      downloadWeeklyFinancialBackup(data)
+      setNotice('Export hebdomadaire Excel téléchargé. Il contient aussi la sauvegarde complète et l’historique des corrections.')
+    } catch (err) { setError(err.message || 'L’export Excel a échoué.') }
     finally { setExporting(false) }
   }
   const openForm = (type) => {
@@ -488,9 +491,9 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     </>}
 
     {view === 'operations' && <>
-      <TreasuryJournalManager data={data} onReload={reload} onReceipt={openReceipt}/>
+      <TreasuryJournalManager data={data} onReload={reload} onReceipt={openReceipt}/>\n      <TreasuryCorrections data={data} onReload={reload} />
       <details className="tv2-panel"><summary style={{cursor:'pointer',fontWeight:750}}>Historique chronologique · recherche avancée · export CSV</summary>
-      <section><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Historique complet</span><h2>Mes opérations</h2></div><div className="tv2-section-actions"><button type="button" className="primary-button" disabled={exporting} onClick={exportFullExcel}>{exporting ? 'Préparation…' : 'Sauvegarde complète Excel ↓'}</button><button type="button" className="ghost-button" onClick={exportRows}>CSV filtré</button></div></div>
+      <section><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Historique complet</span><h2>Mes opérations</h2></div><div className="tv2-section-actions"><button type="button" className="primary-button" disabled={exporting} onClick={exportFullExcel}>{exporting ? 'Préparation…' : 'Export hebdomadaire Excel ↓'}</button><button type="button" className="ghost-button" onClick={exportRows}>CSV filtré</button></div></div>
         <div className="tv2-filters"><label>Rechercher<input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Libellé ou note..." /></label>
           <label>Type<select value={kindFilter} onChange={(e) => setKindFilter(e.target.value)}><option value="all">Tout</option><option value="income">Recettes</option><option value="expense">Dépenses</option><option value="transfer">Transferts</option></select></label>
           <label>Compte<select value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)}><option value="all">Tous</option><option value="bank">Revolut</option><option value="cash">Espèces</option></select></label>
@@ -512,7 +515,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
         <article className="tv2-metric"><span>Avances à rembourser</span><strong>{formatMoney(pendingAdvanceCents)}</strong><small>Achats faits pour l’Amicale</small></article>
       </div>
       {pendingPayments.length > 0 && <section className="tv2-panel"><div className="tv2-section-heading"><h2>{pendingPayments.length} virement(s) à confirmer</h2></div><div className="tv2-list">{pendingPayments.map((p) => <div className="tv2-list-row" key={p.id}><div><strong>{householdById[p.household_id]?.name || 'Foyer'}</strong><small>{p.reference} · {formattedDate(p.declared_at)}</small></div><b>{formatMoney(p.amount_cents)}</b><button type="button" className="ghost-button" disabled={busy} onClick={() => confirmPayment(p)}>Confirmer</button></div>)}</div></section>}
-      <section className="tv2-panel tv2-person-panel"><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Annuaire financier</span><h2>Qui doit quoi ? À qui dois-je rembourser ?</h2></div><button type="button" className="ghost-button" onClick={exportFullExcel} disabled={exporting}>{exporting ? 'Préparation…' : 'Sauvegarde Excel complète ↓'}</button></div>
+      <section className="tv2-panel tv2-person-panel"><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Annuaire financier</span><h2>Qui doit quoi ? À qui dois-je rembourser ?</h2></div><button type="button" className="ghost-button" onClick={exportFullExcel} disabled={exporting}>{exporting ? 'Préparation…' : 'Export hebdomadaire Excel ↓'}</button></div>
         <label className="tv2-search">Rechercher une personne<input value={memberFilter} onChange={(e) => setMemberFilter(e.target.value)} placeholder="Nom ou e-mail" /></label>
         <div className="tv2-person-table-head"><span>Personne</span><span>Cotisation</span><span>Doit à l’Amicale</span><span>Amicale lui doit</span><span>Solde net</span><span></span></div>
         <div className="tv2-person-list">{roster.map((p) => {
@@ -553,11 +556,11 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
           <button type="submit" className="primary-button" disabled={busy}>{opening ? 'Rapprocher les soldes' : 'Initialiser mes comptes'}</button>
         </form>
       </section>
-      <section className="tv2-panel"><span className="tv2-eyebrow">Sauvegarde</span><h2>Export et historique</h2>
-        <p>La gestion courante utilise uniquement Revolut et la caisse liquide. Les traces de l’ancien import Excel restent uniquement dans l’export complet.</p>
+      <section className="tv2-panel"><span className="tv2-eyebrow">Sauvegarde</span><h2>Export hebdomadaire et historique</h2>
+        <p>Chaque semaine, téléchargez un classeur Excel : la première feuille reprend les mouvements de la semaine et les feuilles suivantes conservent la sauvegarde complète, les dettes, remboursements et corrections.</p>
         <div className="tv2-list-row"><div><strong>Revolut</strong><small>Solde {opening ? formatMoney(balances.bank) : 'à initialiser'}</small></div></div>
         <div className="tv2-list-row"><div><strong>Caisse liquide</strong><small>Solde {opening ? formatMoney(balances.cash) : 'à initialiser'}</small></div></div>
-        <div className="tv2-setting-actions"><button type="button" className="primary-button" disabled={exporting} onClick={exportFullExcel}>Sauvegarde complète Excel ↓</button><button type="button" className="ghost-button" onClick={() => onView('operations')}>Consulter le journal</button></div>
+        <div className="tv2-setting-actions"><button type="button" className="primary-button" disabled={exporting} onClick={exportFullExcel}>Export hebdomadaire Excel ↓</button><button type="button" className="ghost-button" onClick={() => onView('operations')}>Consulter le journal</button></div>
       </section>
     </div>}
   </div>
