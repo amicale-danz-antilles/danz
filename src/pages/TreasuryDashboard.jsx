@@ -6,7 +6,8 @@ import { accountFor, accountingDate, ledgerBalances, signedCents } from '../lib/
 import EventTreasury from './EventTreasury.jsx'
 import { annualManagementEconomics, eventManagementEconomics } from '../lib/membershipProfitability.js'
 import { financialPositionForPerson } from '../lib/personFinance.js'
-import TreasuryJournalManager from './TreasuryJournalManager.jsx'\nimport TreasuryCorrections from './TreasuryCorrections.jsx'
+import TreasuryJournalManager from './TreasuryJournalManager.jsx'
+import TreasuryCorrections from './TreasuryCorrections.jsx'
 
 const EXPENSE_CATEGORIES = {
   courses: 'Courses & alimentation', evenement: 'Événement & réception', materiel: 'Matériel',
@@ -491,7 +492,8 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     </>}
 
     {view === 'operations' && <>
-      <TreasuryJournalManager data={data} onReload={reload} onReceipt={openReceipt}/>\n      <TreasuryCorrections data={data} onReload={reload} />
+      <TreasuryJournalManager data={data} onReload={reload} onReceipt={openReceipt}/>
+      <TreasuryCorrections data={data} onReload={reload} />
       <details className="tv2-panel"><summary style={{cursor:'pointer',fontWeight:750}}>Historique chronologique · recherche avancée · export CSV</summary>
       <section><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Historique complet</span><h2>Mes opérations</h2></div><div className="tv2-section-actions"><button type="button" className="primary-button" disabled={exporting} onClick={exportFullExcel}>{exporting ? 'Préparation…' : 'Export hebdomadaire Excel ↓'}</button><button type="button" className="ghost-button" onClick={exportRows}>CSV filtré</button></div></div>
         <div className="tv2-filters"><label>Rechercher<input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Libellé ou note..." /></label>
