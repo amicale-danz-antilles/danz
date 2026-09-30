@@ -26,6 +26,7 @@ export default function AdminDirectory() {
   const [selected, setSelected] = useState(null)
   const [offlineDraft, setOfflineDraft] = useState(null)
   const [linkedProfileId, setLinkedProfileId] = useState('')
+  const [mergeTargetId, setMergeTargetId] = useState('')
 
   const load = async () => {
     const results = await Promise.all([
@@ -105,6 +106,7 @@ export default function AdminDirectory() {
   const createPerson = (event) => {
     event.preventDefault()
     if (!newPerson.name.trim()) return
+    if (duplicate && !window.confirm('Fiche potentiellement existante : ' + [...new Set(existingMatches)].join(', ') + '. Créer tout de même une nouvelle personne distincte ?')) return
     perform(async () => {
       const { error: rpcError } = await supabase.rpc('admin_create_offline_person', { p_name: newPerson.name.trim(), p_email: newPerson.email.trim() || null, p_notes: newPerson.notes.trim() || null })
       if (rpcError) throw rpcError
@@ -116,6 +118,7 @@ export default function AdminDirectory() {
   const openPerson = (person) => {
     setSelected(person)
     setLinkedProfileId('')
+    setMergeTargetId('')
     setOfflineDraft({ display_name: person.display_name, email: person.email || '', notes: person.notes || '', is_amicaliste: person.is_amicaliste, membership_valid_until: person.membership_valid_until || '' })
     setError(''); setNotice('')
   }
@@ -133,7 +136,7 @@ export default function AdminDirectory() {
         updated_at: new Date().toISOString(),
       }).eq('id', selected.id)
       if (updateError) throw updateError
-    }, 'Fiche mise à jour.')
+    }, 'Fiche mise à jour. La correction est inscrite dans l’historique.')
   }
   const linkAccount = () => {
     if (!selected || !linkedProfileId) return
@@ -146,14 +149,36 @@ export default function AdminDirectory() {
     }, 'Fiche associée au compte. Les opérations du foyer provisoire sont conservées.')
   }
 
+  const mergeOffline = () => {
+    if (!selected || !mergeTargetId) return
+    const target = offline.find((p) => p.id === mergeTargetId && !p.linked_user_id)
+    if (!target) return setError('Sélectionnez une fiche de destination valide.')
+    if (!window.confirm('Réunir définitivement « ' + selected.display_name + ' » dans « ' + target.display_name + ' » ? Les dettes, paiements, avances, cotisations et participations seront conservés. Cette opération est réservée aux vrais doublons : vérifiez l’identité.')) return
+    perform(async () => {
+      const { error: rpcError } = await supabase.rpc('admin_merge_offline_people', { p_source: selected.id, p_target: target.id })
+      if (rpcError) throw rpcError
+      setSelected(null); setOfflineDraft(null); setMergeTargetId('')
+    }, 'Doublon réuni : un seul dossier financier conserve toutes les opérations.')
+  }
+  const offlineCandidates = offline.filter((p) => !p.linked_user_id && p.id !== selected?.id).sort((a,b) => {
+    const score = (p) => (selected?.email && clean(selected.email) === clean(p.email) ? 0 : clean(selected?.display_name) === clean(p.display_name) ? 1 : 2)
+    return score(a) - score(b) || clean(a.display_name).localeCompare(clean(b.display_name), 'fr')
+  })
+  const existingMatches = [
+    ...profiles.filter((p) => clean(p.email) && newPerson.email.trim() && clean(p.email) === clean(newPerson.email)).map((p) => p.full_name || p.email),
+    ...offline.filter((p) => !p.linked_user_id && (
+      (newPerson.email.trim() && clean(p.email) === clean(newPerson.email))
+      || (newPerson.name.trim().length>3 && clean(p.display_name) === clean(newPerson.name))
+    )).map((p) => p.display_name),
+  ]
   const candidates = profiles.filter((p) => p.active && !linkedIds.has(p.id)).sort((a, b) => {
     const match = (p) => selected?.email && clean(p.email) === clean(selected.email) ? -1 : 0
     return match(a) - match(b) || clean(a.full_name).localeCompare(clean(b.full_name), 'fr')
   })
-  const duplicate = newPerson.email.trim() && (profiles.some((p) => clean(p.email) === clean(newPerson.email)) || offline.some((p) => clean(p.email) === clean(newPerson.email)))
+  const duplicate = existingMatches.length > 0
 
   return <div className="directory-page">
-    <header className="directory-top"><div><span className="eyebrow">Administration</span><h1>Membres & accès</h1><p>Demandes, comptes actifs et personnes sans compte, au même endroit.</p></div><button className="primary-button" type="button" onClick={() => setCreating((value) => !value)}>＋ Ajouter sans compte</button></header>
+    <header className="directory-top"><div><span className="eyebrow">Administration</span><h1>Membres & accès</h1><p>Un annuaire unique : créez et modifiez une fiche sans e-mail, gérez les comptes, puis réunissez les doublons.</p></div><button className="primary-button" type="button" onClick={() => setCreating((value) => !value)}>＋ Créer une personne (sans e-mail)</button></header>
     <div className="directory-stats">
       <button type="button" className="directory-stat" onClick={() => setTab('request')}><strong>{pending.length}</strong><span>Demandes à traiter</span></button>
       <button type="button" className="directory-stat" onClick={() => setTab('account')}><strong>{registered.length}</strong><span>Comptes actifs</span></button>
@@ -164,7 +189,7 @@ export default function AdminDirectory() {
     {notice && <div className="alert success" role="status">{notice}</div>}
     {creating && <section className="directory-form-panel"><div><h2>Nouvelle personne sans compte</h2><p>Une fiche de suivi, pas un accès au site. Ses opérations pourront être rattachées à son futur compte après vérification.</p></div>
       <form onSubmit={createPerson} className="directory-add-form"><label>Nom complet<input required maxLength={160} autoFocus value={newPerson.name} onChange={(e) => setNewPerson({ ...newPerson, name: e.target.value })} /></label><label>E-mail (facultatif)<input type="email" value={newPerson.email} onChange={(e) => setNewPerson({ ...newPerson, email: e.target.value })} /></label><label>Note (facultatif)<input maxLength={500} value={newPerson.notes} onChange={(e) => setNewPerson({ ...newPerson, notes: e.target.value })} /></label>
-        {duplicate && <p className="directory-duplicate">Une personne utilise déjà cet e-mail. Vérifiez avant de créer une deuxième fiche.</p>}
+        {duplicate && <p className="directory-duplicate">Fiche existante possible : {[...new Set(existingMatches)].join(', ')}. Vérifiez avant de créer un doublon.</p>}
         <div className="directory-actions"><button type="submit" className="primary-button" disabled={busy}>Créer la fiche</button><button type="button" className="ghost-button" onClick={() => setCreating(false)}>Annuler</button></div></form>
     </section>}
     <section className="directory-panel"><div className="directory-toolbar"><div className="directory-tabs" role="group" aria-label="Filtrer les membres">
@@ -184,6 +209,10 @@ export default function AdminDirectory() {
       <div className="directory-drawer-head"><div><span className="eyebrow">Personne sans compte</span><h2>{selected.display_name}</h2><p>Cette fiche conserve les mouvements du foyer avant la création d’un compte.</p></div><button type="button" aria-label="Fermer" onClick={() => setSelected(null)}>×</button></div>
       <form className="directory-drawer-form" onSubmit={savePerson}><label>Nom<input required maxLength={160} value={offlineDraft.display_name} onChange={(e) => setOfflineDraft({ ...offlineDraft, display_name: e.target.value })} /></label><label>E-mail<input type="email" value={offlineDraft.email} onChange={(e) => setOfflineDraft({ ...offlineDraft, email: e.target.value })} /></label><label>Notes<textarea rows={2} value={offlineDraft.notes} onChange={(e) => setOfflineDraft({ ...offlineDraft, notes: e.target.value })} /></label><label className="directory-check"><input type="checkbox" checked={offlineDraft.is_amicaliste} onChange={(e) => setOfflineDraft({ ...offlineDraft, is_amicaliste: e.target.checked })} /> Cotisation acquittée / amicaliste</label>{offlineDraft.is_amicaliste && <label>Valable jusqu’au<input type="date" required value={offlineDraft.membership_valid_until} onChange={(e) => setOfflineDraft({ ...offlineDraft, membership_valid_until: e.target.value })} /></label>}<button className="primary-button" disabled={busy}>Enregistrer la fiche</button></form>
       <div className="directory-link"><h3>Associer à un compte créé ultérieurement</h3><p>Si un futur compte utilise le même e-mail, le rapprochement est proposé dès son approbation. Vous pouvez aussi choisir manuellement un compte après vérification de l’identité. Les dettes, avances, participations et règlements restent conservés.</p><select value={linkedProfileId} onChange={(e) => setLinkedProfileId(e.target.value)} aria-label="Compte à associer"><option value="">Sélectionner le compte actif…</option>{candidates.map((p) => <option key={p.id} value={p.id}>{p.full_name || p.email} · {p.email}{selected.email && clean(selected.email) === clean(p.email) ? ' · e-mail correspondant' : ''}</option>)}</select><button className="ghost-button" disabled={!linkedProfileId || busy} type="button" onClick={linkAccount}>Associer et réunir les foyers</button></div>
+      <div className="directory-link"><h3>Fusionner un doublon sans compte</h3><p>Si deux fiches représentent la même personne, réunissez-les après vérification. Les dettes, les dépenses avancées, les cotisations et les participations sont conservées. Si les deux fiches participent déjà au même événement, corrigez d’abord ce doublon de participation.</p>
+        <select value={mergeTargetId} onChange={(e) => setMergeTargetId(e.target.value)} aria-label="Fiche qui sera conservée"><option value="">Choisir la fiche à conserver…</option>{offlineCandidates.map((p) => <option key={p.id} value={p.id}>{p.display_name}{p.email?' · '+p.email:''}{selected.email && clean(selected.email) === clean(p.email)?' · même e-mail':''}</option>)}</select>
+        <button className="ghost-button" disabled={!mergeTargetId || busy} type="button" onClick={mergeOffline}>Fusionner les deux fiches</button>
+      </div>
       <Link className="directory-finance-link" to="/administration/tresorerie">Consulter les dettes dans la trésorerie →</Link>
     </aside></div>}
   </div>
