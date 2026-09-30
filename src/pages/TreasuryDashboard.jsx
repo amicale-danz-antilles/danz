@@ -424,7 +424,6 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     {view === 'events' && <EventTreasury data={data} onReload={reload} user={user} />}
 
     {view === 'overview' && <>
-      <div className="tv2-home-shortcuts"><button type="button" onClick={()=>onView('cashflow')}>＋ / − <small>Saisir et rembourser</small></button><button type="button" onClick={()=>onView('history')}>Historique <small>Consulter et modifier</small></button><button type="button" onClick={()=>onView('events')}>Événements <small>Suivre leur rentabilité</small></button><button type="button" onClick={()=>onView('export')}>Excel <small>Exporter / réimporter</small></button></div>
       {!opening && <div className="tv2-setup-warning"><strong>Initialisez vos deux soldes réels</strong><span>Revolut et caisse liquide servent de point de départ à toute la trésorerie.</span><button type="button" onClick={() => onView('export')}>Renseigner les soldes →</button></div>}
 
       <section className="tv2-finance-head">
@@ -432,6 +431,8 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
         <article className="tv2-finance-account cash"><span>Caisse liquide</span><strong>{opening ? formatMoney(balances.cash) : 'À initialiser'}</strong><small>espèces réellement disponibles</small></article>
         <button type="button" className="tv2-finance-action" onClick={()=>onView('events')}><span>Événements</span><strong>Gérer un repas / une activité →</strong><small>participants, tarifs, courses, paiements et balance</small></button>
       </section>
+
+      <div className="tv2-home-shortcuts"><button type="button" onClick={()=>onView('cashflow')}>＋ / − <small>Saisir et rembourser</small></button><button type="button" onClick={()=>onView('history')}>Historique <small>Consulter et modifier</small></button><button type="button" onClick={()=>onView('events')}>Événements <small>Suivre leur rentabilité</small></button><button type="button" onClick={()=>onView('export')}>Excel <small>Exporter / réimporter</small></button></div>
 
       <section className="tv2-attention-grid">
         <button type="button" onClick={() => document.getElementById('open-debts')?.scrollIntoView({behavior:'smooth',block:'start'})}><span>À encaisser</span><strong>{formatMoney(dueTotal)}</strong><small>{openDebtRows.length} dette{openDebtRows.length>1?'s':''} encore ouverte{openDebtRows.length>1?'s':''}</small></button>
