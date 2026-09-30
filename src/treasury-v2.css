@@ -213,3 +213,21 @@ button.tv2-metric{cursor:pointer}
 .tv2-net-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem;margin:.35rem 0 .2rem}.tv2-net-summary>div{display:grid;gap:.18rem;padding:.7rem .75rem;border:1px solid #dce8e4;border-radius:10px;background:#f9fbfa}.tv2-net-summary small{font-size:.62rem;color:#71817d}.tv2-net-summary strong{font-size:.82rem;font-variant-numeric:tabular-nums}.tv2-net-summary .association-owes{border-color:#d6c2e3;background:#fbf8fd}.tv2-net-summary .association-owes strong{color:#75488f}.tv2-net-summary .person-owes{border-color:#e8cbbd;background:#fffaf7}.tv2-net-summary .person-owes strong{color:#a45532}.tv2-net-summary .balanced strong{color:#39705f}
 @media(max-width:850px){.tv2-person-table-head,.tv2-person-row{grid-template-columns:minmax(150px,1.6fr) minmax(85px,.8fr) minmax(90px,.8fr) minmax(130px,1fr) 13px}.tv2-person-table-head span:nth-child(2),.tv2-person-row>span:nth-child(2){display:none}}
 @media(max-width:620px){.tv2-person-table-head,.tv2-person-row{grid-template-columns:minmax(145px,1.5fr) minmax(125px,1fr) 13px}.tv2-person-table-head span:nth-child(2),.tv2-person-row>span:nth-child(2),.tv2-person-table-head span:nth-child(3),.tv2-person-row>span:nth-child(3),.tv2-person-table-head span:nth-child(4),.tv2-person-row>span:nth-child(4){display:none}.tv2-net-summary{grid-template-columns:1fr}}
+
+
+/* V43 · pilotage comptable simplifié */
+.tv2-home-shortcuts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.55rem}
+.tv2-home-shortcuts button{display:grid;gap:.25rem;text-align:left;padding:.7rem .8rem;border:1px solid #d1e3da;border-radius:12px;background:#fff;color:#24604d;font-weight:850;cursor:pointer}
+.tv2-home-shortcuts button:hover{border-color:#7aab95;background:#f1f8f3}
+.tv2-home-shortcuts small{color:#6b8275;font-size:.65rem;font-weight:500}
+.tv2-quick-operations{background:linear-gradient(110deg,#f1faf5,#fff);padding:.9rem}
+.tv2-quick-operations h2{font-size:1rem;margin:.12rem 0}
+.tv2-history-edit-title{display:grid;gap:.18rem;padding:.75rem .9rem;border-left:3px solid #3e8a75;background:#f3f8f6}
+.tv2-history-edit-title h2{margin:0;font-size:.98rem}
+.tv2-history-edit-title p{margin:0;font-size:.7rem;color:#60796f}
+.tv2-advanced-export>summary{cursor:pointer;font-weight:800;padding:.45rem 0;color:#275e51}
+.tv2-advanced-export .tv2-two-cols{padding-top:.85rem}
+@media(max-width:900px){.tv2-home-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){.tv2-home-shortcuts{grid-template-columns:1fr 1fr}.tv2-home-shortcuts button{padding:.6rem}}
+
+.tv2-heading-actions{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}.tv2-people-link{font-size:.7rem!important;text-decoration:none;white-space:normal}

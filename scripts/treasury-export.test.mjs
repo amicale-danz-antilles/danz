@@ -3,8 +3,35 @@ import assert from 'node:assert/strict'
 import { strFromU8, unzipSync } from 'fflate'
 import { createFinancialXlsx, eur } from '../src/lib/treasuryXlsx.js'
 import { buildFinancialSheets } from '../src/lib/treasuryExport.js'
+import { buildEditableSheet, previewEditableRows } from '../src/lib/treasuryRoundTrip.js'
 import { eventManagementEconomics, eventMembershipAllocation, membershipMonthlyCents, membershipPlanMonths, membershipRecognitionForYear } from '../src/lib/membershipProfitability.js'
 import { financialPositionForPerson } from '../src/lib/personFinance.js'
+
+
+test('le classeur éditable ne propose que les écritures indépendantes et protégées', () => {
+  const id='11111111-1111-4111-8111-111111111111'
+  const entries=[
+    {id,kind:'expense',status:'settled',amount_cents:1200,label:'Courses',category:'courses',payment_method:'cash',occurred_at:'2026-09-26T12:00:00Z'},
+    {id:'p',kind:'income',status:'settled',amount_cents:6000,label:'Cotisation',payment_method:'bank_transfer',household_payment_id:'pay-1'},
+    {id:'r',kind:'expense',status:'settled',amount_cents:800,label:'Avance remboursée',payment_method:'personal_advance'},
+  ]
+  const sheet=buildEditableSheet({entries})
+  assert.equal(sheet.name,'Écritures modifiables')
+  assert.equal(sheet.rows.length,1)
+  const row=sheet.rows[0].map((v)=>v&&typeof v==='object'&&'euros' in v?String(v.euros):v)
+  row[3]='Courses corrigées'
+  row[4]='13,50'
+  row[7]=String(Math.round((Date.UTC(2026,8,26)-Date.UTC(1899,11,30))/86400000))
+  const preview=previewEditableRows([row],{entries,events:[]})
+  assert.equal(preview.problems.length,0)
+  assert.equal(preview.changes.length,1)
+  assert.deepEqual(preview.changes[0].altered,['label','amountCents'])
+  assert.equal(preview.changes[0].next.amountCents,1350)
+  assert.equal(previewEditableRows([row],{entries:[{...entries[0],amount_cents:1500}],events:[]}).problems.length,1)
+  const xlsx=unzipSync(createFinancialXlsx([sheet]))
+  assert.ok(strFromU8(xlsx['xl/worksheets/sheet1.xml']).includes('Écritures modifiables')===false)
+  assert.ok(strFromU8(xlsx['xl/worksheets/sheet1.xml']).includes('Référence de contrôle'))
+})
 
 test('un export Excel contient les 17 feuilles et toutes les écritures, même sans solde initial', () => {
   const sheets = buildFinancialSheets({
