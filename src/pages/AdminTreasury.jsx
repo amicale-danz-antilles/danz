@@ -8,10 +8,10 @@ import '../treasury-v2.css'
 
 const TABS = [
   ['overview', 'Accueil'],
-  ['events', 'Événements & dettes'],
-  ['memberships', 'Dettes & remboursements'],
-  ['operations', 'Corriger'],
-  ['settings', 'Export hebdomadaire'],
+  ['cashflow', '＋ / − Opérations'],
+  ['history', 'Historique'],
+  ['events', 'Événements'],
+  ['export', 'Exportation Excel'],
 ]
 
 export default function AdminTreasury() {
@@ -55,7 +55,7 @@ export default function AdminTreasury() {
 
   return <div className="treasury-v2">
     <header className="tv2-page-title">
-      <div><span className="tv2-eyebrow">Amicale DANZ · Accès nominatif</span><h1>Finances de l’Amicale</h1><p>Dépenses, dettes par événement, remboursements, corrections et export hebdomadaire au même endroit.</p></div>
+      <div><span className="tv2-eyebrow">Amicale DANZ · Accès nominatif</span><h1>Finances de l’Amicale</h1><p>Soldes réels, recettes et dépenses, remboursements, historique complet et Excel modifiable.</p></div>
       <span className="tv2-role">Administrateur + Trésorier</span>
     </header>
     <nav className="tv2-tabs" aria-label="Sections de la trésorerie">
