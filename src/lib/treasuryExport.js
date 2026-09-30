@@ -1,4 +1,5 @@
 import { createFinancialXlsx, eur } from './treasuryXlsx.js'
+import { buildEditableSheet } from './treasuryRoundTrip.js'
 import { ledgerBalances, accountFor, accountingDate, signedCents } from './treasuryLedger.js'
 import { chargeResidualCents, effectiveAmicaliste, householdBalanceCents } from './finance.js'
 import { buildEventGroups, eventOverview } from './eventFinance.js'
@@ -123,7 +124,7 @@ export function buildFinancialSheets(data, takenAt = new Date()) {
   return sheets
 }
 export function downloadFinancialBackup(data) {
-  const sheets = buildFinancialSheets(data)
+  const sheets = [buildEditableSheet(data), ...buildFinancialSheets(data)]
   const bytes = createFinancialXlsx(sheets)
   const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
   const anchor = document.createElement('a')
@@ -190,7 +191,7 @@ export function buildWeeklyFinancialSheets(data, takenAt = new Date()) {
 export function downloadWeeklyFinancialBackup(data) {
   const now = new Date()
   const week = isoWeek(now)
-  const sheets = buildWeeklyFinancialSheets(data, now)
+  const sheets = [buildEditableSheet(data), ...buildWeeklyFinancialSheets(data, now)]
   const bytes = createFinancialXlsx(sheets)
   const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
   const anchor = document.createElement('a')
