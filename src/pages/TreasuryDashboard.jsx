@@ -558,7 +558,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
 
     {view === 'export' && <>
       <TreasuryExportImport data={data} onReload={reload}/>
-      <details className="tv2-panel tv2-advanced-export"><summary>Rapprocher les soldes réels et autres sauvegardes</summary>
+      <details className="tv2-panel tv2-advanced-export" open={!opening}><summary>Rapprocher les soldes réels et autres sauvegardes</summary>
       <div className="tv2-two-cols">
       <section className="tv2-panel"><span className="tv2-eyebrow">Rapprochement</span><h2>Mes deux soldes réels</h2>
         <p>En cas d’écart avec la banque ou la caisse physique, renseignez simplement les deux montants réellement constatés. L’ancien import Excel reste conservé dans l’historique.</p>
