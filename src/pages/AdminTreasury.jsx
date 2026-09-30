@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { supabase } from '../lib/supabase.js'
 import TreasuryDashboard from './TreasuryDashboard.jsx'
@@ -56,7 +56,7 @@ export default function AdminTreasury() {
   return <div className="treasury-v2">
     <header className="tv2-page-title">
       <div><span className="tv2-eyebrow">Amicale DANZ · Accès nominatif</span><h1>Finances de l’Amicale</h1><p>Soldes réels, recettes et dépenses, remboursements, historique complet et Excel modifiable.</p></div>
-      <span className="tv2-role">Administrateur + Trésorier</span>
+      <div className="tv2-heading-actions"><span className="tv2-role">Administrateur + Trésorier</span><Link className="ghost-button tv2-people-link" to="/administration/utilisateurs">Gérer les utilisateurs et les doublons →</Link></div>
     </header>
     <nav className="tv2-tabs" aria-label="Sections de la trésorerie">
       {TABS.map(([key, label]) => <button type="button" key={key} className={tab === key ? 'active' : ''} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>{label}</button>)}
