@@ -229,3 +229,5 @@ button.tv2-metric{cursor:pointer}
 .tv2-advanced-export .tv2-two-cols{padding-top:.85rem}
 @media(max-width:900px){.tv2-home-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.tv2-home-shortcuts{grid-template-columns:1fr 1fr}.tv2-home-shortcuts button{padding:.6rem}}
+
+.tv2-heading-actions{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}.tv2-people-link{font-size:.7rem!important;text-decoration:none;white-space:normal}
