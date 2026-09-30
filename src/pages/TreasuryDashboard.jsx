@@ -569,7 +569,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
         </form>
       </section>
       <section className="tv2-panel"><span className="tv2-eyebrow">Sauvegarde</span><h2>Export hebdomadaire et historique</h2>
-        <p>Chaque semaine, téléchargez un classeur Excel : la première feuille reprend les mouvements de la semaine et les feuilles suivantes conservent la sauvegarde complète, les dettes, remboursements et corrections.</p>
+        <p>Le classeur Excel contient d’abord une feuille réimportable, puis les mouvements de la semaine et la sauvegarde complète : dettes, remboursements et corrections.</p>
         <div className="tv2-list-row"><div><strong>Revolut</strong><small>Solde {opening ? formatMoney(balances.bank) : 'à initialiser'}</small></div></div>
         <div className="tv2-list-row"><div><strong>Caisse liquide</strong><small>Solde {opening ? formatMoney(balances.cash) : 'à initialiser'}</small></div></div>
         <div className="tv2-setting-actions"><button type="button" className="primary-button" disabled={exporting} onClick={exportFullExcel}>Export hebdomadaire Excel ↓</button><button type="button" className="ghost-button" onClick={() => onView('history')}>Consulter le journal</button></div>
