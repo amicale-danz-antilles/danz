@@ -16,3 +16,25 @@
 .txi-difference span{font-size:.71rem;color:#587568}.txi-difference del{font-size:.72rem;color:#a56a5d}.txi-difference b{font-size:.73rem;color:#24694c}
 .txi-confirm{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:.55rem}
 @media(max-width:650px){.txi-difference{grid-template-columns:1fr 1fr}.txi-difference span{grid-column:1/-1}.txi-actions>button,.txi-confirm>button{flex:1 1 180px}}
+
+
+.txi-scope{display:grid;gap:.75rem;border:1px solid #d3e7db;border-radius:12px;padding:.85rem;background:#fafdfb}
+.txi-scope h3{font-size:.95rem;margin:0}.txi-scope p{font-size:.74rem;color:#637a72;margin:.2rem 0}
+.txi-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:.65rem}
+.txi-filters label{display:grid;gap:.3rem;font-size:.76rem;font-weight:650;color:#345a4f;min-width:0}
+.txi-filters input,.txi-filters select{width:100%;min-width:0;padding:.5rem;border:1px solid #bed5c9;border-radius:8px;background:#fff;color:#23453d;font:inherit}
+.txi-selection-tools{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.txi-selection-tools strong{font-size:.76rem;margin-right:auto}
+.txi-selection-tools button{font-size:.73rem}
+.txi-selection-list{border:1px solid #dbe7e0;background:#fff;border-radius:9px;padding:.65rem}
+.txi-selection-list summary{cursor:pointer;font-size:.78rem;font-weight:650}
+.txi-selection-list label{display:flex;align-items:flex-start;gap:.6rem;padding:.5rem .2rem;border-top:1px solid #edf3ef;font-size:.75rem;cursor:pointer}
+.txi-selection-list label:first-of-type{margin-top:.55rem}
+.txi-selection-list label span{display:grid;gap:.1rem;min-width:0}
+.txi-selection-list label small{font-size:.69rem;color:#607e72}
+.txi-selection-download{display:flex;align-items:center;flex-wrap:wrap;gap:.65rem}
+.txi-selection-download small{font-size:.7rem;color:#607e72;line-height:1.4}
+.txi-selection-download p{color:#9b4c33}
+.txi-change-checkbox{display:flex;align-items:center;gap:.65rem;cursor:pointer}
+.txi-change-checkbox span{display:grid;gap:.12rem}
+@media(max-width:650px){.txi-filters{grid-template-columns:repeat(auto-fit,minmax(135px,1fr))}.txi-selection-download>button{width:100%}}
