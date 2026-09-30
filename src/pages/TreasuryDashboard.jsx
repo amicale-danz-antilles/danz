@@ -8,6 +8,8 @@ import { annualManagementEconomics, eventManagementEconomics } from '../lib/memb
 import { financialPositionForPerson } from '../lib/personFinance.js'
 import TreasuryJournalManager from './TreasuryJournalManager.jsx'
 import TreasuryCorrections from './TreasuryCorrections.jsx'
+import TreasuryActivityHistory from './TreasuryActivityHistory.jsx'
+import TreasuryExportImport from './TreasuryExportImport.jsx'
 
 const EXPENSE_CATEGORIES = {
   courses: 'Courses & alimentation', evenement: 'Événement & réception', materiel: 'Matériel',
@@ -386,7 +388,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     {error && <div className="alert error" role="alert">{error}<button type="button" onClick={() => setError('')} aria-label="Fermer l’erreur">×</button></div>}
     {notice && <div className="alert success" role="status">{notice}<button type="button" onClick={() => setNotice('')} aria-label="Fermer la confirmation">×</button></div>}
 
-    {view !== 'settings' && view !== 'events' && view !== 'overview' && <div className="tv2-actions">
+    {view === 'cashflow' && <div className="tv2-actions">
       <button type="button" className="tv2-action tv2-action-primary" onClick={() => openForm('expense')}>− Dépense</button>
       <button type="button" className="tv2-action" onClick={() => openForm('income')}>＋ Recette</button>
       <button type="button" className="tv2-action" onClick={() => openForm('transfer')}>⇄ Transfert Revolut / caisse</button>
@@ -422,7 +424,8 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
     {view === 'events' && <EventTreasury data={data} onReload={reload} user={user} />}
 
     {view === 'overview' && <>
-      {!opening && <div className="tv2-setup-warning"><strong>Initialisez vos deux soldes réels</strong><span>Revolut et caisse liquide servent de point de départ à toute la trésorerie.</span><button type="button" onClick={() => onView('settings')}>Renseigner les soldes →</button></div>}
+      <div className="tv2-home-shortcuts"><button type="button" onClick={()=>onView('cashflow')}>＋ / − <small>Saisir et rembourser</small></button><button type="button" onClick={()=>onView('history')}>Historique <small>Consulter et modifier</small></button><button type="button" onClick={()=>onView('events')}>Événements <small>Suivre leur rentabilité</small></button><button type="button" onClick={()=>onView('export')}>Excel <small>Exporter / réimporter</small></button></div>
+      {!opening && <div className="tv2-setup-warning"><strong>Initialisez vos deux soldes réels</strong><span>Revolut et caisse liquide servent de point de départ à toute la trésorerie.</span><button type="button" onClick={() => onView('export')}>Renseigner les soldes →</button></div>}
 
       <section className="tv2-finance-head">
         <article className="tv2-finance-account bank"><span>Compte bancaire · Revolut</span><strong>{opening ? formatMoney(balances.bank) : 'À initialiser'}</strong><small>argent réellement disponible</small></article>
@@ -437,7 +440,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
         <article className={(annualEconomics?.membershipHeadroom || 0)>=0?'positive':'negative'}><span>Marge cotisations / événements</span><strong>{(annualEconomics?.membershipHeadroom || 0)>=0?'+':''}{formatMoney(annualEconomics?.membershipHeadroom || 0)}</strong><small>{(annualEconomics?.membershipHeadroom || 0)>=0?'budget annuel encore disponible':'coût des gratuités supérieur aux cotisations connues'}</small></article>
       </section>
 
-      {pendingPayments.length>0 && <div className="tj-warning">{pendingPayments.length} virement{pendingPayments.length>1?'s':''} déclaré{pendingPayments.length>1?'s':''} à confirmer. <button type="button" onClick={()=>onView('operations')}>Vérifier →</button></div>}
+      {pendingPayments.length>0 && <div className="tj-warning">{pendingPayments.length} virement{pendingPayments.length>1?'s':''} déclaré{pendingPayments.length>1?'s':''} à confirmer. <button type="button" onClick={()=>onView('history')}>Vérifier →</button></div>}
 
       <section className="tv2-panel tv2-year-cockpit">
         <div className="tv2-section-heading"><div><span className="tv2-eyebrow">Pilotage {year}</span><h2>Les cotisations financent-elles nos activités ?</h2></div><span className={'tv2-profit-status '+((annualEconomics?.membershipHeadroom || 0)>=0?'positive':'negative')}>{(annualEconomics?.membershipHeadroom || 0)>=0?'Budget soutenable':'Budget à surveiller'}</span></div>
@@ -474,7 +477,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
             <button type="button" className="tv2-mini-button" disabled={busy} onClick={()=>collectOneDebt(charge,'bank_transfer')}>Payé Revolut</button>
           </div>)}
           {!openDebtRows.length&&<p className="tv2-empty">Aucune dette en cours.</p>}
-          {openDebtRows.length>12&&<button type="button" className="ghost-button" onClick={()=>onView('memberships')}>Voir les {openDebtRows.length} dettes →</button>}
+          {openDebtRows.length>12&&<button type="button" className="ghost-button" onClick={()=>onView('cashflow')}>Voir les {openDebtRows.length} dettes →</button>}
         </div>
       </section>
 
@@ -491,7 +494,9 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
       </details>
     </>}
 
-    {view === 'operations' && <>
+    {view === 'history' && <>
+      <TreasuryActivityHistory data={data}/>
+      <div className="tv2-history-edit-title"><h2>Modifier les opérations existantes</h2><p>Toutes les dépenses, recettes, dettes et remboursements peuvent être corrigés ici, selon leurs règles comptables.</p></div>
       <TreasuryJournalManager data={data} onReload={reload} onReceipt={openReceipt}/>
       <TreasuryCorrections data={data} onReload={reload} />
       <details className="tv2-panel"><summary style={{cursor:'pointer',fontWeight:750}}>Historique chronologique · recherche avancée · export CSV</summary>
@@ -504,12 +509,14 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
         <p className="tv2-hint">{activityFiltered.length} opération{activityFiltered.length > 1 ? 's' : ''} · Les transferts ne modifient pas le résultat.</p>
         {renderOperations(activityFiltered, openReceipt)}
       </section></details>
-      {pendingAdvances.length > 0 && <section className="tv2-panel"><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Dettes envers les membres</span><h2>Remboursements en attente</h2></div></div><div className="tv2-advance-list">
-        {pendingAdvances.map((e) => <div className="tv2-advance" key={e.id}><div><strong>{e.label}</strong><small>{profileById[e.advanced_by]?.full_name || 'Membre'} · {formattedDate(e.occurred_at)}</small></div><b>{formatMoney(e.amount_cents)}</b><label>Rembourser depuis<select value={reimburseBy[e.id] || 'bank_transfer'} onChange={(evt) => setReimburseBy({ ...reimburseBy, [e.id]: evt.target.value })}><option value="bank_transfer">Revolut</option><option value="cash">Caisse espèces</option></select></label><button type="button" className="primary-button" disabled={busy} onClick={() => reimburse(e)}>Marquer remboursé</button></div>)}
-      </div></section>}
     </>}
 
-    {view === 'memberships' && <>
+    {view === 'cashflow' && <>
+      <section className="tv2-panel tv2-quick-operations"><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Gestion quotidienne</span><h2>Recettes, dépenses et remboursements</h2><p className="tv2-hint">Utilisez les boutons + et − en haut pour saisir une opération, puis validez ici les avances à rembourser. Toute modification reste consultable dans l’historique.</p></div></div></section>
+      {pendingAdvances.length > 0 && <section className="tv2-panel"><div className="tv2-section-heading"><div><span className="tv2-eyebrow">Dettes envers les membres</span><h2>Remboursements en attente</h2></div></div><div className="tv2-advance-list">
+        {pendingAdvances.map((e) => <div className="tv2-advance" key={e.id}><div><strong>{e.label}</strong><small>{profileById[e.advanced_by]?.full_name || offlineById[e.advanced_by_offline]?.display_name || 'Personne'} · {formattedDate(e.occurred_at)}</small></div><b>{formatMoney(e.amount_cents)}</b><label>Rembourser depuis<select value={reimburseBy[e.id] || 'bank_transfer'} onChange={(evt) => setReimburseBy({ ...reimburseBy, [e.id]: evt.target.value })}><option value="bank_transfer">Revolut</option><option value="cash">Caisse espèces</option></select></label><button type="button" className="primary-button" disabled={busy} onClick={() => reimburse(e)}>Marquer remboursé</button></div>)}
+      </div></section>}
+
       <div className="tv2-metric-grid">
         <article className="tv2-metric"><span>Amicalistes à jour</span><strong>{currentMemberCount}</strong><small>Comptes et fiches sans compte</small></article>
         <article className="tv2-metric"><span>Échéance sous 60 jours</span><strong>{expiringCount}</strong><small>Cotisations à renouveler</small></article>
@@ -548,7 +555,10 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
       <section className="tv2-panel"><div className="tv2-section-heading"><h2>Soldes non attribués des foyers</h2><button type="button" className="ghost-button" onClick={onAdvanced}>Gestion avancée des foyers</button></div><div className="tv2-list">{households.filter((h) => dueByHousehold[h.id] > 0).map((h) => <div className="tv2-list-row tv2-debt" key={h.id}><div><strong>{h.name}</strong><small>{charges.filter((c) => c.household_id === h.id && c.status === 'open' && !c.user_id && !c.offline_person_id && !c.household_member_id).length} charge(s) du foyer non attribuées</small></div><b>{formatMoney(dueByHousehold[h.id])}</b><button type="button" className="ghost-button" disabled={busy} onClick={() => collectCash(h)}>Encaisser tout en espèces</button></div>)}{dueTotal === 0 && <p className="tv2-empty">Tous les foyers sont à jour.</p>}</div></section>
     </>}
 
-    {view === 'settings' && <div className="tv2-two-cols">
+    {view === 'export' && <>
+      <TreasuryExportImport data={data} onReload={reload}/>
+      <details className="tv2-panel tv2-advanced-export"><summary>Rapprocher les soldes réels et autres sauvegardes</summary>
+      <div className="tv2-two-cols">
       <section className="tv2-panel"><span className="tv2-eyebrow">Rapprochement</span><h2>Mes deux soldes réels</h2>
         <p>En cas d’écart avec la banque ou la caisse physique, renseignez simplement les deux montants réellement constatés. L’ancien import Excel reste conservé dans l’historique.</p>
         {opening && <div className="tv2-reference-card"><strong>Dernier point de référence</strong><span>{new Date(opening.as_of).toLocaleString('fr-FR')}</span><span>Revolut : {formatMoney(balances.bank)} · Espèces : {formatMoney(balances.cash)}</span></div>}
@@ -562,9 +572,9 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
         <p>Chaque semaine, téléchargez un classeur Excel : la première feuille reprend les mouvements de la semaine et les feuilles suivantes conservent la sauvegarde complète, les dettes, remboursements et corrections.</p>
         <div className="tv2-list-row"><div><strong>Revolut</strong><small>Solde {opening ? formatMoney(balances.bank) : 'à initialiser'}</small></div></div>
         <div className="tv2-list-row"><div><strong>Caisse liquide</strong><small>Solde {opening ? formatMoney(balances.cash) : 'à initialiser'}</small></div></div>
-        <div className="tv2-setting-actions"><button type="button" className="primary-button" disabled={exporting} onClick={exportFullExcel}>Export hebdomadaire Excel ↓</button><button type="button" className="ghost-button" onClick={() => onView('operations')}>Consulter le journal</button></div>
+        <div className="tv2-setting-actions"><button type="button" className="primary-button" disabled={exporting} onClick={exportFullExcel}>Export hebdomadaire Excel ↓</button><button type="button" className="ghost-button" onClick={() => onView('history')}>Consulter le journal</button></div>
       </section>
-    </div>}
+    </div></details></>}
   </div>
 }
 
