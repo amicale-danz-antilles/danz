@@ -96,6 +96,14 @@ const moneyCents = (value) => {
   return Number.isFinite(amount) && amount > 0 && amount <= 1000000
     && Math.abs(amount * 100 - Math.round(amount * 100)) < .00001 ? Math.round(amount * 100) : NaN
 }
+const normalizeExcelDate = (raw) => {
+  const value=String(raw || '').trim()
+  if (/^\d{5}(\.\d+)?$/.test(value)) {
+    const date=new Date(Date.UTC(1899,11,30)+Math.round(Number(value)*86400000))
+    return Number.isNaN(date.getTime()) ? value : date.toISOString().slice(0,10)
+  }
+  return value
+}
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 const keys = ['label', 'amountCents', 'category', 'account', 'occurredOn', 'note', 'eventId', 'person']
@@ -118,7 +126,7 @@ export function previewEditableRows(rows, data) {
       const next = {
         ...baseline, label: String(row[3] || '').trim(), amountCents: moneyCents(row[4]),
         category: String(row[5] || '').trim(), account: String(row[6] || '').trim(),
-        occurredOn: String(row[7] || '').trim(), note: String(row[8] || '').trim(),
+        occurredOn: normalizeExcelDate(row[7]), note: String(row[8] || '').trim(),
         eventId: String(row[9] || '').trim(), person: String(row[10] || '').trim(),
       }
       if (!next.label || next.label.length > 250 || !Number.isSafeInteger(next.amountCents)) throw new Error('Libellé ou montant invalide.')
