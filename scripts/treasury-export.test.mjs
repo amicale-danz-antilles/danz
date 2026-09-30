@@ -21,6 +21,7 @@ test('le classeur éditable ne propose que les écritures indépendantes et prot
   const row=sheet.rows[0].map((v)=>v&&typeof v==='object'&&'euros' in v?String(v.euros):v)
   row[3]='Courses corrigées'
   row[4]='13,50'
+  row[7]=String(Math.round((Date.UTC(2026,8,26)-Date.UTC(1899,11,30))/86400000))
   const preview=previewEditableRows([row],{entries,events:[]})
   assert.equal(preview.problems.length,0)
   assert.equal(preview.changes.length,1)
