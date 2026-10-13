@@ -60,7 +60,7 @@ const fetchAll = async (table, orderField = 'created_at') => {
 }
 const defaultEntry = () => ({ kind: 'expense', label: '', amount: '', category: 'courses', payment_method: 'bank_transfer', advanced_by: '', beneficiary: '', event_id: '', note: '', date: localDay() })
 
-export default function TreasuryDashboard({ view, onAdvanced, onView }) {
+export default function TreasuryDashboard({ view, onAdvanced, onView, initialAction = '' }) {
   const { user } = useTreasuryIdentity()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -68,6 +68,14 @@ export default function TreasuryDashboard({ view, onAdvanced, onView }) {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [formType, setFormType] = useState('')
+  // Deep link from SuperAgent: only opens the form after the usual auth checks.
+  // No mutations, amounts, or identities are accepted from URL parameters.
+  useEffect(() => {
+    if (initialAction !== 'income' && initialAction !== 'expense') return
+    setFormType(initialAction)
+    setEntryForm({ ...defaultEntry(), kind: initialAction,
+      category: initialAction === 'income' ? 'don' : 'courses' })
+  }, [initialAction])
   const [entryForm, setEntryForm] = useState(defaultEntry)
   const [transferForm, setTransferForm] = useState({ from_account: 'bank', amount: '', note: '', date: localDay() })
   const [openingDraft, setOpeningDraft] = useState({ bank: '', cash: '' })
