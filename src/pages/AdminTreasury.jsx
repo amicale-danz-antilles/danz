@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { supabase } from '../lib/supabase.js'
 import TreasuryDashboard from './TreasuryDashboard.jsx'
@@ -16,7 +16,9 @@ const TABS = [
 
 export default function AdminTreasury() {
   const { isAdmin, isTreasurer, loading, refreshProfile } = useAuth()
-  const [tab, setTab] = useState('overview')
+  const [params] = useSearchParams()
+  const [tab, setTab] = useState(() => TABS.some(([name]) => name === params.get('tab')) ? params.get('tab') : 'overview')
+  const initialAction = ['income','expense'].includes(params.get('action')) ? params.get('action') : ''
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -61,6 +63,6 @@ export default function AdminTreasury() {
     <nav className="tv2-tabs" aria-label="Sections de la trésorerie">
       {TABS.map(([key, label]) => <button type="button" key={key} className={tab === key ? 'active' : ''} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>{label}</button>)}
     </nav>
-    {tab === 'advanced' ? <div className="tv2-legacy"><LegacyTreasury /></div> : <TreasuryDashboard view={tab} onAdvanced={() => setTab('advanced')} onView={setTab} />}
+    {tab === 'advanced' ? <div className="tv2-legacy"><LegacyTreasury /></div> : <TreasuryDashboard view={tab} initialAction={initialAction} onAdvanced={() => setTab('advanced')} onView={setTab} />}
   </div>
 }
