@@ -98,3 +98,78 @@ test("GET /db-health ne divulgue pas les erreurs de base", async () => {
   assert.equal(response.status, 503);
   assert.doesNotMatch(await response.text(), /private database information/);
 });
+
+test("GET /schema-status : aucun schema pilote dans D1", async () => {
+  const queries = [];
+  const env = { DB: { prepare(sql) {
+    queries.push(sql);
+    return { async all() { return { results: [] }; } };
+  } } };
+  const response = await worker.fetch(new Request(base + "/schema-status"), env);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    ok: false, database: "danz-staging", stage: "finance-schema-check",
+    tablesExpected: 8, tablesPresent: 0, triggersExpected: 4,
+    triggersPresent: 0, empty: false, readonly: true,
+  });
+  assert.equal(queries.length, 2);
+  assert.ok(queries.every(sql => sql.startsWith("SELECT ")));
+});
+
+test("GET /schema-status : schema complet et tables vides", async () => {
+  const tables = [
+    "stg_households", "stg_events", "stg_household_charges",
+    "stg_household_payments", "stg_household_payment_allocations",
+    "stg_treasury_opening", "stg_treasury_entries", "stg_treasury_transfers",
+  ];
+  const triggers = [
+    "stg_allocations_check_insert", "stg_allocations_check_update",
+    "stg_payment_update_guard", "stg_charge_update_guard",
+  ];
+  const queries = [];
+  const env = { DB: { prepare(sql) {
+    queries.push(sql);
+    if (sql.includes("type = 'table'")) return { async all() { return { results: tables.map(name => ({ name })) }; } };
+    if (sql.includes("type = 'trigger'")) return { async all() { return { results: triggers.map(name => ({ name })) }; } };
+    return { async all() { return { results: tables.map(() => ({ n: 0 })) }; } };
+  } } };
+  const response = await worker.fetch(new Request(base + "/schema-status"), env);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    ok: true, database: "danz-staging", stage: "finance-schema-check",
+    tablesExpected: 8, tablesPresent: 8, triggersExpected: 4,
+    triggersPresent: 4, empty: true, readonly: true,
+  });
+  assert.equal(queries.length, 3);
+  assert.ok(queries.every(sql => sql.startsWith("SELECT ")));
+});
+
+test("GET /schema-status : signaler la presence de donnees sans les exposer", async () => {
+  const tableNames = [
+    "stg_households", "stg_events", "stg_household_charges",
+    "stg_household_payments", "stg_household_payment_allocations",
+    "stg_treasury_opening", "stg_treasury_entries", "stg_treasury_transfers",
+  ];
+  const triggers = [
+    "stg_allocations_check_insert", "stg_allocations_check_update",
+    "stg_payment_update_guard", "stg_charge_update_guard",
+  ];
+  const env = { DB: { prepare(sql) {
+    if (sql.includes("type = 'table'")) return { async all() { return { results: tableNames.map(name => ({ name })) }; } };
+    if (sql.includes("type = 'trigger'")) return { async all() { return { results: triggers.map(name => ({ name })) }; } };
+    return { async all() { return { results: tableNames.map((_, i) => ({ n: i === 0 ? 1 : 0 })) }; } };
+  } } };
+  const response = await worker.fetch(new Request(base + "/schema-status"), env);
+  const body = await response.json();
+  assert.equal(body.ok, false);
+  assert.equal(body.empty, false);
+  assert.equal(body.tablesPresent, 8);
+  assert.equal(JSON.stringify(body).includes("stg_households"), false);
+});
+
+test("GET /schema-status : masquer les erreurs D1", async () => {
+  const env = { DB: { prepare() { throw new Error("secret-schema-error"); } } };
+  const response = await worker.fetch(new Request(base + "/schema-status"), env);
+  assert.equal(response.status, 503);
+  assert.doesNotMatch(await response.text(), /secret-schema-error/);
+});
