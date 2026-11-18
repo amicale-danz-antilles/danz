@@ -1,5 +1,6 @@
 // API de diagnostic, isolee de DANZ en production.
-// Aucune donnee membre, aucun compte, aucun acces Supabase, D1 ou R2.
+// Aucun compte membre, mot de passe, acces Supabase ou R2.
+// Seul un SELECT 1 en lecture seule est effectue sur la base D1 de test.
 const DANZ_ORIGIN = "https://amicale-danz-antilles.github.io";
 
 function responseHeaders(request) {
@@ -24,7 +25,7 @@ function json(data, status, headers) {
 }
 
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     const url = new URL(request.url);
     const headers = responseHeaders(request);
     const method = request.method.toUpperCase();
@@ -38,6 +39,21 @@ export default {
         return json({ ok: false, error: "not_found" }, 404, headers);
       }
       return new Response(null, { status: 204, headers });
+    }
+
+    // GET /db-health : test de liaison D1, strictement en lecture seule.
+    // Ne renvoie ni schema, ni contenu, ni message de base de donnees.
+    if (method === "GET" && url.pathname === "/db-health") {
+      if (!env?.DB) {
+        return json({ ok: false, database: "danz-staging", stage: "binding-test" }, 503, headers);
+      }
+      try {
+        const result = await env.DB.prepare("SELECT 1 AS reachable").first();
+        const ok = Number(result?.reachable) === 1;
+        return json({ ok, database: "danz-staging", stage: "binding-test", readonly: true }, ok ? 200 : 503, headers);
+      } catch (_) {
+        return json({ ok: false, database: "danz-staging", stage: "binding-test" }, 503, headers);
+      }
     }
 
     if (method === "GET" && (url.pathname === "/" || url.pathname === "/health")) {
