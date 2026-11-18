@@ -1,6 +1,6 @@
 // API de diagnostic, isolee de DANZ en production.
 // Aucun compte membre, mot de passe, acces Supabase ou R2.
-// Seul un SELECT 1 en lecture seule est effectue sur la base D1 de test.
+// Seules des lectures de diagnostic sont effectuees sur la base D1 de test.
 const DANZ_ORIGIN = "https://amicale-danz-antilles.github.io";
 
 function responseHeaders(request) {
@@ -53,6 +53,56 @@ export default {
         return json({ ok, database: "danz-staging", stage: "binding-test", readonly: true }, ok ? 200 : 503, headers);
       } catch (_) {
         return json({ ok: false, database: "danz-staging", stage: "binding-test" }, 503, headers);
+      }
+    }
+
+
+    // Controle strictement en lecture seule du schema financier PILOTE.
+    // N'expose ni lignes, ni donnees personnelles, ni SQL provenant de l'utilisateur.
+    if (method === "GET" && url.pathname === "/schema-status") {
+      if (!env?.DB) {
+        return json({ ok: false, stage: "finance-schema-check", reason: "db_unavailable" }, 503, headers);
+      }
+      try {
+        const tableNames = [
+          "stg_households", "stg_events", "stg_household_charges",
+          "stg_household_payments", "stg_household_payment_allocations",
+          "stg_treasury_opening", "stg_treasury_entries", "stg_treasury_transfers",
+        ];
+        const triggerNames = [
+          "stg_allocations_check_insert", "stg_allocations_check_update",
+          "stg_payment_update_guard", "stg_charge_update_guard",
+        ];
+        const [tablesResult, triggersResult] = await Promise.all([
+          env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'stg_%'").all(),
+          env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'stg_%'").all(),
+        ]);
+        const tables = new Set((tablesResult.results || []).map(item => item.name));
+        const triggers = new Set((triggersResult.results || []).map(item => item.name));
+        const tablesPresent = tableNames.filter(name => tables.has(name)).length;
+        const triggersPresent = triggerNames.filter(name => triggers.has(name)).length;
+        const schemaReady = tablesPresent === tableNames.length && triggersPresent === triggerNames.length;
+        let empty = false;
+        if (schemaReady) {
+          // Les noms de tables sont fixes et controles dans le code, jamais parametres par URL.
+          const query = tableNames.map(name => "SELECT COUNT(*) AS n FROM " + name).join(" UNION ALL ");
+          const counts = await env.DB.prepare(query).all();
+          empty = counts.results?.length === tableNames.length
+            && counts.results.every(row => Number(row.n) === 0);
+        }
+        return json({
+          ok: schemaReady && empty,
+          database: "danz-staging",
+          stage: "finance-schema-check",
+          tablesExpected: tableNames.length,
+          tablesPresent,
+          triggersExpected: triggerNames.length,
+          triggersPresent,
+          empty,
+          readonly: true,
+        }, 200, headers);
+      } catch (_) {
+        return json({ ok: false, stage: "finance-schema-check", reason: "query_failed" }, 503, headers);
       }
     }
 
