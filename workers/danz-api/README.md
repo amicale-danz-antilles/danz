@@ -60,3 +60,21 @@ La sonde ne fait que `SELECT 1 AS reachable`. Aucune table, donnée privee, auth
 Si le test renvoie 503, verifier la liaison D1 `DB` du Worker et le journal de build; ne pas modifier Supabase.
 
 Pour ce test, ne saisir **aucun identifiant, nom, email, ecriture comptable ou document d'adherent** dans la base D1.
+
+## Prototype SQL financier (préparation, NON appliqué sur D1)
+
+Fichiers :
+- `migrations/0001_staging_finance_pilot.sql` : 8 tables préfixées `stg_`, intégrité des paiements et écritures, aucune donnée réelle.
+- `test/staging-finance.test.mjs` : données synthétiques uniquement, intégrées à `npm run build` via `node --test`.
+
+Ce schéma est **un pilote partiel**, pas une copie équivalente de Supabase. Il manque notamment l'authentification, les rôles, les autorisations (RLS à remplacer par une sécurité serveur), le suivi complet des événements, les notifications, les imports et les sauvegardes. Ne pas connecter l'application des adhérents à ces tables.
+
+**Important : les fichiers de migration ne sont PAS automatiquement appliqués par la compilation Worker.** Tant que nous ne lançons pas explicitement la migration dans D1, la base `danz-staging` conserve ses 0 table.
+
+Précondition indispensable avant d'appliquer le schéma : confirmer le compte Cloudflare Amicale Danz, la base cible `danz-staging` et l'absence de données réelles. La commande suivante est un exemple réservé à l'étape future, **ne pas la lancer maintenant** :
+
+```bash
+npx wrangler d1 migrations apply danz-staging --remote
+```
+
+Pour les essais, ne jamais importer de noms, emails, mots de passe, photos, pièces comptables ou fichiers provenant des adhérents. Les tests synthétiques s'exécutent en local dans une base éphémère.
