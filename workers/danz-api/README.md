@@ -46,3 +46,17 @@ La requete POST declenche un **preflight CORS OPTIONS** ; les deux doivent reuss
 - Il ne change **rien** pour les utilisateurs actuels.
 
 Avant toute migration reelle : accord du service informatique, sauvegarde, inventaire des fonctions, modele de securite, migration des comptes et tests d'integrite de la tresorerie.
+
+## Test D1 (base de test vide)
+
+Le fichier `wrangler.toml` associe le Worker au binding `DB` de la base `danz-staging`.
+Ce binding doit apparaitre dans **Workers & Pages > danz-api > Parametres > Liaisons** apres deploiement.
+Il ne relie pas la base au site GitHub Pages des membres.
+
+Apres validation du build GitHub, ouvrir `https://danz-api.amicale-danz.workers.dev/db-health`.
+Reponse attendue : `{"ok":true,"database":"danz-staging","stage":"binding-test","readonly":true}`.
+
+La sonde ne fait que `SELECT 1 AS reachable`. Aucune table, donnée privee, authentification ni écriture ne sont creees.
+Si le test renvoie 503, verifier la liaison D1 `DB` du Worker et le journal de build; ne pas modifier Supabase.
+
+Pour ce test, ne saisir **aucun identifiant, nom, email, ecriture comptable ou document d'adherent** dans la base D1.
