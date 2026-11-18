@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "node --test",
     "test": "node --test",
     "deploy": "wrangler deploy"
   },
