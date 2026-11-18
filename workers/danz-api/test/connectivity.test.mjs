@@ -66,3 +66,35 @@ test("Aucune route de gestion des adherents n'existe", async () => {
   const response = await worker.fetch(new Request(base + "/members"));
   assert.equal(response.status, 404);
 });
+
+test("GET /db-health signale proprement une liaison D1 absente", async () => {
+  const response = await worker.fetch(new Request(base + "/db-health"), {});
+  assert.equal(response.status, 503);
+  const data = await response.json();
+  assert.equal(data.ok, false);
+  assert.equal(data.database, "danz-staging");
+});
+
+test("GET /db-health n'exécute que SELECT 1 sur la base de test", async () => {
+  let executed = "";
+  const env = { DB: { prepare(sql) {
+    executed = sql;
+    return { async first() { return { reachable: 1 }; } };
+  } } };
+  const response = await worker.fetch(new Request(base + "/db-health"), env);
+  assert.equal(response.status, 200);
+  assert.equal(executed, "SELECT 1 AS reachable");
+  assert.deepEqual(await response.json(), {
+    ok: true,
+    database: "danz-staging",
+    stage: "binding-test",
+    readonly: true,
+  });
+});
+
+test("GET /db-health ne divulgue pas les erreurs de base", async () => {
+  const env = { DB: { prepare() { throw new Error("private database information"); } } };
+  const response = await worker.fetch(new Request(base + "/db-health"), env);
+  assert.equal(response.status, 503);
+  assert.doesNotMatch(await response.text(), /private database information/);
+});
