@@ -1,0 +1,27 @@
+name: Vérifier le prototype Cloudflare D1 (sans données réelles)
+on:
+  push:
+    branches:
+      - cloudflare/danz-api-preparation
+    paths:
+      - "workers/danz-api/**"
+      - ".github/workflows/danz-d1-staging-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-d1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Vérifier la syntaxe du Worker
+        run: node --check workers/danz-api/src/index.mjs
+      - name: Tester le schema financier dans une base SQLite temporaire
+        run: node --test
+        working-directory: workers/danz-api
