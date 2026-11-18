@@ -78,3 +78,13 @@ npx wrangler d1 migrations apply danz-staging --remote
 ```
 
 Pour les essais, ne jamais importer de noms, emails, mots de passe, photos, pièces comptables ou fichiers provenant des adhérents. Les tests synthétiques s'exécutent en local dans une base éphémère.
+
+## Controle du schema applique dans D1 (lecture seule)
+
+Le Worker propose maintenant `GET /schema-status` : il verifie **8 tables et 4 triggers** prefixes `stg_`, et controle si leurs lignes sont vides, sans jamais transmettre les donnees. Il **ne cree aucune table**. Resultat attendu une fois le schema installe :
+
+```json
+{"ok":true,"database":"danz-staging","stage":"finance-schema-check","tablesExpected":8,"tablesPresent":8,"triggersExpected":4,"triggersPresent":4,"empty":true,"readonly":true}
+```
+
+Si les tables n'ont pas encore ete installees, `ok:false`, `tablesPresent:0`, `triggersPresent:0` est normal : **/db-health ne teste que la connexion D1**, pas le schema. Cette sonde de staging est publique et devra etre supprimee ou protegee avant toute mise en production d'une API manipulant les donnees de l'Amicale.
