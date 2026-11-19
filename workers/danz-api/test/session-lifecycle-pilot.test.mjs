@@ -93,10 +93,11 @@ test("session fictive: emise, validee, puis revoquee sans affecter des utilisate
   assert.equal(await revokePilotSession(
     requestFor(tokens.sessionToken,{method:"POST",origin:ORIGIN,csrf:"bad"}),env,{nowIso:NOW},
   ),false);
-  assert.equal(await verifyPilotSession(
+  const verifiedForMutation = await verifyPilotSession(
     requestFor(tokens.sessionToken,{method:"POST",origin:ORIGIN,csrf:tokens.csrfToken}),
     env,{nowIso:NOW},
-  )?.id,"fake-account-1");
+  );
+  assert.equal(verifiedForMutation?.id,"fake-account-1");
   assert.equal(await revokePilotSession(
     requestFor(tokens.sessionToken,{method:"POST",origin:ORIGIN,csrf:tokens.csrfToken}),
     env,{nowIso:NOW},
