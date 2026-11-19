@@ -90,6 +90,26 @@ test("perte de droit de tresorerie ou de compte bloque la migration",()=>{
   assert.equal(compareSnapshots(a,b).ok,false);
 });
 
+test("deux inventaires d'identité incomplets ne prouvent pas la parité", () => {
+  for (const field of ["role", "active", "is_treasurer", "household_id"]) {
+    const source = sample();
+    delete source.authAccounts[0][field];
+    const report = compareSnapshots(source, clone(source));
+    assert.equal(report.ok, false);
+    assert.ok(report.issues.some(issue => issue.area === "authAccounts"));
+  }
+});
+
+test("une différence dans une propriété JSON __proto__ reste visible", () => {
+  const source = sample();
+  const target = sample();
+  source.tables.profiles.push(JSON.parse('{"id":"fake","metadata":{"__proto__":"original"}}'));
+  target.tables.profiles.push(JSON.parse('{"id":"fake","metadata":{"__proto__":"changed"}}'));
+  assert.deepEqual(compareSnapshots(source, target).issues, [
+    { area: "table:profiles", missing: 0, extra: 0, changed: 1 },
+  ]);
+});
+
 test("chiffres non fiables et formats invalides refusent la migration",()=>{
   const a=sample(),b=clone(a);
   b.format="not-a-snapshot";
