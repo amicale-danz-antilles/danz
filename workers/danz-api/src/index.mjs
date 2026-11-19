@@ -162,6 +162,41 @@ export default {
       return json({ ok: false, error: "unknown_probe_step" }, 400, headers);
     }
 
+    // Verification du schema d'identite pilote (lecture seule, aucune session reelle).
+    if (method === "GET" && url.pathname === "/auth-schema-status") {
+      if (!env?.DB) {
+        return json({ ok: false, stage: "auth-schema-check", reason: "db_unavailable" }, 503, headers);
+      }
+      try {
+        const tableNames = ["stg_auth_accounts", "stg_auth_sessions", "stg_auth_audit"];
+        const triggerName = "stg_auth_security_version_guard";
+        const [tablesResponse, triggersResponse] = await Promise.all([
+          env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'stg_auth_%'").all(),
+          env.DB.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name='stg_auth_security_version_guard'").all(),
+        ]);
+        const foundTables = new Set((tablesResponse.results || []).map(row => row.name));
+        const tablesPresent = tableNames.filter(name => foundTables.has(name)).length;
+        const triggerPresent = (triggersResponse.results || []).some(row => row.name === triggerName);
+        let empty = false;
+        if (tablesPresent === tableNames.length && triggerPresent) {
+          empty = true;
+          for (const name of tableNames) {
+            const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM " + name).first();
+            if (Number(count?.n) !== 0) empty = false;
+          }
+        }
+        return json({
+          ok: tablesPresent === tableNames.length && triggerPresent && empty,
+          stage: "auth-schema-check", database: "danz-staging",
+          tablesExpected: 3, tablesPresent,
+          triggersExpected: 1, triggersPresent: triggerPresent ? 1 : 0,
+          empty, readonly: true,
+        }, 200, headers);
+      } catch (_) {
+        return json({ ok: false, stage: "auth-schema-check", reason: "query_failed" }, 503, headers);
+      }
+    }
+
     if (method === "GET" && (url.pathname === "/" || url.pathname === "/health")) {
       return json({
         ok: true,
