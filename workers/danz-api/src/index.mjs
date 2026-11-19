@@ -63,6 +63,7 @@ export default {
       if (!env?.DB) {
         return json({ ok: false, stage: "finance-schema-check", reason: "db_unavailable" }, 503, headers);
       }
+      let phase = "introspection";
       try {
         const tableNames = [
           "stg_households", "stg_events", "stg_household_charges",
@@ -73,10 +74,13 @@ export default {
           "stg_allocations_check_insert", "stg_allocations_check_update",
           "stg_payment_update_guard", "stg_charge_update_guard",
         ];
-        const [tablesResult, triggersResult] = await Promise.all([
-          env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'stg_%'").all(),
-          env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'stg_%'").all(),
-        ]);
+        // Requetes sequentielles pour eviter les limites de certaines instances D1.
+        const tablesResult = await env.DB.prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'stg_%'"
+        ).all();
+        const triggersResult = await env.DB.prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'stg_%'"
+        ).all();
         const tables = new Set((tablesResult.results || []).map(item => item.name));
         const triggers = new Set((triggersResult.results || []).map(item => item.name));
         const tablesPresent = tableNames.filter(name => tables.has(name)).length;
@@ -84,11 +88,14 @@ export default {
         const schemaReady = tablesPresent === tableNames.length && triggersPresent === triggerNames.length;
         let empty = false;
         if (schemaReady) {
-          // Les noms de tables sont fixes et controles dans le code, jamais parametres par URL.
-          const query = tableNames.map(name => "SELECT COUNT(*) AS n FROM " + name).join(" UNION ALL ");
-          const counts = await env.DB.prepare(query).all();
-          empty = counts.results?.length === tableNames.length
-            && counts.results.every(row => Number(row.n) === 0);
+          // Noms fixes, definis dans le code. Pas de requete UNION ALL a huit termes.
+          // Une seule lecture simple par table : aucun contenu retourne au navigateur.
+          phase = "row-counts";
+          empty = true;
+          for (const name of tableNames) {
+            const result = await env.DB.prepare("SELECT COUNT(*) AS n FROM " + name).first();
+            if (Number(result?.n) !== 0) empty = false;
+          }
         }
         return json({
           ok: schemaReady && empty,
@@ -102,7 +109,8 @@ export default {
           readonly: true,
         }, 200, headers);
       } catch (_) {
-        return json({ ok: false, stage: "finance-schema-check", reason: "query_failed" }, 503, headers);
+        // Ne jamais exposer la cause interne ou des informations de la base.
+        return json({ ok: false, stage: "finance-schema-check", reason: "query_failed", phase }, 503, headers);
       }
     }
 
