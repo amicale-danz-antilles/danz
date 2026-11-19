@@ -7,3 +7,16 @@ dist
 # Données de migration privées et comptes réels : ne jamais commiter.
 migration-private/
 *.migration-export.json
+
+# Donnees DANZ de comparaison privee : jamais dans GitHub
+**/migration/private-*.json
+**/migration/*-snapshot.json
+**/migration/*.secrets.json
+
+# Ne jamais publier les sauvegardes privées SQL et les manifestes d'objets.
+/DANZ-SAUVEGARDE-PRIVEE/
+**/DANZ-SAUVEGARDE-PRIVEE/
+**/assets-manifest.json
+**/*.backup.7z
+**/*.backup.age
+**/private-backups/

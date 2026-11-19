@@ -1,0 +1,10 @@
+name = "danz-api"
+main = "src/index.mjs"
+compatibility_date = "2026-11-18"
+workers_dev = true
+
+# Base Cloudflare D1 de test : aucune donnee personnelle.
+[[d1_databases]]
+binding = "DB"
+database_name = "danz-staging"
+database_id = "40438228-8e2d-4872-9c00-17cc7ccfdd4a"
