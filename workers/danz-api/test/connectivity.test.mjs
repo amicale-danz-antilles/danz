@@ -131,7 +131,7 @@ test("GET /schema-status : schema complet et tables vides", async () => {
     queries.push(sql);
     if (sql.includes("type = 'table'")) return { async all() { return { results: tables.map(name => ({ name })) }; } };
     if (sql.includes("type = 'trigger'")) return { async all() { return { results: triggers.map(name => ({ name })) }; } };
-    return { async all() { return { results: tables.map(() => ({ n: 0 })) }; } };
+    return { async first() { return { n: 0 }; } };
   } } };
   const response = await worker.fetch(new Request(base + "/schema-status"), env);
   assert.equal(response.status, 200);
@@ -140,7 +140,7 @@ test("GET /schema-status : schema complet et tables vides", async () => {
     tablesExpected: 8, tablesPresent: 8, triggersExpected: 4,
     triggersPresent: 4, empty: true, readonly: true,
   });
-  assert.equal(queries.length, 3);
+  assert.equal(queries.length, 10);
   assert.ok(queries.every(sql => sql.startsWith("SELECT ")));
 });
 
@@ -157,7 +157,7 @@ test("GET /schema-status : signaler la presence de donnees sans les exposer", as
   const env = { DB: { prepare(sql) {
     if (sql.includes("type = 'table'")) return { async all() { return { results: tableNames.map(name => ({ name })) }; } };
     if (sql.includes("type = 'trigger'")) return { async all() { return { results: triggers.map(name => ({ name })) }; } };
-    return { async all() { return { results: tableNames.map((_, i) => ({ n: i === 0 ? 1 : 0 })) }; } };
+    return { async first() { return { n: sql.includes("FROM stg_households") ? 1 : 0 }; } };
   } } };
   const response = await worker.fetch(new Request(base + "/schema-status"), env);
   const body = await response.json();
@@ -172,4 +172,26 @@ test("GET /schema-status : masquer les erreurs D1", async () => {
   const response = await worker.fetch(new Request(base + "/schema-status"), env);
   assert.equal(response.status, 503);
   assert.doesNotMatch(await response.text(), /secret-schema-error/);
+});
+
+test("GET /schema-status : erreur de comptage identifiee sans divulgation", async () => {
+  const names = [
+    "stg_households", "stg_events", "stg_household_charges",
+    "stg_household_payments", "stg_household_payment_allocations",
+    "stg_treasury_opening", "stg_treasury_entries", "stg_treasury_transfers",
+  ];
+  const triggers = [
+    "stg_allocations_check_insert", "stg_allocations_check_update",
+    "stg_payment_update_guard", "stg_charge_update_guard",
+  ];
+  const env = { DB: { prepare(sql) {
+    if (sql.includes("type = 'table'")) return { async all() { return { results: names.map(name => ({ name })) }; } };
+    if (sql.includes("type = 'trigger'")) return { async all() { return { results: triggers.map(name => ({ name })) }; } };
+    return { async first() { throw new Error("private SQL detail"); } };
+  } } };
+  const response = await worker.fetch(new Request(base + "/schema-status"), env);
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), {
+    ok: false, stage: "finance-schema-check", reason: "query_failed", phase: "row-counts",
+  });
 });
