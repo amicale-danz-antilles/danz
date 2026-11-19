@@ -47,7 +47,7 @@ read -r -p "Hote PostgreSQL (Supabase > Connect) : " PGHOST
 read -r -p "Port PostgreSQL (5432/6543 selon le mode) : " PGPORT
 read -r -p "Utilisateur PostgreSQL : " PGUSER
 read -r -p "Base PostgreSQL (habituellement postgres) : " PGDATABASE
-if [[ "$PGHOST" != *.supabase.com || "$PGDATABASE" != postgres ||
+if [[ ( "$PGHOST" != *.supabase.com && "$PGHOST" != *.supabase.co ) || "$PGDATABASE" != postgres ||
       ( "$PGHOST" != db.axewfeanyfxkzercafen.supabase.co &&
         "$PGUSER" != *axewfeanyfxkzercafen* ) ||
       ! "$PGPORT" =~ ^[0-9]{2,5}$ ]]; then
