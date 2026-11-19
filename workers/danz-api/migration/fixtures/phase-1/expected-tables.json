@@ -1,0 +1,114 @@
+{
+  "admin_audit_log": [
+    {"id": "FICT-admin_audit_log"}
+  ],
+  "association_settings": [
+    {"id": 1}
+  ],
+  "bureau_members": [
+    {"role_key": "FICT-bureau_members"}
+  ],
+  "content_attachments": [
+    {"id": "FICT-content_attachments"}
+  ],
+  "documents": [
+    {"id": "FICT-documents"}
+  ],
+  "event_albums": [
+    {"id": "FICT-event_albums"}
+  ],
+  "events": [
+    {"id": "FICT-event", "title": "Événement du test"}
+  ],
+  "gallery": [],
+  "good_deal_submissions": [
+    {"id": "FICT-good_deal_submissions"}
+  ],
+  "good_deals": [
+    {"id": "FICT-good_deals"}
+  ],
+  "household_charges": [
+    {"id": "FICT-charge", "household_id": "FICT-household", "amount_cents": 1500}
+  ],
+  "household_members": [
+    {"id": "FICT-household-member", "household_id": "FICT-household", "user_id": "FICT-member"},
+    {"id": "FICT-child", "household_id": "FICT-household", "user_id": null}
+  ],
+  "household_payment_allocations": [
+    {"payment_id": "FICT-payment", "charge_id": "FICT-charge", "amount_cents": 1500}
+  ],
+  "household_payments": [
+    {"id": "FICT-payment", "household_id": "FICT-household", "amount_cents": 1500}
+  ],
+  "households": [
+    {"id": "FICT-household", "name": "Foyer fictif"}
+  ],
+  "membership_requests": [
+    {"id": "FICT-membership_requests"}
+  ],
+  "membership_subscriptions": [
+    {"id": "FICT-subscription", "household_id": "FICT-household", "amount_cents": 1500}
+  ],
+  "news": [
+    {"id": "FICT-news"}
+  ],
+  "notification_preferences": [
+    {"user_id": "FICT-member"}
+  ],
+  "notification_settings": [
+    {"id": "FICT-notification_settings"}
+  ],
+  "offline_people": [],
+  "poll_household_attendance": [
+    {"poll_id": "FICT-poll", "household_member_id": "FICT-household-member"},
+    {"poll_id": "FICT-poll", "household_member_id": "FICT-child"}
+  ],
+  "poll_options": [
+    {"id": "FICT-option", "poll_id": "FICT-poll"}
+  ],
+  "poll_question_answers": [
+    {"question_id": "FICT-question", "user_id": "FICT-member", "answer": "Ligne 1\nLigne 2\tFin"}
+  ],
+  "poll_questions": [
+    {"id": "FICT-question", "poll_id": "FICT-poll"}
+  ],
+  "poll_votes": [
+    {"poll_id": "FICT-poll", "user_id": "FICT-member", "option_id": "FICT-option"},
+    {"poll_id": "FICT-poll", "user_id": "FICT-admin", "option_id": "FICT-option"}
+  ],
+  "polls": [
+    {"id": "FICT-poll"}
+  ],
+  "profiles": [
+    {"id": "FICT-member", "active": true, "is_treasurer": false, "note": null},
+    {"id": "FICT-admin", "active": true, "is_treasurer": true, "note": "\\N"},
+    {"id": "FICT-inactive", "active": false, "is_treasurer": false, "note": ""}
+  ],
+  "push_subscriptions": [],
+  "treasury_entries": [
+    {"id": "FICT-income", "kind": "income", "status": "settled", "payment_method": "bank_transfer", "amount_cents": 1500, "household_payment_id": "FICT-payment"},
+    {"id": "FICT-expense", "kind": "expense", "status": "settled", "payment_method": "cash", "amount_cents": 200, "household_payment_id": null},
+    {"id": "FICT-pending", "kind": "income", "status": "pending", "payment_method": "cash", "amount_cents": 399, "household_payment_id": null},
+    {"id": "FICT-cancelled", "kind": "expense", "status": "cancelled", "payment_method": "cash", "amount_cents": 400, "household_payment_id": null},
+    {"id": "FICT-unassigned", "kind": "income", "status": "settled", "payment_method": "unassigned", "amount_cents": 400, "household_payment_id": null}
+  ],
+  "treasury_event_batches": [
+    {"id": "FICT-treasury_event_batches"}
+  ],
+  "treasury_event_participants": [
+    {"id": "FICT-treasury_event_participants"}
+  ],
+  "treasury_import_archive_lines": [
+    {"batch_id": "FICT-archive", "source_row": 1, "income_cents": 1500, "expense_cents": null},
+    {"batch_id": "FICT-archive", "source_row": 2, "income_cents": null, "expense_cents": 200}
+  ],
+  "treasury_import_batches": [
+    {"id": "FICT-archive"}
+  ],
+  "treasury_opening": [
+    {"id": 1, "bank_cents": 10000, "cash_cents": -200}
+  ],
+  "treasury_transfers": [
+    {"id": "FICT-transfer", "from_account": "bank", "to_account": "cash", "amount_cents": 1000}
+  ]
+}

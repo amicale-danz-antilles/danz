@@ -6,6 +6,12 @@ on:
     paths:
       - "workers/danz-api/**"
       - ".github/workflows/danz-d1-staging-check.yml"
+  pull_request:
+    branches:
+      - cloudflare/danz-api-preparation
+    paths:
+      - "workers/danz-api/**"
+      - ".github/workflows/danz-d1-staging-check.yml"
   workflow_dispatch:
 
 permissions:
@@ -22,6 +28,14 @@ jobs:
           node-version: "22"
       - name: Vérifier la syntaxe du Worker
         run: node --check workers/danz-api/src/index.mjs
-      - name: Tester le schema financier dans une base SQLite temporaire
+      - name: Exécuter les tests du Worker et les contrôles de migration fictive
         run: node --test
         working-directory: workers/danz-api
+      - name: Vérifier la parité du transfert fictif vers SQLite
+        run: node migration/dry-run.mjs
+        working-directory: workers/danz-api
+      - name: Restaurer les fixtures PostgreSQL dans un conteneur sans réseau
+        working-directory: workers/danz-api
+        run: |
+          docker pull postgres@sha256:526f86d93c6ea08fd3f1fe5605650cacc781b2c6013169a0ad8f42c7d3d84f32
+          node migration/restore-synthetic-postgres.mjs

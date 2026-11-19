@@ -4,6 +4,8 @@
 
 **Interdits avant recette finale** : aucune migration reelle de donnees, aucun changement du site public `https://amicale-danz-antilles.github.io/danz/`, aucune fusion du PR #52 dans `main`, aucun effacement ou changement de Supabase, aucun secret ni donnee d'adherent dans GitHub ou les logs.
 
+La [répétition synthétique et le rapport GO/NO-GO](GO-NO-GO-PHASE-1.md) décrivent les commandes locales, leurs preuves et les portes à franchir. Le [suivi de l’inventaire et de la recette](INVENTAIRE-PHASE-1.md) consigne les écarts du SQL versionné et les fonctions à valider.
+
 ## Inventaire de couverture obligatoire
 
 Le contrat machine `source-contract.json` repertorie, sans aucune donnee d'adherent :

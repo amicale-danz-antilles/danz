@@ -1,6 +1,6 @@
 # DANZ Antilles — Sauvegarde complète et privée (avant migration)
 
-**Statut au 19 novembre 2026 : procédure préparée, AUCUNE sauvegarde réelle exécutée ou vérifiée par ChatGPT.**
+**Statut au 19 novembre 2026.** La restauration des fixtures PostgreSQL a été exercée localement. La sauvegarde réelle et sa restauration restent à effectuer après les accords prévus au [rapport de décision](GO-NO-GO-PHASE-1.md).
 
 **Interdiction de procéder à la migration réelle** tant que la base, les fichiers et le retour arrière ne sont pas sauvegardés et restaurables.
 
@@ -30,18 +30,21 @@ $secure = Read-Host "URL PostgreSQL COMPLETE depuis Supabase Connect" -AsSecureS
 $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
 try {
   $env:SUPABASE_DB_URL = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+  supabase db dump --remote="$env:SUPABASE_DB_URL" -f roles.sql --role-only
+  if ($LASTEXITCODE -ne 0) { throw "Export roles.sql incomplet" }
+  supabase db dump --remote="$env:SUPABASE_DB_URL" -f schema.sql
+  if ($LASTEXITCODE -ne 0) { throw "Export schema.sql incomplet" }
+  supabase db dump --remote="$env:SUPABASE_DB_URL" -f data.sql --use-copy --data-only -x "storage.buckets_vectors" -x "storage.vector_indexes"
+  if ($LASTEXITCODE -ne 0) { throw "Export data.sql incomplet" }
 } finally {
   [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
+  Remove-Item Env:SUPABASE_DB_URL -ErrorAction SilentlyContinue
 }
-
-supabase db dump --remote="$env:SUPABASE_DB_URL" -f roles.sql --role-only
-supabase db dump --remote="$env:SUPABASE_DB_URL" -f schema.sql
-supabase db dump --remote="$env:SUPABASE_DB_URL" -f data.sql --use-copy --data-only -x "storage.buckets_vectors" -x "storage.vector_indexes"
-
-Remove-Item Env:SUPABASE_DB_URL
 ```
 
 **Important** : une base contenant des données personnelles et d'authentification est incluse dans le SQL. Garder cet export privé. Les trois fichiers sont complémentaires ; si une commande échoue, arrêter et enregistrer **uniquement le code d'erreur**, jamais l'URL, le mot de passe ou des extraits des données SQL. Les fichiers peuvent ne pas suffire si des changements particuliers ont été apportés aux schemas gérés, aux clés Vault ou à des extensions : ils doivent être examinés et la restauration testée.
+
+Les commandes séparées et les copies d’objets ne partagent pas un instantané. Avant une sauvegarde qui servira de référence, faire approuver le point de cohérence et la procédure de capture des changements ou la fenêtre de suspension des écritures. Créer un répertoire neuf à chaque tentative. Après un échec, écarter le lot incomplet du circuit de restauration. Vérifier au préalable les paramètres de la version installée via `supabase db dump --help` et confirmer le traitement des schémas gérés et des exclusions.
 
 ## 2. Sauvegarder séparément les objets R2 ET Supabase Storage
 
@@ -80,11 +83,13 @@ node workers/danz-api/migration/verify-local-backup.mjs "D:\DANZ-SAUVEGARDE-PRIV
 
 `create-assets-manifest.mjs` calcule le SHA-256 de chaque fichier présent dans `r2/` et `supabase-storage/`. `verify-local-backup.mjs` :
 - vérifie la présence des fichiers rôles, schéma, données ;
-- cherche les déclarations de **36 tables** dans le schéma ;
-- cherche les commandes COPY des **36 tables** et des tables gérées `auth.users`, `storage.objects`, `storage.buckets` ;
+- contrôle la structure attendue des **36 tables**, y compris les clés primaires du contrat ;
+- vérifie les blocs COPY texte des **36 tables**, même vides, et des tables gérées `auth.users`, `storage.objects`, `storage.buckets` ;
 - revérifie que les fichiers correspondent aux empreintes du manifeste privé.
 
-**Limite majeure** : ce sont des vérifications préliminaires, pas une preuve que les 36 tables ont le bon nombre de lignes ou que les 9 fonctions Edge, déclencheurs/stratégies RLS, les comptes et les fichiers sont restaurables. Ce script n'interroge pas Supabase/R2 et ne sait donc pas détecter un objet distant jamais téléchargé. Il peut signaler un faux négatif si la CLI produit une forme SQL différente ; dans ce cas, conserver la sauvegarde et adapter le parseur avec des tests.
+Ce contrôle structurel fonctionne sur le format COPY texte de `pg_dump`. Il signale notamment les blocs absents ou tronqués, les clés dupliquées et les fichiers absents, ajoutés ou modifiés depuis l’inventaire. Générer le manifeste pour la première copie contrôlée et conserver cette référence avec la sauvegarde indépendante. Après une perte suspectée, vérifier avec le manifeste d’origine.
+
+La preuve de complétude exige en plus des inventaires de source indépendants et une restauration isolée. Une ligne entièrement omise d’un bloc COPY valide ou un objet jamais téléchargé peut échapper au contrôle local. La restauration doit vérifier aussi les fonctions, les rôles, les comptes, les contraintes, les déclencheurs et les RLS. Si la CLI produit une autre forme SQL, conserver la sauvegarde et adapter le parseur avec des tests.
 
 Ne jamais publier le manifeste de vrais fichiers : ses noms et ses empreintes peuvent être sensibles.
 

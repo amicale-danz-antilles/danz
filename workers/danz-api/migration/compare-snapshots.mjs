@@ -25,7 +25,7 @@ const contract = JSON.parse(readFileSync(new URL("./source-contract.json", impor
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
   if (value !== null && typeof value === "object") {
-    const out = {};
+    const out = Object.create(null);
     for (const key of Object.keys(value).sort()) out[key] = stable(value[key]);
     return out;
   }
@@ -43,7 +43,8 @@ const hash = item => createHash("sha256").update(JSON.stringify(stable(item))).d
 function rowKey(row, fields) {
   if (!row || typeof row !== "object" || Array.isArray(row)) throw new Error("invalid_row");
   const key = fields.map(field => {
-    if (!(field in row) || row[field] === null || typeof row[field] === "object") {
+    if (!Object.hasOwn(row,field) || !["string","number"].includes(typeof row[field])
+      || row[field] === "") {
       throw new Error("missing_primary_key");
     }
     return String(row[field]);
@@ -81,7 +82,7 @@ function compareAssetList(source,target,report) {
   const keys=["key"];
   for (const rows of [source,target]) {
     for (const row of rows) {
-      if (typeof row.key!=="string" || !Number.isSafeInteger(row.bytes) || row.bytes<0
+      if (!row || typeof row.key!=="string" || !row.key || !Number.isSafeInteger(row.bytes) || row.bytes<0
         || typeof row.sha256!=="string" || !/^[a-f0-9]{64}$/.test(row.sha256)) {
         throw new Error("unverified_asset_manifest");
       }
@@ -91,13 +92,18 @@ function compareAssetList(source,target,report) {
 }
 
 function identityProjection(account) {
-  if(!account || typeof account.id!=="string" || !account.id)throw new Error("invalid_auth_account");
+  if (!account || typeof account.id!=="string" || !account.id
+    || typeof account.role!=="string" || !account.role
+    || typeof account.active!=="boolean" || typeof account.is_treasurer!=="boolean"
+    || (account.household_id!==null && (typeof account.household_id!=="string" || !account.household_id))) {
+    throw new Error("invalid_auth_account");
+  }
   return {
     id:account.id,
     role:account.role,
     active:account.active,
     is_treasurer:account.is_treasurer,
-    household_id:account.household_id??null,
+    household_id:account.household_id,
   };
 }
 
@@ -107,14 +113,14 @@ export function compareSnapshots(source,target,expected=contract) {
     report.issues.push({area:"format",reason:"unrecognized_snapshot_format"});
     return report;
   }
-  if (!source.tables || !target.tables || typeof source.tables!=="object" || typeof target.tables!=="object") {
+  if ([source.tables,target.tables].some(tables=>!tables || typeof tables!=="object" || Array.isArray(tables))) {
     report.issues.push({area:"tables",reason:"snapshot_tables_missing"});
     return report;
   }
   for (const item of expected.tables) {
     const name=item.name;
     if (!Object.hasOwn(source.tables,name) || !Object.hasOwn(target.tables,name)) {
-      report.issues.push({area:"tables",reason:"missing_required_table"});
+      report.issues.push({area:"table:"+name,reason:"missing_required_table"});
       continue;
     }
     try {
@@ -138,6 +144,9 @@ export function compareSnapshots(source,target,expected=contract) {
     report.areasChecked++;
   }catch(_){report.issues.push({area:"files",reason:"invalid_or_incomplete_manifest"});}
   try{
+    if (!Array.isArray(source.authAccounts) || !Array.isArray(target.authAccounts)) {
+      throw new Error("invalid_identity_manifest");
+    }
     const a=source.authAccounts.map(identityProjection);
     const b=target.authAccounts.map(identityProjection);
     compareMaps(keyedRows(a,["id"]),keyedRows(b,["id"]),"authAccounts",report);
