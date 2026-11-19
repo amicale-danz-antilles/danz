@@ -14,6 +14,7 @@ test("l'inventaire couvre 36 tables, 406 colonnes et 89 relations",()=>{
   assert.equal(metadata.tables.filter(t=>t.sourceRlsEnabled).length,36);
   assert.equal(metadata.tables.reduce((n,t)=>n+t.constraintsNotModeled.checks,0),73);
   assert.equal(metadata.tables.reduce((n,t)=>n+t.constraintsNotModeled.uniques,0),10);
+  assert.equal(metadata.tables.reduce((n,t)=>n+t.uniqueKeys.length,0),10);
 });
 
 test("le plan SQLite s'exécute en mémoire sans écrire dans Cloudflare",()=>{
@@ -24,7 +25,8 @@ test("le plan SQLite s'exécute en mémoire sans écrire dans Cloudflare",()=>{
   assert.equal(generated.safeForRemoteImport,false);
   assert.equal(generated.approval,"NO-GO");
   assert.ok(generated.risks.some(x=>x.kind==="check_constraints"));
-  assert.ok(generated.risks.some(x=>x.kind==="unique_constraints"));
+  assert.ok(!generated.risks.some(x=>x.kind==="unique_constraints"));
+  assert.match(generated.sql,/UNIQUE \("id", "poll_id"\)/);
   assert.ok(generated.risks.some(x=>x.kind==="server_authorization_required"));
   assert.match(generated.sql,/CREATE TABLE "mig_treasury_entries"/);
   assert.doesNotMatch(generated.sql,/DROP TABLE|DELETE FROM|INSERT INTO/);
@@ -76,6 +78,10 @@ test("une clé étrangère incohérente ou une contrainte inconnue est bloquée"
   const b=clone(metadata);
   b.tables[0].constraintsNotModeled.checks=-1;
   assert.throws(()=>generateD1Blueprint(b),/invalid_constraint_count/);
+  const c=clone(metadata);
+  const withUnique=c.tables.find(t=>t.uniqueKeys.length>0);
+  withUnique.uniqueKeys=[];
+  assert.throws(()=>generateD1Blueprint(c),/unique_constraints_count_mismatch/);
 });
 
 test("génération stable et strictement limitée à la structure",()=>{
