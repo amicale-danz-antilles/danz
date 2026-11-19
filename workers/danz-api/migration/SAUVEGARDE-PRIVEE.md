@@ -4,6 +4,25 @@
 
 **Interdiction de procéder à la migration réelle** tant que la base, les fichiers et le retour arrière ne sont pas sauvegardés et restaurables.
 
+## Correction de sécurité — CLI Supabase v3 (19 novembre 2026)
+
+**ATTENTION : les trois commandes `supabase db dump` ci-dessous ne constituent PAS une sauvegarde complète de l'application.** La documentation CLI v3 indique que les schémas gérés par Supabase, notamment `auth` et `storage`, sont exclus du dump standard. Leurs données requièrent une extraction distincte autorisée et une restauration dans une pile Supabase compatible.
+
+Le code de vérification `verify-local-backup.mjs` cherche désormais les blocs `COPY` requis dans `data.sql` **ou** dans un fichier supplémentaire privé `managed-data.sql`. L'absence de `auth.users`, `auth.identities`, `storage.objects` ou `storage.buckets` reste BLOQUANTE. Le fichier additionnel peut être produit uniquement dans un environnement local sûr après validation de la méthode d'extraction des schémas gérés. Ne jamais déposer ce fichier dans GitHub ou ChatGPT : il peut contenir des empreintes de mots de passe, jetons et données sensibles.
+
+Pour préparer un export privé des schémas gérés, le mécanisme PostgreSQL natif `pg_dump --data-only --schema=auth --schema=storage` doit être examiné et exécuté **sur la machine autorisée**, avec un utilisateur disposant des permissions requises, une version PostgreSQL compatible et une destination chiffrée. **Cette commande n'est pas exécutée par ChatGPT et n'est pas, à elle seule, une sauvegarde restaurable** : certains objets gérés nécessitent des précautions de restauration, une configuration Supabase identique, et les octets Storage doivent être copiés séparément. Ne pas déployer une restauration sur le projet source.
+
+Documentation officielle mise à jour :
+- <https://supabase.com/docs/reference/cli/supabase-db-dump>
+- <https://supabase.com/changelog/supabase-cli-v3>
+- <https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore>
+
+**Supabase CLI v3 :** depuis le 4 novembre 2026, `db dump` vise la pile locale par défaut. Employer explicitement `--remote` pour cibler la source distante et vérifier la ligne `Target:` en sortie d'erreur. Les commandes de sauvegarde ci-dessous sont documentées pour v3, mais leur disponibilité et les paramètres doivent être revérifiés sur l'installation locale avec `supabase db dump --help`.
+
+**Bilan requis :** pour chaque sauvegarde, établir dans un environnement privé quatre couvertures distinctes : (1) 36 tables métier et structures, (2) identités et métadonnées gérées auth/storage, (3) fichiers binaires R2/Storage, (4) code/configurations métier des neuf fonctions Edge et des 25 RPC. Les validateurs actuels contrôlent surtout la présence et certaines structures ; ni la restauration, ni les droits, ni les écritures et les fichiers réellement distants ne sont vérifiés par une simple réponse `ok: true`.
+
+
+
 ## 0. Protections indispensables
 
 - Effectuer le travail uniquement sur un appareil **autorisé** par l'association et sa politique informatique, protégé et chiffré au repos (par ex. BitLocker). Ne pas contourner les contrôles du poste militaire ; si son réseau bloque Supabase, employer une machine autorisée et un accès permis.
@@ -12,6 +31,18 @@
 - La commande Supabase officielle `db dump` produit des fichiers SQL **en clair**. Pour les préserver, créer immédiatement les fichiers sur un disque autorisé et chiffré, puis en faire une copie chiffrée indépendante. Ne pas supposer qu'un dump n'inclut pas les secrets ou les hachages.
 - L'offre gratuite Supabase ne fournit pas de sauvegarde automatique accessible comme remplacement de ce plan.
 - Les commandes ci-dessous sont en lecture sur la base source. Elles ne sont pas des commandes de migration Cloudflare.
+
+### Étape zéro — vérifier les outils sur l'ordinateur personnel
+
+Depuis une copie locale du dépôt DANZ (branche `codex/danz-pilot-synthetic`), ouvrir le Terminal, puis lancer cette commande depuis la racine du dépôt :
+
+```sh
+node workers/danz-api/migration/preflight-backup.mjs
+```
+
+Ce précontrôle local **ne demande aucun mot de passe et ne lit aucune donnée d'adhérent**. Il signale uniquement si Node.js, Supabase CLI, Docker, `pg_dump`, `psql` et `rclone` sont présents et exécutables. `toolsReady: true` signifie seulement que les outils sont détectés ; cela **ne prouve pas** le chiffrement du support, l'accès autorisé, la sauvegarde ni la restauration. La version de la CLI et les options de `db dump` doivent encore être contrôlées localement via `supabase --version` et `supabase db dump --help`.
+
+Ne pas transmettre le contenu des futurs dumps, des chemins sensibles ou des clés. Il suffit de partager `checks` et `toolsReady` (ce sont des indicateurs non personnels).
 
 ## 1. Sauvegarder les données PostgreSQL
 
@@ -42,6 +73,11 @@ Remove-Item Env:SUPABASE_DB_URL
 ```
 
 **Important** : une base contenant des données personnelles et d'authentification est incluse dans le SQL. Garder cet export privé. Les trois fichiers sont complémentaires ; si une commande échoue, arrêter et enregistrer **uniquement le code d'erreur**, jamais l'URL, le mot de passe ou des extraits des données SQL. Les fichiers peuvent ne pas suffire si des changements particuliers ont été apportés aux schemas gérés, aux clés Vault ou à des extensions : ils doivent être examinés et la restauration testée.
+
+
+### Point de contrôle obligatoire des exports (avant la copie des fichiers)
+
+Après la sauvegarde des données métier, vérifier dans un espace local privé l'existence d'un export des schémas gérés `auth` et `storage`. En l'absence d'un export privé validé, **ne pas continuer vers une migration de comptes**. La présence de 27 tables `auth` et huit tables `storage` a été constatée en lecture seule sur le schéma source ; les quatre blocs `COPY` exigés par le validateur ne suffisent pas à garantir le rétablissement de toutes les fonctions de ces schémas.
 
 ## 2. Sauvegarder séparément les objets R2 ET Supabase Storage
 
@@ -81,7 +117,7 @@ node workers/danz-api/migration/verify-local-backup.mjs "D:\DANZ-SAUVEGARDE-PRIV
 `create-assets-manifest.mjs` calcule le SHA-256 de chaque fichier présent dans `r2/` et `supabase-storage/`. `verify-local-backup.mjs` :
 - vérifie la présence des fichiers rôles, schéma, données ;
 - cherche les déclarations de **36 tables** dans le schéma ;
-- cherche les commandes COPY des **36 tables** et des tables gérées `auth.users`, `storage.objects`, `storage.buckets` ;
+- cherche les commandes COPY des **36 tables** métier dans `data.sql`, puis les données gérées `auth.users`, `auth.identities`, `storage.objects`, `storage.buckets` dans `data.sql` ou `managed-data.sql` ;
 - revérifie que les fichiers correspondent aux empreintes du manifeste privé.
 
 **Limite majeure** : ce sont des vérifications préliminaires, pas une preuve que les 36 tables ont le bon nombre de lignes ou que les 9 fonctions Edge, déclencheurs/stratégies RLS, les comptes et les fichiers sont restaurables. Ce script n'interroge pas Supabase/R2 et ne sait donc pas détecter un objet distant jamais téléchargé. Il peut signaler un faux négatif si la CLI produit une forme SQL différente ; dans ce cas, conserver la sauvegarde et adapter le parseur avec des tests.

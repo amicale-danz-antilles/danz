@@ -8,3 +8,12 @@ workers_dev = true
 binding = "DB"
 database_name = "danz-staging"
 database_id = "40438228-8e2d-4872-9c00-17cc7ccfdd4a"
+
+# Les apercus sont separes des reglages de production.
+# Utiliser EXCLUSIVEMENT la base D1 de test deja vide danz-staging.
+[previews]
+
+[[previews.d1_databases]]
+binding = "DB"
+database_name = "danz-staging"
+database_id = "40438228-8e2d-4872-9c00-17cc7ccfdd4a"

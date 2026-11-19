@@ -1,0 +1,6235 @@
+{
+  "format": "DANZ-READONLY-SCHEMA-METADATA-1",
+  "source": "Supabase public schema metadata only (no user rows, values, credentials or SQL defaults)",
+  "date": "2026-11-19",
+  "warning": "This is an INCOMPLETE modeling inventory. Missing defaults, CHECK definitions, RLS policies, triggers, SQL functions, views, indexes, table grants and managed auth/storage schemas; never deploy as a replacement without audits.",
+  "tables": [
+    {
+      "name": "admin_audit_log",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "pgType": "int8",
+          "nullable": false,
+          "identity": true,
+          "generated": false,
+          "maxLength": null,
+          "precision": 64,
+          "scale": 0
+        },
+        {
+          "name": "actor_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "target_user_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "details",
+          "type": "jsonb",
+          "pgType": "jsonb",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "admin_audit_log_actor_id_fkey",
+          "columns": [
+            "actor_id"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "admin_audit_log_target_user_id_fkey",
+          "columns": [
+            "target_user_id"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 0,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "association_settings",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "smallint",
+          "pgType": "int2",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 16,
+          "scale": 0
+        },
+        {
+          "name": "association_name",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "bank_name",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "account_name",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "iban",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "bic",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "membership_fee_cents",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        },
+        {
+          "name": "child_age_categories",
+          "type": "jsonb",
+          "pgType": "jsonb",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "association_settings_updated_by_fkey",
+          "columns": [
+            "updated_by"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 2,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "bureau_members",
+      "primaryKey": [
+        "role_key"
+      ],
+      "columns": [
+        {
+          "name": "role_key",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "role_label",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "full_name",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "sort_order",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "bureau_members_updated_by_fkey",
+          "columns": [
+            "updated_by"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 0,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "content_attachments",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "news_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "event_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "file_name",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "storage_provider",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "storage_path",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "mime_type",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "file_size",
+          "type": "bigint",
+          "pgType": "int8",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 64,
+          "scale": 0
+        },
+        {
+          "name": "is_cover",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "content_attachments_created_by_fkey",
+          "columns": [
+            "created_by"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "content_attachments_event_id_fkey",
+          "columns": [
+            "event_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "events",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        },
+        {
+          "name": "content_attachments_news_id_fkey",
+          "columns": [
+            "news_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "news",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 2,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "documents",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "storage_path",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "audience",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "publish_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "notified_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "documents_created_by_fkey",
+          "columns": [
+            "created_by"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "a"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 1,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "event_albums",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "event_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "storage_provider",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "storage_path",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "image_url",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "mime_type",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "file_size",
+          "type": "bigint",
+          "pgType": "int8",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 64,
+          "scale": 0
+        },
+        {
+          "name": "source_gallery_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "transfer_provider",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "transfer_url",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "transfer_expires_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "item_count",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        },
+        {
+          "name": "download_note",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "published",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "audience",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "publish_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "notified_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "notify_on_publish",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "event_albums_created_by_fkey",
+          "columns": [
+            "created_by"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "event_albums_event_id_fkey",
+          "columns": [
+            "event_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "events",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        },
+        {
+          "name": "event_albums_source_gallery_id_fkey",
+          "columns": [
+            "source_gallery_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "gallery",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "event_albums_updated_by_fkey",
+          "columns": [
+            "updated_by"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 5,
+        "uniques": 1,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "event_albums_event_id_key",
+          "columns": [
+            "event_id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "events",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "location",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "starts_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "ends_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "audience",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "publish_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "notified_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "published",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "notify_on_publish",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "cover_fit",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "all_day",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "pricing_enabled",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "member_meal_cents",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        },
+        {
+          "name": "nonmember_meal_cents",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        },
+        {
+          "name": "child_prices",
+          "type": "jsonb",
+          "pgType": "jsonb",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "pricing_notes",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "events_created_by_fkey",
+          "columns": [
+            "created_by"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "a"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 4,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "gallery",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "image_url",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "taken_at",
+          "type": "date",
+          "pgType": "date",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "audience",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "storage_path",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "publish_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "notified_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "event_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "media_type",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "mime_type",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "file_size",
+          "type": "bigint",
+          "pgType": "int8",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 64,
+          "scale": 0
+        },
+        {
+          "name": "storage_provider",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "gallery_created_by_fkey",
+          "columns": [
+            "created_by"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "a"
+        },
+        {
+          "name": "gallery_event_id_fkey",
+          "columns": [
+            "event_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "events",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 4,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "good_deal_submissions",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "offer_text",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "municipality",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "website_url",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "submitted_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "submitted_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "reviewed_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "reviewed_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "admin_note",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "submission_type",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "target_deal_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "change_note",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "good_deal_submissions_reviewed_by_fkey",
+          "columns": [
+            "reviewed_by"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "good_deal_submissions_submitted_by_fkey",
+          "columns": [
+            "submitted_by"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        },
+        {
+          "name": "good_deal_submissions_target_deal_id_fkey",
+          "columns": [
+            "target_deal_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "good_deals",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 3,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "good_deals",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "offer_text",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "municipality",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "latitude",
+          "type": "double precision",
+          "pgType": "float8",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 53,
+          "scale": null
+        },
+        {
+          "name": "longitude",
+          "type": "double precision",
+          "pgType": "float8",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 53,
+          "scale": null
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "website_url",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "valid_until",
+          "type": "date",
+          "pgType": "date",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "audience",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "publish_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "map_verified",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "good_deals_created_by_fkey",
+          "columns": [
+            "created_by"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 2,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "household_charges",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "household_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "household_member_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "event_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "amount_cents",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "metadata",
+          "type": "jsonb",
+          "pgType": "jsonb",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "cancelled_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "cancelled_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "offline_person_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "household_charges_cancelled_by_fkey",
+          "columns": [
+            "cancelled_by"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "household_charges_created_by_fkey",
+          "columns": [
+            "created_by"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "household_charges_event_id_fkey",
+          "columns": [
+            "event_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "events",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "household_charges_household_id_fkey",
+          "columns": [
+            "household_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "households",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        },
+        {
+          "name": "household_charges_household_member_id_fkey",
+          "columns": [
+            "household_member_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "household_members",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "household_charges_offline_person_id_fkey",
+          "columns": [
+            "offline_person_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "offline_people",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "r"
+        },
+        {
+          "name": "household_charges_user_id_fkey",
+          "columns": [
+            "user_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 3,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "household_members",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "household_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "display_name",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "member_type",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "age_category",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "sort_order",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "household_members_household_id_fkey",
+          "columns": [
+            "household_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "households",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        },
+        {
+          "name": "household_members_user_id_fkey",
+          "columns": [
+            "user_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 2,
+        "uniques": 1,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "household_members_user_id_key",
+          "columns": [
+            "user_id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "household_payment_allocations",
+      "primaryKey": [
+        "payment_id",
+        "charge_id"
+      ],
+      "columns": [
+        {
+          "name": "payment_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "charge_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "amount_cents",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "household_payment_allocations_charge_id_fkey",
+          "columns": [
+            "charge_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "household_charges",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        },
+        {
+          "name": "household_payment_allocations_payment_id_fkey",
+          "columns": [
+            "payment_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "household_payments",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 1,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "household_payments",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "household_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "amount_cents",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        },
+        {
+          "name": "method",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "reference",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "declared_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "declared_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "confirmed_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "confirmed_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "household_payments_confirmed_by_fkey",
+          "columns": [
+            "confirmed_by"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "household_payments_declared_by_fkey",
+          "columns": [
+            "declared_by"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "household_payments_household_id_fkey",
+          "columns": [
+            "household_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "households",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 3,
+        "uniques": 1,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "household_payments_reference_key",
+          "columns": [
+            "reference"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "households",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "households_created_by_fkey",
+          "columns": [
+            "created_by"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 0,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "membership_requests",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "full_name",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "message",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "reviewed_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "reviewed_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "first_name",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "last_name",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "applicant_type",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "military_reference",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "requested_access",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "is_amicaliste",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "auth_user_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "membership_requests_auth_user_id_fkey",
+          "columns": [
+            "auth_user_id"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "membership_requests_reviewed_by_fkey",
+          "columns": [
+            "reviewed_by"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 4,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "membership_subscriptions",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "household_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "charge_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "starts_on",
+          "type": "date",
+          "pgType": "date",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "ends_on",
+          "type": "date",
+          "pgType": "date",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "amount_cents",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "activated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "offline_person_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "import_batch_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "source_row",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "membership_subscriptions_charge_id_fkey",
+          "columns": [
+            "charge_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "household_charges",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "membership_subscriptions_household_id_fkey",
+          "columns": [
+            "household_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "households",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        },
+        {
+          "name": "membership_subscriptions_import_batch_id_fkey",
+          "columns": [
+            "import_batch_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "treasury_import_batches",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "a"
+        },
+        {
+          "name": "membership_subscriptions_offline_person_id_fkey",
+          "columns": [
+            "offline_person_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "offline_people",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "a"
+        },
+        {
+          "name": "membership_subscriptions_user_id_fkey",
+          "columns": [
+            "user_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 4,
+        "uniques": 1,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "membership_subscriptions_charge_id_key",
+          "columns": [
+            "charge_id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "news",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "summary",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "content",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "published",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "published_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "audience",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "publish_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "notified_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "notify_on_publish",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "cover_fit",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "show_date",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "news_created_by_fkey",
+          "columns": [
+            "created_by"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "a"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 2,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "notification_preferences",
+      "primaryKey": [
+        "user_id"
+      ],
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "news",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "events",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "documents",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "gallery",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "membership_requests",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "notification_preferences_user_id_fkey",
+          "columns": [
+            "user_id"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 0,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "notification_settings",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "smallint",
+          "pgType": "int2",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 16,
+          "scale": 0
+        },
+        {
+          "name": "enabled",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "news",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "events",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "gallery",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "membership_requests",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "polls",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "notification_settings_updated_by_fkey",
+          "columns": [
+            "updated_by"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 1,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "offline_people",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "display_name",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "household_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "linked_user_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "is_amicaliste",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "membership_valid_until",
+          "type": "date",
+          "pgType": "date",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "offline_people_created_by_fkey",
+          "columns": [
+            "created_by"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "offline_people_household_id_fkey",
+          "columns": [
+            "household_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "households",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "r"
+        },
+        {
+          "name": "offline_people_linked_user_id_fkey",
+          "columns": [
+            "linked_user_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 3,
+        "uniques": 1,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "offline_people_linked_user_id_key",
+          "columns": [
+            "linked_user_id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "poll_household_attendance",
+      "primaryKey": [
+        "poll_id",
+        "household_member_id"
+      ],
+      "columns": [
+        {
+          "name": "poll_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "household_member_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "household_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "respondent_user_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "attending",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "poll_household_attendance_household_id_fkey",
+          "columns": [
+            "household_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "households",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        },
+        {
+          "name": "poll_household_attendance_household_member_id_fkey",
+          "columns": [
+            "household_member_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "household_members",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        },
+        {
+          "name": "poll_household_attendance_poll_id_fkey",
+          "columns": [
+            "poll_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "polls",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        },
+        {
+          "name": "poll_household_attendance_respondent_user_id_fkey",
+          "columns": [
+            "respondent_user_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 0,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "poll_options",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "poll_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "sort_order",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "vote_count",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "poll_options_poll_id_fkey",
+          "columns": [
+            "poll_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "polls",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 1,
+        "uniques": 1,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "poll_options_id_poll_id_key",
+          "columns": [
+            "id",
+            "poll_id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "poll_question_answers",
+      "primaryKey": [
+        "question_id",
+        "user_id"
+      ],
+      "columns": [
+        {
+          "name": "poll_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "question_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "answer_boolean",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "answer_number",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        },
+        {
+          "name": "answer_text",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "poll_question_answers_poll_id_fkey",
+          "columns": [
+            "poll_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "polls",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        },
+        {
+          "name": "poll_question_answers_question_id_poll_id_fkey",
+          "columns": [
+            "question_id",
+            "poll_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "poll_questions",
+          "targetColumns": [
+            "id",
+            "poll_id"
+          ],
+          "deleteRule": "c"
+        },
+        {
+          "name": "poll_question_answers_user_id_fkey",
+          "columns": [
+            "user_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 1,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "poll_questions",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "poll_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "prompt",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "question_type",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "sort_order",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        },
+        {
+          "name": "required",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "attendance_gate",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "settings",
+          "type": "jsonb",
+          "pgType": "jsonb",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "poll_questions_poll_id_fkey",
+          "columns": [
+            "poll_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "polls",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 2,
+        "uniques": 1,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "poll_questions_id_poll_id_key",
+          "columns": [
+            "id",
+            "poll_id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "poll_votes",
+      "primaryKey": [
+        "poll_id",
+        "user_id"
+      ],
+      "columns": [
+        {
+          "name": "poll_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "option_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "poll_votes_option_poll_fk",
+          "columns": [
+            "option_id",
+            "poll_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "poll_options",
+          "targetColumns": [
+            "id",
+            "poll_id"
+          ],
+          "deleteRule": "c"
+        },
+        {
+          "name": "poll_votes_poll_id_fkey",
+          "columns": [
+            "poll_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "polls",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        },
+        {
+          "name": "poll_votes_user_id_fkey",
+          "columns": [
+            "user_id"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 0,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "polls",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "closes_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "notify_on_publish",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "notified_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "featured",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "linked_news_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "linked_event_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "poll_type",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "published",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "household_mode",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "polls_created_by_fkey",
+          "columns": [
+            "created_by"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "polls_linked_event_id_fkey",
+          "columns": [
+            "linked_event_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "events",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "polls_linked_news_id_fkey",
+          "columns": [
+            "linked_news_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "news",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 3,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "profiles",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "full_name",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "access_type",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "applicant_type",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "is_amicaliste",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "deactivated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "deactivated_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "membership_valid_until",
+          "type": "date",
+          "pgType": "date",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "is_treasurer",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "profiles_deactivated_by_fkey",
+          "columns": [
+            "deactivated_by"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "profiles_id_fkey",
+          "columns": [
+            "id"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 3,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "push_subscriptions",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "endpoint",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "p256dh",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "auth",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "push_subscriptions_user_id_fkey",
+          "columns": [
+            "user_id"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 0,
+        "uniques": 1,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "push_subscriptions_endpoint_key",
+          "columns": [
+            "endpoint"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "treasury_entries",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "amount_cents",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "event_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "household_payment_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "payment_method",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "advanced_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "receipt_storage_provider",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "receipt_storage_path",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "receipt_file_name",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "settled_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "settled_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "reimbursement_method",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "advanced_by_offline",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "beneficiary_user_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "beneficiary_offline_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "import_batch_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "source_row",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        },
+        {
+          "name": "source_date",
+          "type": "date",
+          "pgType": "date",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "needs_review",
+          "type": "boolean",
+          "pgType": "bool",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "cancelled_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "cancelled_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "cancel_reason",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "cancelled_previous_status",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "treasury_entries_advanced_by_fkey",
+          "columns": [
+            "advanced_by"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "treasury_entries_advanced_by_offline_fkey",
+          "columns": [
+            "advanced_by_offline"
+          ],
+          "targetSchema": "public",
+          "targetTable": "offline_people",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "r"
+        },
+        {
+          "name": "treasury_entries_beneficiary_offline_id_fkey",
+          "columns": [
+            "beneficiary_offline_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "offline_people",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "a"
+        },
+        {
+          "name": "treasury_entries_beneficiary_user_id_fkey",
+          "columns": [
+            "beneficiary_user_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "a"
+        },
+        {
+          "name": "treasury_entries_cancelled_by_fkey",
+          "columns": [
+            "cancelled_by"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "a"
+        },
+        {
+          "name": "treasury_entries_created_by_fkey",
+          "columns": [
+            "created_by"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "treasury_entries_event_id_fkey",
+          "columns": [
+            "event_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "events",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "treasury_entries_household_payment_id_fkey",
+          "columns": [
+            "household_payment_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "household_payments",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "treasury_entries_import_batch_id_fkey",
+          "columns": [
+            "import_batch_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "treasury_import_batches",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "a"
+        },
+        {
+          "name": "treasury_entries_settled_by_fkey",
+          "columns": [
+            "settled_by"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 7,
+        "uniques": 1,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "treasury_entries_household_payment_id_key",
+          "columns": [
+            "household_payment_id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "treasury_event_batches",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "event_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "result",
+          "type": "jsonb",
+          "pgType": "jsonb",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "treasury_event_batches_created_by_fkey",
+          "columns": [
+            "created_by"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "a"
+        },
+        {
+          "name": "treasury_event_batches_event_id_fkey",
+          "columns": [
+            "event_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "events",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "a"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 0,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "treasury_event_participants",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "event_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "offline_person_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "household_member_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "pricing_group",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "price_cents",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        },
+        {
+          "name": "charge_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "pricing_note",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "treasury_event_participants_charge_id_fkey",
+          "columns": [
+            "charge_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "household_charges",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "treasury_event_participants_created_by_fkey",
+          "columns": [
+            "created_by"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "n"
+        },
+        {
+          "name": "treasury_event_participants_event_id_fkey",
+          "columns": [
+            "event_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "events",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "c"
+        },
+        {
+          "name": "treasury_event_participants_household_member_id_fkey",
+          "columns": [
+            "household_member_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "household_members",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "r"
+        },
+        {
+          "name": "treasury_event_participants_offline_person_id_fkey",
+          "columns": [
+            "offline_person_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "offline_people",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "r"
+        },
+        {
+          "name": "treasury_event_participants_user_id_fkey",
+          "columns": [
+            "user_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "r"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 3,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "treasury_import_archive_lines",
+      "primaryKey": [
+        "batch_id",
+        "source_row"
+      ],
+      "columns": [
+        {
+          "name": "batch_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "source_row",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        },
+        {
+          "name": "income_label",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "income_cents",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        },
+        {
+          "name": "expense_label",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "expense_cents",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "treasury_import_archive_lines_batch_id_fkey",
+          "columns": [
+            "batch_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "treasury_import_batches",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "r"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 0,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "treasury_import_batches",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "sha256",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "source_filename",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "exercise",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "opening_cents",
+          "type": "bigint",
+          "pgType": "int8",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 64,
+          "scale": 0
+        },
+        {
+          "name": "income_cents",
+          "type": "bigint",
+          "pgType": "int8",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 64,
+          "scale": 0
+        },
+        {
+          "name": "expense_cents",
+          "type": "bigint",
+          "pgType": "int8",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 64,
+          "scale": 0
+        },
+        {
+          "name": "confirmed_closing_cents",
+          "type": "bigint",
+          "pgType": "int8",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 64,
+          "scale": 0
+        },
+        {
+          "name": "membership_count",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        },
+        {
+          "name": "source_note",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "imported_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "imported_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "treasury_import_batches_imported_by_fkey",
+          "columns": [
+            "imported_by"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "a"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 2,
+        "uniques": 1,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "treasury_import_batches_sha256_key",
+          "columns": [
+            "sha256"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "treasury_opening",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "smallint",
+          "pgType": "int2",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 16,
+          "scale": 0
+        },
+        {
+          "name": "bank_cents",
+          "type": "bigint",
+          "pgType": "int8",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 64,
+          "scale": 0
+        },
+        {
+          "name": "cash_cents",
+          "type": "bigint",
+          "pgType": "int8",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 64,
+          "scale": 0
+        },
+        {
+          "name": "as_of",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "unassigned_cents",
+          "type": "bigint",
+          "pgType": "int8",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 64,
+          "scale": 0
+        },
+        {
+          "name": "import_batch_id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "treasury_opening_import_batch_id_fkey",
+          "columns": [
+            "import_batch_id"
+          ],
+          "targetSchema": "public",
+          "targetTable": "treasury_import_batches",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "a"
+        },
+        {
+          "name": "treasury_opening_updated_by_fkey",
+          "columns": [
+            "updated_by"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "a"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 1,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    },
+    {
+      "name": "treasury_transfers",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "from_account",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "to_account",
+          "type": "text",
+          "pgType": "text",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "amount_cents",
+          "type": "integer",
+          "pgType": "int4",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0
+        },
+        {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": false,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "cancelled_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "cancelled_by",
+          "type": "uuid",
+          "pgType": "uuid",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "cancel_reason",
+          "type": "text",
+          "pgType": "text",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "pgType": "timestamptz",
+          "nullable": true,
+          "identity": false,
+          "generated": false,
+          "maxLength": null,
+          "precision": null,
+          "scale": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "treasury_transfers_cancelled_by_fkey",
+          "columns": [
+            "cancelled_by"
+          ],
+          "targetSchema": "public",
+          "targetTable": "profiles",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "a"
+        },
+        {
+          "name": "treasury_transfers_created_by_fkey",
+          "columns": [
+            "created_by"
+          ],
+          "targetSchema": "auth",
+          "targetTable": "users",
+          "targetColumns": [
+            "id"
+          ],
+          "deleteRule": "a"
+        }
+      ],
+      "constraintsNotModeled": {
+        "checks": 4,
+        "uniques": 0,
+        "exclusions": 0
+      },
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
+    }
+  ]
+}

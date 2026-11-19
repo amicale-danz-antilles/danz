@@ -2,6 +2,25 @@
 
 Ce module est independant du site GitHub Pages en production.
 
+## Pilote du 19 novembre 2026
+
+La route `/pilot` fournit une page autonome pour tester depuis le poste professionnel
+les diagnostics existants et un cookie **de diagnostic même site**. Aucun formulaire
+de connexion, aucun accès Supabase, aucune écriture D1 et aucun média réel ne sont ajoutés.
+Ce cookie ne valide pas le futur mécanisme de connexion ni les cookies entre sites.
+Les requêtes POST supplémentaires sont limitées à l'origine exacte du Worker.
+
+Le dry-run local se lance depuis ce répertoire avec :
+
+```sh
+node migration/synthetic-dry-run.mjs
+node --test
+```
+
+Voir `migration/RAPPORT-PILOTE.md`, `migration/COUVERTURE-FONCTIONNELLE.md` et
+`migration/synthetic-dry-run.md`. **NO-GO pour les données réelles** tant que la
+sauvegarde indépendante chiffrée n'a pas été restaurée et la parité prouvée.
+
 ## Objectif
 
 Valider l'acces reseau a un Worker appartenant au **compte Cloudflare dedie a l'Amicale**, sans jamais utiliser le sous-domaine ou le compte Planet Pizza. Aucun compte adherent, mot de passe, jeton, table SQL ou media n'est traite.
