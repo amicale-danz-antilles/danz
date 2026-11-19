@@ -108,7 +108,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "association_settings",
@@ -246,7 +247,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "bureau_members",
@@ -340,7 +342,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "content_attachments",
@@ -513,7 +516,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "documents",
@@ -640,7 +644,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "event_albums",
@@ -946,7 +951,15 @@
         "uniques": 1,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "event_albums_event_id_key",
+          "columns": [
+            "event_id"
+          ]
+        }
+      ]
     },
     {
       "name": "events",
@@ -1194,7 +1207,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "gallery",
@@ -1399,7 +1413,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "good_deal_submissions",
@@ -1660,7 +1675,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "good_deals",
@@ -1897,7 +1913,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "household_charges",
@@ -2162,7 +2179,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "household_members",
@@ -2301,7 +2319,15 @@
         "uniques": 1,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "household_members_user_id_key",
+          "columns": [
+            "user_id"
+          ]
+        }
+      ]
     },
     {
       "name": "household_payment_allocations",
@@ -2375,7 +2401,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "household_payments",
@@ -2559,7 +2586,15 @@
         "uniques": 1,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "household_payments_reference_key",
+          "columns": [
+            "reference"
+          ]
+        }
+      ]
     },
     {
       "name": "households",
@@ -2642,7 +2677,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "membership_requests",
@@ -2847,7 +2883,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "membership_subscriptions",
@@ -3066,7 +3103,15 @@
         "uniques": 1,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "membership_subscriptions_charge_id_key",
+          "columns": [
+            "charge_id"
+          ]
+        }
+      ]
     },
     {
       "name": "news",
@@ -3237,7 +3282,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "notification_preferences",
@@ -3342,7 +3388,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "notification_settings",
@@ -3469,7 +3516,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "offline_people",
@@ -3642,7 +3690,15 @@
         "uniques": 1,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "offline_people_linked_user_id_key",
+          "columns": [
+            "linked_user_id"
+          ]
+        }
+      ]
     },
     {
       "name": "poll_household_attendance",
@@ -3773,7 +3829,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "poll_options",
@@ -3867,7 +3924,16 @@
         "uniques": 1,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "poll_options_id_poll_id_key",
+          "columns": [
+            "id",
+            "poll_id"
+          ]
+        }
+      ]
     },
     {
       "name": "poll_question_answers",
@@ -4010,7 +4076,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "poll_questions",
@@ -4148,7 +4215,16 @@
         "uniques": 1,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "poll_questions_id_poll_id_key",
+          "columns": [
+            "id",
+            "poll_id"
+          ]
+        }
+      ]
     },
     {
       "name": "poll_votes",
@@ -4258,7 +4334,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "polls",
@@ -4486,7 +4563,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "profiles",
@@ -4680,7 +4758,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "push_subscriptions",
@@ -4785,7 +4864,15 @@
         "uniques": 1,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "push_subscriptions_endpoint_key",
+          "columns": [
+            "endpoint"
+          ]
+        }
+      ]
     },
     {
       "name": "treasury_entries",
@@ -5262,7 +5349,15 @@
         "uniques": 1,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "treasury_entries_household_payment_id_key",
+          "columns": [
+            "household_payment_id"
+          ]
+        }
+      ]
     },
     {
       "name": "treasury_event_batches",
@@ -5357,7 +5452,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "treasury_event_participants",
@@ -5566,7 +5662,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "treasury_import_archive_lines",
@@ -5661,7 +5758,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "treasury_import_batches",
@@ -5821,7 +5919,15 @@
         "uniques": 1,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": [
+        {
+          "name": "treasury_import_batches_sha256_key",
+          "columns": [
+            "sha256"
+          ]
+        }
+      ]
     },
     {
       "name": "treasury_opening",
@@ -5949,7 +6055,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     },
     {
       "name": "treasury_transfers",
@@ -6121,7 +6228,8 @@
         "uniques": 0,
         "exclusions": 0
       },
-      "sourceRlsEnabled": true
+      "sourceRlsEnabled": true,
+      "uniqueKeys": []
     }
   ]
 }
