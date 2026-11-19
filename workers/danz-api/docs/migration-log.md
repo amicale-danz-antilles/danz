@@ -78,3 +78,26 @@ Ce test ne garantit ni les navigateurs mobiles ni la persistance des sessions ap
 **Limites :** aucun point d'entrée de connexion n'est activé, aucun mot de passe stocké ou migré, aucune session de membre n'est créée. Il manque le fournisseur d'identité, l'authentification à facteurs multiples, la prévention des tentatives abusives, la création/réinitialisation de compte et l'expédition éventuelle des messages de confirmation.
 
 Avant une vraie migration, réviser le risque des cookies tiers partitionnés, l'hébergement des données de personnels militaires, l'exigence d'accord informatique et la continuité des mots de passe. Ne pas fusionner sur `main` tant que ces points ne sont pas validés.
+
+### Validation de schema d'identite pilote (confirmee)
+
+L'utilisateur a confirme `GET /auth-schema-status` :
+`{ok:true,stage:"auth-schema-check",tablesExpected:3,tablesPresent:3,triggersExpected:1,triggersPresent:1,empty:true,readonly:true}`.
+
+D1 de test contient 8 tables financieres et 3 tables d'authentification, sans donnees personnelles.
+
+### Sessions — etape de preparation supplementaire
+
+- `src/sessionLifecyclePilot.mjs` produit 32 octets aleatoires pour chaque jeton de session et pour le jeton CSRF, et leur empreinte SHA-256 pour le stockage D1. Il produit un cookie `__Host-danz_session` avec `Secure; HttpOnly; SameSite=None; Partitioned; Path=/`, expiration pilote 1 heure.
+- `src/authSessionPilot.mjs` exige maintenant automatiquement un CSRF pour toutes les methodes HTTP autres que GET et HEAD, meme si l'appelant ne l'a pas indique.
+- `revokePilotSession` exige une requete POST, une origine autorisee, un jeton CSRF valide, et revoque exclusivement la session courante en base.
+- `test/session-lifecycle-pilot.test.mjs` teste un cycle complet sur SQLite en memoire avec compte fictif et jamais dans D1 distante.
+- Aucune route de connexion, de creation ou de deconnexion reelle n'est exposee ; ce module n'est pas un serveur d'identite complet.
+
+### Point bloquant a etudier avant la reprise des mots de passe actuels
+
+Les mots de passe existants sont sous forme de hachages bcrypt dans Supabase (et jamais en clair). Cloudflare Workers Free impose 10 ms de CPU par requete ; il ne faut pas supposer que verifier bcrypt avec un package JavaScript rentre dans cette limite. Le test de faisabilite devra se faire avec des donnees **synthetiques**, mesurer le temps CPU et valider l'option sans frais.
+
+Une piste alternative est Cloudflare Access (offre Free pour petites equipes), avec connexion par identite/OTP/passkey, mais elle pourrait imposer une nouvelle procedure de connexion et son integration avec notre domaine GitHub Pages + Workers doit etre eprouvee avant decision. Ne pas activer Access sur le Worker de test sans plan de compatibilite des acces.
+
+Le rapprochement entre l'identite Supabase et les profils applicatifs doit etre effectue avant toute exportation, sans modifier automatiquement les comptes orphelins. Les donnees de mot de passe et de session ne doivent jamais etre publiees dans GitHub, un log ou une capture.
