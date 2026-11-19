@@ -20,7 +20,7 @@ test("les soldes fictifs correspondent au grand livre actuellement utilise par D
 test("SQLite calcule les memes soldes a partir de VALUES fictifs, sans table ni ecriture", () => {
   const db = new DatabaseSync(":memory:");
   const result = db.prepare(FINANCE_PILOT_SQL).get();
-  assert.deepEqual(result, { ...expected });
+  assert.deepEqual({ ...result }, { ...expected });
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table'").get().n, 0);
   db.close();
 });
