@@ -32,6 +32,18 @@ Documentation officielle mise à jour :
 - L'offre gratuite Supabase ne fournit pas de sauvegarde automatique accessible comme remplacement de ce plan.
 - Les commandes ci-dessous sont en lecture sur la base source. Elles ne sont pas des commandes de migration Cloudflare.
 
+### Étape zéro — vérifier les outils sur l'ordinateur personnel
+
+Depuis une copie locale du dépôt DANZ (branche `codex/danz-pilot-synthetic`), ouvrir le Terminal, puis lancer cette commande depuis la racine du dépôt :
+
+```sh
+node workers/danz-api/migration/preflight-backup.mjs
+```
+
+Ce précontrôle local **ne demande aucun mot de passe et ne lit aucune donnée d'adhérent**. Il signale uniquement si Node.js, Supabase CLI, Docker, `pg_dump`, `psql` et `rclone` sont présents et exécutables. `toolsReady: true` signifie seulement que les outils sont détectés ; cela **ne prouve pas** le chiffrement du support, l'accès autorisé, la sauvegarde ni la restauration. La version de la CLI et les options de `db dump` doivent encore être contrôlées localement via `supabase --version` et `supabase db dump --help`.
+
+Ne pas transmettre le contenu des futurs dumps, des chemins sensibles ou des clés. Il suffit de partager `checks` et `toolsReady` (ce sont des indicateurs non personnels).
+
 ## 1. Sauvegarder les données PostgreSQL
 
 Installer sur le poste autorisé : Docker, Supabase CLI à jour, et ultérieurement PostgreSQL/psql pour vérifier une restauration. Les étapes officielles sont dans :
