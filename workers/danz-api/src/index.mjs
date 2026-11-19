@@ -1,4 +1,5 @@
 import { FINANCE_PILOT_SQL, EXPECTED_PILOT_BALANCES } from "./financePilot.mjs";
+import { pilotResponse } from "./pilotPage.mjs";
 // API de diagnostic, isolee de DANZ en production.
 // Aucun compte membre, mot de passe, acces Supabase ou R2.
 // Seules des lectures de diagnostic sont effectuees sur la base D1 de test.
@@ -27,6 +28,8 @@ function json(data, status, headers) {
 
 export default {
   async fetch(request, env) {
+    const pilot = pilotResponse(request);
+    if (pilot) return pilot;
     const url = new URL(request.url);
     const headers = responseHeaders(request);
     const method = request.method.toUpperCase();

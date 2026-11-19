@@ -98,3 +98,48 @@ test("chiffres non fiables et formats invalides refusent la migration",()=>{
   a.tables.treasury_entries=[{id:"fake",amount_cents:Number.MAX_SAFE_INTEGER+1}];
   assert.equal(compareSnapshots(a,b).ok,false);
 });
+
+test("identités incomplètes et booléens ambigus bloquent même deux copies identiques",()=>{
+  for (const field of ["role","active","is_treasurer","household_id"]) {
+    const a=sample();
+    delete a.authAccounts[0][field];
+    assert.equal(compareSnapshots(a,clone(a)).ok,false,field);
+  }
+  for (const field of ["active","is_treasurer"]) {
+    const a=sample();
+    a.authAccounts[0][field]="false";
+    assert.equal(compareSnapshots(a,clone(a)).ok,false,field);
+  }
+});
+
+test("lien de fournisseur, statut et métadonnées auth ne sont jamais projetés silencieusement",()=>{
+  const a=sample();
+  a.authAccounts[0].provider_identity={provider:"synthetic",subject:"synthetic-subject"};
+  a.authAccounts[0].confirmed=true;
+  const b=clone(a);
+  delete b.authAccounts[0].provider_identity;
+  assert.equal(compareSnapshots(a,b).ok,false);
+  b.authAccounts=clone(a.authAccounts);
+  b.authAccounts[0].confirmed=false;
+  assert.equal(compareSnapshots(a,b).ok,false);
+});
+
+test("centimes fractionnaires, clés vides et valeurs JSON omises sont bloqués",()=>{
+  for (const row of [
+    {id:"synthetic",amount_cents:12.1},
+    {id:"",amount_cents:100},
+    {id:"synthetic",discarded:undefined},
+    {id:"synthetic",nested:{discarded:undefined}},
+  ]) {
+    const a=sample(); a.tables.treasury_entries=[row];
+    assert.equal(compareSnapshots(a,clone(a)).ok,false);
+  }
+});
+
+test("une propriété __proto__ dans le JSON participe à la comparaison",()=>{
+  const a=sample();
+  a.tables.profiles=[JSON.parse('{"id":"synthetic","__proto__":{"flag":"one"}}')];
+  const b=clone(a);
+  b.tables.profiles[0]=JSON.parse('{"id":"synthetic","__proto__":{"flag":"two"}}');
+  assert.equal(compareSnapshots(a,b).ok,false);
+});

@@ -1,0 +1,270 @@
+{
+  "checkedOn": "2026-11-19",
+  "sourceProject": "axewfeanyfxkzercafen",
+  "scope": "read-only schema metadata; no business rows or identities queried",
+  "tables": [
+    {
+      "table_name": "admin_audit_log",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "association_settings",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "bureau_members",
+      "primary_key": [
+        "role_key"
+      ]
+    },
+    {
+      "table_name": "content_attachments",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "documents",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "event_albums",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "events",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "gallery",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "good_deal_submissions",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "good_deals",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "household_charges",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "household_members",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "household_payment_allocations",
+      "primary_key": [
+        "payment_id",
+        "charge_id"
+      ]
+    },
+    {
+      "table_name": "household_payments",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "households",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "membership_requests",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "membership_subscriptions",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "news",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "notification_preferences",
+      "primary_key": [
+        "user_id"
+      ]
+    },
+    {
+      "table_name": "notification_settings",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "offline_people",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "poll_household_attendance",
+      "primary_key": [
+        "poll_id",
+        "household_member_id"
+      ]
+    },
+    {
+      "table_name": "poll_options",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "poll_question_answers",
+      "primary_key": [
+        "question_id",
+        "user_id"
+      ]
+    },
+    {
+      "table_name": "poll_questions",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "poll_votes",
+      "primary_key": [
+        "poll_id",
+        "user_id"
+      ]
+    },
+    {
+      "table_name": "polls",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "profiles",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "push_subscriptions",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "treasury_entries",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "treasury_event_batches",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "treasury_event_participants",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "treasury_import_archive_lines",
+      "primary_key": [
+        "batch_id",
+        "source_row"
+      ]
+    },
+    {
+      "table_name": "treasury_import_batches",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "treasury_opening",
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "table_name": "treasury_transfers",
+      "primary_key": [
+        "id"
+      ]
+    }
+  ],
+  "edgeFunctions": [
+    {
+      "name": "admin-data-export",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "admin-system-status",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "admin-user-management",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "approve-membership-request",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "danz-assistant",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "push-notifications",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "r2-media",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "request-membership",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "send-member-login-link",
+      "status": "ACTIVE"
+    }
+  ],
+  "tableContractMatch": true,
+  "edgeFunctionNameContractMatch": true,
+  "realDataParityVerified": false,
+  "productionReady": false
+}

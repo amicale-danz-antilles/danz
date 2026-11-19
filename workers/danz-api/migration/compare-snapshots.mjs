@@ -23,11 +23,18 @@ import { createHash } from "node:crypto";
 const contract = JSON.parse(readFileSync(new URL("./source-contract.json", import.meta.url),"utf8"));
 
 function stable(value) {
-  if (Array.isArray(value)) return value.map(stable);
+  if (Array.isArray(value)) {
+    if (Object.keys(value).length !== value.length) throw new Error("invalid_json_array");
+    return value.map(stable);
+  }
   if (value !== null && typeof value === "object") {
-    const out = {};
+    if (![Object.prototype, null].includes(Object.getPrototypeOf(value))) throw new Error("invalid_json_object");
+    const out = Object.create(null);
     for (const key of Object.keys(value).sort()) out[key] = stable(value[key]);
     return out;
+  }
+  if (!["string", "number", "boolean"].includes(typeof value) && value !== null) {
+    throw new Error("invalid_json_value");
   }
   if (typeof value === "number" &&
       (!Number.isFinite(value) || (Number.isInteger(value) && !Number.isSafeInteger(value)))) {
@@ -43,10 +50,12 @@ const hash = item => createHash("sha256").update(JSON.stringify(stable(item))).d
 function rowKey(row, fields) {
   if (!row || typeof row !== "object" || Array.isArray(row)) throw new Error("invalid_row");
   const key = fields.map(field => {
-    if (!(field in row) || row[field] === null || typeof row[field] === "object") {
+    if (!Object.hasOwn(row,field) ||
+        !(typeof row[field] === "string" && row[field].length > 0 ||
+          typeof row[field] === "number" && Number.isSafeInteger(row[field]))) {
       throw new Error("missing_primary_key");
     }
-    return String(row[field]);
+    return row[field];
   });
   return JSON.stringify(key);
 }
@@ -56,6 +65,11 @@ function keyedRows(rows, fields) {
   const map = new Map();
   for (const row of rows) {
     const key = rowKey(row,fields);
+    for (const [name,value] of Object.entries(row)) {
+      if (name.endsWith("_cents") && value !== null && !Number.isSafeInteger(value)) {
+        throw new Error("non_integer_cents");
+      }
+    }
     if (map.has(key)) throw new Error("duplicate_primary_key");
     map.set(key,hash(row));
   }
@@ -91,14 +105,16 @@ function compareAssetList(source,target,report) {
 }
 
 function identityProjection(account) {
-  if(!account || typeof account.id!=="string" || !account.id)throw new Error("invalid_auth_account");
-  return {
-    id:account.id,
-    role:account.role,
-    active:account.active,
-    is_treasurer:account.is_treasurer,
-    household_id:account.household_id??null,
-  };
+  if(!account || typeof account.id!=="string" || !account.id ||
+      typeof account.role!=="string" || !account.role ||
+      typeof account.active!=="boolean" || typeof account.is_treasurer!=="boolean" ||
+      !Object.hasOwn(account,"household_id") ||
+      !(account.household_id===null || typeof account.household_id==="string" && account.household_id.length>0)) {
+    throw new Error("invalid_auth_account");
+  }
+  // Compare every supplied identity field, including provider/status metadata.
+  // A projection of five fields could silently discard a lost identity link.
+  return account;
 }
 
 export function compareSnapshots(source,target,expected=contract) {

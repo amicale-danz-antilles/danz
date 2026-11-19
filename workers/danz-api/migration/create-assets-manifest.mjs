@@ -2,7 +2,7 @@
 // Usage: node migration/create-assets-manifest.mjs <private-backup-directory>
 // Chemins attends: <root>/r2/<bucket>/<objet> et <root>/supabase-storage/<bucket>/<objet>
 // IMPORTANT : aucun fichier ou lien signe ne doit etre commite ou partage.
-import { createReadStream, existsSync, readdirSync, lstatSync, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, readdirSync, lstatSync, writeFileSync, openSync, closeSync, fchmodSync, constants } from "node:fs";
 import { resolve, join, relative, sep } from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -28,11 +28,14 @@ async function sha256File(file) {
 }
 
 export async function createManifest(directory) {
+  if (typeof directory!=="string" || !directory) throw new Error("missing_backup_directory");
   const root=resolve(directory);
+  if (!lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink()) throw new Error("unsafe_backup_directory");
   const manifest={format:"DANZ-ASSETS-1",files:[]};
   for (const storage of ["r2","supabase-storage"]){
     const folder=join(root,storage);
     if(!existsSync(folder))throw new Error("missing_storage_directory");
+    if(!lstatSync(folder).isDirectory() || lstatSync(folder).isSymbolicLink())throw new Error("unsafe_storage_directory");
     for(const file of walk(folder,root)){
       manifest.files.push({path:file.path,bytes:file.bytes,sha256:await sha256File(file.absolute)});
     }
@@ -48,7 +51,10 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
     try{
       const root=resolve(process.argv[2]);
       const manifest=await createManifest(root);
-      writeFileSync(join(root,"assets-manifest.json"),JSON.stringify(manifest,null,2)+"\n",{flag:"w",mode:0o600});
+      // Refuse a redirected output and keep an existing manifest private too.
+      const fd=openSync(join(root,"assets-manifest.json"),constants.O_WRONLY|constants.O_CREAT|constants.O_TRUNC|constants.O_NOFOLLOW,0o600);
+      try { fchmodSync(fd,0o600); writeFileSync(fd,JSON.stringify(manifest,null,2)+"\n"); }
+      finally { closeSync(fd); }
       console.log(JSON.stringify({ok:true,filesHashed:manifest.files.length,manifest:"assets-manifest.json"}));
     }catch(_){
       console.error("Cannot build private file manifest; verify storage copies and permissions");
