@@ -1,0 +1,23 @@
+# Configuration de secours pour Cloudflare Builds en mode Preview quand
+# le service lance wrangler depuis la racine "/" du depot.
+# UNIQUEMENT sur la branche de test Codex ; ne pas fusionner dans main.
+# Ce Worker n'est pas le site GitHub Pages des adherents.
+name = "danz-api"
+main = "workers/danz-api/src/index.mjs"
+compatibility_date = "2026-11-18"
+workers_dev = true
+
+# D1 DE TEST SEULEMENT — aucune identite ni donnee comptable reelle.
+[[d1_databases]]
+binding = "DB"
+database_name = "danz-staging"
+database_id = "40438228-8e2d-4872-9c00-17cc7ccfdd4a"
+
+# Necessaire pour "npx wrangler preview" sur les builds secondaires.
+# Le preview n'herite pas automatiquement des liaisons D1.
+[previews]
+
+[[previews.d1_databases]]
+binding = "DB"
+database_name = "danz-staging"
+database_id = "40438228-8e2d-4872-9c00-17cc7ccfdd4a"
