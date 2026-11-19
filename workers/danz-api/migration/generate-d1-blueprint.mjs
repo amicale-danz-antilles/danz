@@ -74,6 +74,17 @@ export function generateD1Blueprint(meta=source, contract=sourceContract) {
     for(const key of t.primaryKey) if(!columnNames.has(key))throw new Error("missing_primary_key_column");
     definitions.push(`  PRIMARY KEY (${t.primaryKey.map(quote).join(", ")})`);
 
+    if(!Array.isArray(t.uniqueKeys))throw new Error("missing_unique_constraints_inventory");
+    for(const unique of t.uniqueKeys){
+      if(!NAME.test(unique.name) || !Array.isArray(unique.columns) ||
+         unique.columns.length===0 ||
+         new Set(unique.columns).size!==unique.columns.length ||
+         !unique.columns.every(n=>columnNames.has(n))) {
+        throw new Error("invalid_unique_constraint");
+      }
+      definitions.push(`  UNIQUE (${unique.columns.map(quote).join(", ")})`);
+    }
+
     for(const fk of t.foreignKeys){
       if(!NAME.test(fk.name) || !Array.isArray(fk.columns) ||
          !Array.isArray(fk.targetColumns) || fk.columns.length!==fk.targetColumns.length ||
@@ -87,7 +98,10 @@ export function generateD1Blueprint(meta=source, contract=sourceContract) {
       }
     }
     const unmodeled=t.constraintsNotModeled||{};
-    for(const [key,kind] of [["checks","check_constraints"],["uniques","unique_constraints"],["exclusions","exclusion_constraints"]]){
+    if(unmodeled.uniques !== t.uniqueKeys.length) {
+      throw new Error("unique_constraints_count_mismatch");
+    }
+    for(const [key,kind] of [["checks","check_constraints"],["exclusions","exclusion_constraints"]]){
       const n=Number(unmodeled[key]);
       if(!Number.isSafeInteger(n)||n<0)throw new Error("invalid_constraint_count");
       if(n) risks.push({area:t.name,kind,count:n});
@@ -103,7 +117,7 @@ export function generateD1Blueprint(meta=source, contract=sourceContract) {
     "-- DANZ - SCHEMA PILOTE LOCAL UNIQUEMENT ; NON AUTORISE EN D1 DISTANT",
     "-- Metadonnees publiques de schema, pas de donnees metier ni d'authentification.",
     "-- 36 tables avec prefixe mig_ (evite de toucher aux stg_* existantes).",
-    "-- BLOQUEURS : DEFAULTS, CHECKS, UNIQUE, RLS, INDEX, TRIGGERS, RPC, AUTH, STORAGE.",
+    "-- BLOQUEURS : DEFAULTS, CHECKS, RLS, INDEX SPECIFIQUES, TRIGGERS, RPC, AUTH, STORAGE.",
     "-- Les risques et ecarts sont listes par generateD1Blueprint().",
     "PRAGMA foreign_keys = ON;",
   ].join("\n");
