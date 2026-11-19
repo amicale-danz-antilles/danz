@@ -27,6 +27,13 @@ Les 11 tables `stg_*` de D1 sont un prototype, **pas** la migration complete. Le
 - Ne pas utiliser D1 Time Travel comme unique sauvegarde : sur Workers Free, la retention est de **sept jours**, la restauration est destructive et s'effectue en place.
 - Confirmer les exigences de traitement des informations des personnels militaires avec l'autorite competente avant toute copie ou export inter-services.
 
+
+### Avertissement sur le bouton d'export administratif existant
+
+Le code de la fonction Supabase Edge `admin-data-export` en production, inspecte en lecture seule le 19 novembre 2026, exporte **16 des 36 tables publiques**. La liste et les 20 tables non couvertes figurent dans `legacy-export-coverage.json`. Parmi les oublis figurent `treasury_entries`, `treasury_opening`, `households`, `household_payments`, `household_payment_allocations` et `membership_subscriptions`.
+
+Cet export ne contient aucun objet binaire R2 ou Supabase Storage, ne conserve pas les empreintes de mots de passe ni les secrets du serveur, et ne peut **en aucun cas** valoir sauvegarde integrale ou etre la source unique d'une migration. Ne pas le declencher automatiquement, car il contient des informations privees et ajoute lui-meme une ligne au journal d'audit. Une sauvegarde plus large doit etre construite et testee dans un environnement chiffre, selon une procedure autorisee.
+
 ### 2. Completude des donnees (zero difference inexpliquee)
 
 - Capturer une photographie de reference a une date precise avec les ecritures suspendues ou une reprise incrementalement prouvee.
