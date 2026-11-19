@@ -31,7 +31,7 @@ test("une seule TABLE DATA absente bloque la sauvegarde",()=>{
   assert.equal(r.tableDataChecked,35);
 });
 test("absence de comptes et Storage bloque la validation",()=>{
-  const s=fixture().split("\n").filter(x=>!x.includes("TABLE DATA auth.users")&&!x.includes("TABLE DATA storage.objects")).join("\n");
+  const s=fixture().split("\n").filter(x=>!x.includes("TABLE DATA auth users ")&&!x.includes("TABLE DATA storage objects ")).join("\n");
   const r=verifyDumpTOC(s);
   assert.equal(r.ok,false);
   assert.equal(r.managedDataChecked,2);
