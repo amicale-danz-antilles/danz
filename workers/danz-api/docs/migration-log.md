@@ -30,7 +30,7 @@ Le modèle `src/authorizationPilot.mjs` et ses tests ne sont pas connectés aux 
 
 L'adresse du site (`https://amicale-danz-antilles.github.io/danz/`) et l'adresse du Worker (`https://danz-api.amicale-danz.workers.dev`) sont sur deux sites distincts.
 
-Un cookie de connexion cross-site demande des paramètres CORS/cookie spécifiques et peut être bloqué, partitionné ou restreint par les navigateurs. La sonde `GET /session-probe?step=set|check|clear` ne manipule que le cookie temporaire `danz_probe=1`, de validité 60 secondes, marqué `HttpOnly; Secure; SameSite=None`. Elle ne crée aucune session ni mot de passe.
+Un cookie de connexion cross-site demande des paramètres CORS/cookie spécifiques et peut être bloqué, partitionné ou restreint par les navigateurs. La sonde `GET /session-probe?step=set|check|clear` ne manipule que le cookie temporaire `danz_probe=1`, de validité 60 secondes, marqué `HttpOnly; Secure; SameSite=None; Partitioned` et préfixé `__Host-`, avec `Path=/`. Elle ne crée aucune session ni mot de passe.
 
 Avant de choisir une authentification réelle, confirmer les contraintes du navigateur professionnel et des appareils mobiles. Ne pas conseiller de désactiver les protections du réseau ou du navigateur.
 
@@ -44,3 +44,17 @@ Avant de choisir une authentification réelle, confirmer les contraintes du navi
 6. Galerie, documents, notifications, événements, administration et stockage R2 : audit et tests de bout en bout.
 7. Protection ou suppression des routes temporaires `/schema-status`, `/finance-check`, `/session-probe` avant la production.
 8. Aucune fusion dans `main` ni bascule automatique de GitHub Pages avant validation de tous les contrôles.
+
+### Résultat de la première sonde de cookie (non partitionné)
+
+L'utilisateur a exécuté le test depuis le site DANZ avec Firefox professionnel :
+`{ok:true, step:"check", cookieReceived:true, personalData:false}`.
+La promesse JavaScript terminée avec une valeur `undefined` est normale.
+Firefox a cependant averti : le cookie tiers `danz_probe` « sera bientôt rejeté car il est étranger et ne possède pas l'attribut Partitioned ».
+
+Cela confirme uniquement qu'un cookie de diagnostic non partitionné a été renvoyé sur cet appareil et cette configuration à cet instant, **pas que l'authentification définitive est compatible avec tous les navigateurs**.
+
+La sonde de test a été adaptée à `__Host-danz_probe` avec `Secure; HttpOnly; SameSite=None; Partitioned; Path=/; Max-Age=60`.
+Le résultat de cette nouvelle sonde reste à valider sur Firefox professionnel, puis sur les navigateurs mobiles.
+
+Aucun cookie de connexion réel n'est émis ; les sessions, le stockage des identités, les protections CSRF, la déconnexion et le mécanisme de récupération des comptes ne sont pas développés.
