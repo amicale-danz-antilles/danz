@@ -88,3 +88,18 @@ Le Worker propose maintenant `GET /schema-status` : il verifie **8 tables et 4 t
 ```
 
 Si les tables n'ont pas encore ete installees, `ok:false`, `tablesPresent:0`, `triggersPresent:0` est normal : **/db-health ne teste que la connexion D1**, pas le schema. Cette sonde de staging est publique et devra etre supprimee ou protegee avant toute mise en production d'une API manipulant les donnees de l'Amicale.
+
+## Verification des calculs de tresorerie dans D1 (fictive, lecture seule)
+
+Le Worker propose `GET /finance-check` qui execute uniquement un `WITH ... VALUES ... SELECT` sur des chiffres fictifs. Aucune table utilisateur ou staging n'est lue, et aucune ecriture SQL n'est effectuee.
+
+Exemples de calculs dans le scenario : solde initial banque 100,00 EUR, caisse 20,00 EUR ; recette bancaire 60,00 EUR ; depense caisse 15,00 EUR ; recette caisse 25,00 EUR ; recette non affectee 4,00 EUR ; transfert caisse vers banque 10,00 EUR. Les paiements en attente/annules et les dates hors periode sont exclus, comme dans le grand livre actuel.
+
+Reponse attendue apres deploiement :
+```json
+{"ok":true,"stage":"synthetic-finance-check","readonly":true,"data":"synthetic-only","balances":{"bank_cents":17000,"cash_cents":2000,"unassigned_cents":400,"total_cents":19400}}
+```
+
+`test/finance-pilot.test.mjs` compare le calcul SQLite avec `src/lib/treasuryLedger.js` et controle le comportement du Worker.
+
+Ce controle NE PROUVE PAS la capacite de traitement des donnees reelles ni la securite d'une API financiere. Il doit etre retire ou protege avant la mise en production finale. L'etape suivante exige une authentification serveur, un controle des roles, la journalisation des actions et des transactions atomiques.
