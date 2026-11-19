@@ -12,3 +12,11 @@ migration-private/
 **/migration/private-*.json
 **/migration/*-snapshot.json
 **/migration/*.secrets.json
+
+# Ne jamais publier les sauvegardes privées SQL et les manifestes d'objets.
+/DANZ-SAUVEGARDE-PRIVEE/
+**/DANZ-SAUVEGARDE-PRIVEE/
+**/assets-manifest.json
+**/*.backup.7z
+**/*.backup.age
+**/private-backups/
