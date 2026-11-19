@@ -133,6 +133,22 @@ export function verifyLocalBackup(directory,{requireAssets=true}={}) {
       report.fileDigests[filename]={bytes:bytes.length,sha256:digest(bytes)};
     }catch(_){report.issues.push("unreadable_"+filename);}
   }
+  // La CLI Supabase exclut par defaut les schemas geres (auth, storage).
+  // Leurs donnees peuvent etre rassemblees dans un export separe issu
+  // d'un outil postgres autorise. Ce controle ne produit aucun export.
+  const managedFile=join(root,"managed-data.sql");
+  if (existsSync(managedFile)) {
+    try {
+      const stat=lstatSync(managedFile);
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.size===0) {
+        report.issues.push("empty_or_invalid_managed-data.sql");
+      } else {
+        const bytes=readFileSync(managedFile);
+        files["managed-data.sql"]=bytes.toString("utf8");
+        report.fileDigests["managed-data.sql"]={bytes:bytes.length,sha256:digest(bytes)};
+      }
+    } catch (_) { report.issues.push("unreadable_managed-data.sql"); }
+  }
   if (files["schema.sql"]){
     const schema=sqlSkeleton(files["schema.sql"]);
     for (const item of contract.tables) {
@@ -152,8 +168,15 @@ export function verifyLocalBackup(directory,{requireAssets=true}={}) {
         report.issues.push("missing_copy_primary_key:"+item.name);
       }
     }
+    // Les donnees auth/storage peuvent etre dans data.sql OU un export
+    // managed-data.sql autonome. Ne jamais considerer la presence d'un
+    // simple schema auth comme une sauvegarde d'identites reutilisable.
+    const managedCopies=files["managed-data.sql"]
+      ? copyBlocks(files["managed-data.sql"],report.issues) : new Map();
     for(const managed of ["auth.users","auth.identities","storage.objects","storage.buckets"]){
-      if(!copies.has(managed))report.issues.push("missing_managed_data:"+managed);
+      if(!copies.has(managed) && !managedCopies.has(managed)) {
+        report.issues.push("missing_managed_data:"+managed);
+      }
     }
   }
   const assetManifest=join(root,"assets-manifest.json");
