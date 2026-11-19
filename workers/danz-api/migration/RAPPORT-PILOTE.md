@@ -107,3 +107,19 @@ Sources techniques vérifiées :
 [guide Supabase sauvegarde/restauration](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore),
 [changelog CLI v3](https://supabase.com/changelog/supabase-cli-v3),
 [commandes Wrangler](https://developers.cloudflare.com/workers/wrangler/commands/).
+
+## Complément — avancée sans Codex, le 19 novembre 2026
+
+Le trésorier a testé `/pilot` sur **son ordinateur personnel et son ordinateur professionnel**. Pour chaque poste, la page a rapporté `pilotVersion: 2026-11-19-v1`, `mode: synthetic-only`, avec **7 tests sur 7 réussis** : serveur, D1, tables financières et d'identité vides, calcul fictif, POST diagnostic et cookie même site. Elle rapportait aussi explicitement `realMigration: NO-GO` et `memberLogin: unavailable`. Cela valide l'accès technique au pilote, **pas** la migration réelle ni la connexion des adhérents.
+
+Travaux de continuation sur la branche `codex/danz-pilot-synthetic`, réalisés via GitHub et lecture seule du catalogue Supabase :
+- `source-schema-metadata.json` : 36 tables, 406 colonnes, 89 FK et dix contraintes d'unicité, sans aucune donnée personnelle ni valeur métier.
+- `generate-d1-blueprint.mjs` : 36 tables SQLite de développement `mig_*`, relations internes et contraintes d'unicité testées sur SQLite en mémoire ; **non autorisé à être importé dans D1 distante**.
+- `BLOQUEURS-SCHEMA-REEL.md` : 73 CHECK, 77 politiques RLS, 35 fonctions SQL, 31 triggers et 110 index identifiés comme chantiers à terminer / réconcilier.
+- `verify-pgdump-toc.mjs` : garde-fou sur une sauvegarde PostgreSQL complète, y compris l'existence des tables `auth` et `storage`.
+- `backup-postgres-private-macos.sh` : sauvegarde PostgreSQL locale et privée, **prête mais jamais exécutée par ChatGPT sur le poste personnel**.
+- `CONTINUER-SANS-CODEX.md` : guide sans abonnement Codex ni transmission d'identifiants.
+
+**Toujours bloquant** : aucune archive réelle chiffrée/restaurée n'a été contrôlée ici ; aucun objet R2/Storage réel n'a été transféré ; aucune authentification réelle, aucune conversion de RLS/RPC/fonctions Edge, aucune réconciliation au centime et aucun plan de rollback opérationnel ne sont confirmés. Aucun transfert de comptes ou de données réelles n'a eu lieu.
+
+Le seul déploiement concerné par les commits de cette branche est le Worker pilote `danz-api` avec sa liaison `danz-staging`. La PR #55 reste un brouillon visant la branche de préparation. **Toujours NO-GO pour toute bascule réelle.**
