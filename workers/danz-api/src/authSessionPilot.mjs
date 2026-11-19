@@ -43,9 +43,13 @@ export async function verifyPilotSession(request, env, { nowIso = new Date().toI
   const token = extractSingleCookie(request, PILOT_COOKIE_NAME);
   if (!token || !TOKEN_PATTERN.test(token)) return null;
 
-  if (requireCsrf && request.headers.get("Origin") !== DANZ_ORIGIN) return null;
-  const csrf = requireCsrf ? request.headers.get("X-DANZ-CSRF") : null;
-  if (requireCsrf && (!csrf || !TOKEN_PATTERN.test(csrf))) return null;
+  // Les methodes non idempotentes exigent systematiquement un CSRF valide,
+  // meme si un futur appelant oublie requireCsrf.
+  const safeMethod = request.method === "GET" || request.method === "HEAD";
+  const csrfRequired = requireCsrf || !safeMethod;
+  if (csrfRequired && request.headers.get("Origin") !== DANZ_ORIGIN) return null;
+  const csrf = csrfRequired ? request.headers.get("X-DANZ-CSRF") : null;
+  if (csrfRequired && (!csrf || !TOKEN_PATTERN.test(csrf))) return null;
 
   try {
     const digest = await sha256Hex(token);
@@ -64,7 +68,7 @@ export async function verifyPilotSession(request, env, { nowIso = new Date().toI
     if (!row || row.active !== 1 || row.session_version !== row.current_version) return null;
     if (row.role !== "admin" && row.role !== "member") return null;
 
-    if (requireCsrf) {
+    if (csrfRequired) {
       const csrfDigest = await sha256Hex(csrf);
       if (!constantTimeHexEqual(csrfDigest, row.csrf_digest)) return null;
     }
