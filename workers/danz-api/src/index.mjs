@@ -1,3 +1,4 @@
+import { FINANCE_PILOT_SQL, EXPECTED_PILOT_BALANCES } from "./financePilot.mjs";
 // API de diagnostic, isolee de DANZ en production.
 // Aucun compte membre, mot de passe, acces Supabase ou R2.
 // Seules des lectures de diagnostic sont effectuees sur la base D1 de test.
@@ -111,6 +112,27 @@ export default {
       } catch (_) {
         // Ne jamais exposer la cause interne ou des informations de la base.
         return json({ ok: false, stage: "finance-schema-check", reason: "query_failed", phase }, 503, headers);
+      }
+    }
+
+    // Controle comptable D1 purement synthetique : aucune lecture/ecriture de tables.
+    if (method === "GET" && url.pathname === "/finance-check") {
+      if (!env?.DB) {
+        return json({ ok: false, stage: "synthetic-finance-check", reason: "db_unavailable" }, 503, headers);
+      }
+      try {
+        const result = await env.DB.prepare(FINANCE_PILOT_SQL).first();
+        const fields = ["bank_cents", "cash_cents", "unassigned_cents", "total_cents"];
+        const balances = Object.fromEntries(fields.map(field => [field, Number(result?.[field])]));
+        const ok = fields.every(field =>
+          Number.isSafeInteger(balances[field]) && balances[field] === EXPECTED_PILOT_BALANCES[field]
+        );
+        return json({
+          ok, stage: "synthetic-finance-check", readonly: true,
+          data: "synthetic-only", balances,
+        }, ok ? 200 : 503, headers);
+      } catch (_) {
+        return json({ ok: false, stage: "synthetic-finance-check", reason: "query_failed" }, 503, headers);
       }
     }
 
