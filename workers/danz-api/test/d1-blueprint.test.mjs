@@ -37,7 +37,7 @@ test("le plan SQLite s'exécute en mémoire sans écrire dans Cloudflare",()=>{
     const columns=db.prepare("SELECT COUNT(*) AS n FROM pragma_table_info('mig_profiles')").get().n;
     assert.equal(columns,metadata.tables.find(t=>t.name==="profiles").columns.length);
     const foreignKeyCount=metadata.tables.reduce((n,t)=>n+t.foreignKeys
-      .filter(f=>f.targetSchema==="public" && f.deleteRule!=="d").length+n,0);
+      .filter(f=>f.targetSchema==="public" && f.deleteRule!=="d").length,0);
     assert.equal(generated.publicForeignKeysModeled,foreignKeyCount);
     const foreignKeyStatus=db.prepare("PRAGMA foreign_key_check").all();
     assert.deepEqual(foreignKeyStatus,[]);
