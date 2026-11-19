@@ -7,3 +7,8 @@ dist
 # Données de migration privées et comptes réels : ne jamais commiter.
 migration-private/
 *.migration-export.json
+
+# Donnees DANZ de comparaison privee : jamais dans GitHub
+**/migration/private-*.json
+**/migration/*-snapshot.json
+**/migration/*.secrets.json
