@@ -16,8 +16,11 @@ function fixture(){
   writeFileSync(join(root,"supabase-storage","test-bucket","fake-b.txt"),"fictitious Storage object");
   writeFileSync(join(root,"roles.sql"),"-- fake roles SQL");
   writeFileSync(join(root,"schema.sql"),contract.tables.map(x=>`CREATE TABLE public.${x.name} (id text);\n`).join(""));
-  writeFileSync(join(root,"data.sql"),[
-    ...contract.tables.map(x=>`COPY public.${x.name} (${x.primaryKey.join(", ")}) FROM stdin;\n\\.\n`),
+  // Simuler un dump Supabase CLI (public) + un export PostgreSQL prive
+  // distinct des schemas manages auth et storage.
+  writeFileSync(join(root,"data.sql"),
+    contract.tables.map(x=>`COPY public.${x.name} (${x.primaryKey.join(", ")}) FROM stdin;\n\\.\n`).join(""));
+  writeFileSync(join(root,"managed-data.sql"),[
     "COPY auth.users (id) FROM stdin;\n\\.\n",
     "COPY auth.identities (id, user_id) FROM stdin;\n\\.\n",
     "COPY storage.objects (id) FROM stdin;\n\\.\n",
@@ -44,13 +47,19 @@ test("tous les 36 schémas et 40 blocs de donnees + fichiers SHA256 valident la 
   }finally{rmSync(root,{recursive:true,force:true});}
 });
 
+test("la sauvegarde CLI sans export de schemas geres ne peut pas etre validee", async()=>{
+  await withBackup(root=>rmSync(join(root,"managed-data.sql")),
+    report=>assert.ok(report.issues.includes("missing_managed_data:auth.users")
+      && report.issues.includes("missing_managed_data:storage.objects")));
+});
+
 test("bloc auth.users absent : refuse la sauvegarde incomplète",async()=>{
   const root=fixture();
   try{
     writeFileSync(join(root,"assets-manifest.json"),JSON.stringify(await createManifest(root)));
-    let content=readFileSync(join(root,"data.sql"),"utf8");
+    let content=readFileSync(join(root,"managed-data.sql"),"utf8");
     content=content.replace("COPY auth.users (id) FROM stdin;\n\\.\n","");
-    writeFileSync(join(root,"data.sql"),content);
+    writeFileSync(join(root,"managed-data.sql"),content);
     const report=verifyLocalBackup(root);
     assert.equal(report.ok,false);
     assert.ok(report.issues.includes("missing_managed_data:auth.users"));
@@ -104,7 +113,7 @@ test("COPY tronqué ou dupliqué et ligne à colonnes manquantes bloquent la val
   for (const [mutation,issue] of [
     [s=>s.replace(/\\\.\n$/, ""),"unterminated_copy_block"],
     [s=>s+"COPY public.profiles (id) FROM stdin;\n\\.\n","duplicate_copy_block"],
-    [s=>s.replace("COPY auth.identities (id, user_id) FROM stdin;\n", "COPY auth.identities (id, user_id) FROM stdin;\nsynthetic-only-one-column\n"),"invalid_copy_row_width"],
+    [s=>s.replace("COPY public.profiles (id) FROM stdin;\n", "COPY public.profiles (id) FROM stdin;\nsynthetic-one\tsynthetic-two\n"),"invalid_copy_row_width"],
   ]) {
     await withBackup(root=>writeFileSync(join(root,"data.sql"),mutation(readFileSync(join(root,"data.sql"),"utf8"))),
       report=>assert.ok(report.issues.includes(issue)));
@@ -115,7 +124,7 @@ test("COPY sans clé composée et identités absentes sont refusés",async()=>{
   await withBackup(root=>writeFileSync(join(root,"data.sql"),readFileSync(join(root,"data.sql"),"utf8")
     .replace("COPY public.poll_votes (poll_id, user_id)","COPY public.poll_votes (poll_id)")),
     report=>assert.ok(report.issues.includes("missing_copy_primary_key:poll_votes")));
-  await withBackup(root=>writeFileSync(join(root,"data.sql"),readFileSync(join(root,"data.sql"),"utf8")
+  await withBackup(root=>writeFileSync(join(root,"managed-data.sql"),readFileSync(join(root,"managed-data.sql"),"utf8")
     .replace("COPY auth.identities (id, user_id) FROM stdin;\n\\.\n","")),
     report=>assert.ok(report.issues.includes("missing_managed_data:auth.identities")));
 });
