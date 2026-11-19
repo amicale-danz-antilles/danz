@@ -1,0 +1,250 @@
+{
+  "description": "Schema contract of table names and primary keys. NO personal data, credentials, row counts or content.",
+  "source": "Supabase read-only schema metadata, 2026-11-19",
+  "sourceSchemas": [
+    "public"
+  ],
+  "tables": [
+    {
+      "name": "admin_audit_log",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "association_settings",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "bureau_members",
+      "primaryKey": [
+        "role_key"
+      ]
+    },
+    {
+      "name": "content_attachments",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "documents",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "event_albums",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "events",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "gallery",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "good_deal_submissions",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "good_deals",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "household_charges",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "household_members",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "household_payment_allocations",
+      "primaryKey": [
+        "payment_id",
+        "charge_id"
+      ]
+    },
+    {
+      "name": "household_payments",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "households",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "membership_requests",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "membership_subscriptions",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "news",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "notification_preferences",
+      "primaryKey": [
+        "user_id"
+      ]
+    },
+    {
+      "name": "notification_settings",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "offline_people",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "poll_household_attendance",
+      "primaryKey": [
+        "poll_id",
+        "household_member_id"
+      ]
+    },
+    {
+      "name": "poll_options",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "poll_question_answers",
+      "primaryKey": [
+        "question_id",
+        "user_id"
+      ]
+    },
+    {
+      "name": "poll_questions",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "poll_votes",
+      "primaryKey": [
+        "poll_id",
+        "user_id"
+      ]
+    },
+    {
+      "name": "polls",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "profiles",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "push_subscriptions",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "treasury_entries",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "treasury_event_batches",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "treasury_event_participants",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "treasury_import_archive_lines",
+      "primaryKey": [
+        "batch_id",
+        "source_row"
+      ]
+    },
+    {
+      "name": "treasury_import_batches",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "treasury_opening",
+      "primaryKey": [
+        "id"
+      ]
+    },
+    {
+      "name": "treasury_transfers",
+      "primaryKey": [
+        "id"
+      ]
+    }
+  ],
+  "edgeFunctions": [
+    "admin-data-export",
+    "admin-system-status",
+    "admin-user-management",
+    "approve-membership-request",
+    "danz-assistant",
+    "push-notifications",
+    "r2-media",
+    "request-membership",
+    "send-member-login-link"
+  ],
+  "otherComponents": [
+    "Supabase Auth users and identities/sessions",
+    "Supabase Storage bucket objects",
+    "Cloudflare R2 asset objects",
+    "Cloudflare Worker API",
+    "Push notifications and delivery",
+    "Offline browser cache and service worker"
+  ],
+  "cutoverPolicy": "No production switch before independent encrypted backup, full verified data and functional parity, and approved reversible cutover."
+}
