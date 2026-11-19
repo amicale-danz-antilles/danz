@@ -58,3 +58,23 @@ La sonde de test a été adaptée à `__Host-danz_probe` avec `Secure; HttpOnly;
 Le résultat de cette nouvelle sonde reste à valider sur Firefox professionnel, puis sur les navigateurs mobiles.
 
 Aucun cookie de connexion réel n'est émis ; les sessions, le stockage des identités, les protections CSRF, la déconnexion et le mécanisme de récupération des comptes ne sont pas développés.
+
+### Deuxième test des cookies partitionnés (confirmé)
+
+Firefox professionnel a reçu et retransmis le cookie `__Host-danz_probe` partitionné :
+`{ok:true,step:"check",cookieReceived:true,personalData:false}`.
+Aucun avertissement n'a été transmis dans la sortie de console partagée.
+
+Ce test ne garantit ni les navigateurs mobiles ni la persistance des sessions après un changement de navigateur ; il ne confirme pas la conformité de l'infrastructure aux politiques informatiques militaires.
+
+### Préparation des identités et sessions (non déployée comme auth)
+
+- `migrations/0002_staging_identity_pilot.sql` : trois tables `stg_auth_accounts`, `stg_auth_sessions`, `stg_auth_audit` et un déclencheur de révocation logique via `security_version`. Les tableaux sont vides tant que l'utilisateur n'a pas appliqué cette migration dans `danz-staging`.
+- `migrations/0002_staging_identity_pilot_console.sql` : même SQL sans lignes de commentaires, destiné à la console Cloudflare D1.
+- `src/authSessionPilot.mjs` : vérification de cookie opaque, empreinte SHA-256 du jeton, contrôle D1 des rôles/états, dates d'expiration, révocation, version de sécurité, et protection CSRF facultative pour les futures mutations.
+- `test/auth-session-pilot.test.mjs` : tests entièrement fictifs, sans compte ni cookie réel.
+- `GET /auth-schema-status` : diagnostic **en lecture seule** des trois tables et d'un déclencheur ; ne renvoie aucun contenu.
+
+**Limites :** aucun point d'entrée de connexion n'est activé, aucun mot de passe stocké ou migré, aucune session de membre n'est créée. Il manque le fournisseur d'identité, l'authentification à facteurs multiples, la prévention des tentatives abusives, la création/réinitialisation de compte et l'expédition éventuelle des messages de confirmation.
+
+Avant une vraie migration, réviser le risque des cookies tiers partitionnés, l'hébergement des données de personnels militaires, l'exigence d'accord informatique et la continuité des mots de passe. Ne pas fusionner sur `main` tant que ces points ne sont pas validés.
