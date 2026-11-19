@@ -85,3 +85,25 @@ export async function verifyPilotSession(request, env, { nowIso = new Date().toI
     return null;
   }
 }
+
+/**
+ * Deconnexion de la session courante uniquement.
+ * La requete DOIT etre POST avec Origin et X-DANZ-CSRF valides.
+ * Fonction pilote non exposee par une route du Worker.
+ */
+export async function revokePilotSession(request, env, { nowIso = new Date().toISOString() } = {}) {
+  if (request?.method !== "POST" || !env?.DB) return false;
+  const principal = await verifyPilotSession(request, env, { nowIso, requireCsrf: true });
+  if (!principal) return false;
+  const token = extractSingleCookie(request, PILOT_COOKIE_NAME);
+  if (!token || !TOKEN_PATTERN.test(token)) return false;
+  try {
+    const digest = await sha256Hex(token);
+    const result = await env.DB.prepare(
+      "UPDATE stg_auth_sessions SET revoked_at = ?1 WHERE session_digest = ?2 AND revoked_at IS NULL"
+    ).bind(nowIso, digest).run();
+    return Number(result?.meta?.changes) === 1;
+  } catch (_) {
+    return false;
+  }
+}
