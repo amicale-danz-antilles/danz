@@ -29,8 +29,10 @@ function stable(value) {
     for (const key of Object.keys(value).sort()) out[key] = stable(value[key]);
     return out;
   }
-  if (typeof value === "number" && !Number.isSafeInteger(value)) {
-    // Les sommes en centimes doivent rester des entiers exacts.
+  if (typeof value === "number" &&
+      (!Number.isFinite(value) || (Number.isInteger(value) && !Number.isSafeInteger(value)))) {
+    // Eviter toute perte de precision pour les entiers. Les flottants finis
+    // restent autorises pour les colonnes de mesures non financieres.
     throw new Error("unsafe_number_in_snapshot");
   }
   return value;
