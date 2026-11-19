@@ -13,7 +13,7 @@ test("GET /session-probe autorise uniquement le site DANZ et annonce les credent
   assert.equal(response.headers.get("Access-Control-Allow-Origin"), origin);
   assert.equal(response.headers.get("Access-Control-Allow-Credentials"), "true");
   const cookie = response.headers.get("Set-Cookie") || "";
-  for (const flag of ["HttpOnly", "Secure", "SameSite=None", "Path=/session-probe", "Max-Age=60"]) {
+  for (const flag of ["HttpOnly", "Secure", "SameSite=None", "Path=/", "Partitioned", "__Host-danz_probe=1", "Max-Age=60"]) {
     assert.ok(cookie.includes(flag), flag);
   }
   assert.deepEqual(await response.json(), { ok: true, step: "set", personalData: false });
@@ -21,7 +21,7 @@ test("GET /session-probe autorise uniquement le site DANZ et annonce les credent
 
 test("GET /session-probe ne renvoie aucune valeur de cookie", async () => {
   const response = await worker.fetch(new Request(base + "/session-probe?step=check", {
-    headers: { Origin: origin, Cookie: "danz_probe=1" },
+    headers: { Origin: origin, Cookie: "__Host-danz_probe=1" },
   }), {});
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
@@ -49,6 +49,7 @@ test("GET /session-probe supprime le cookie sans session", async () => {
   }), {});
   assert.equal(response.status, 200);
   assert.ok((response.headers.get("Set-Cookie") || "").includes("Max-Age=0"));
+  assert.ok((response.headers.get("Set-Cookie") || "").includes("Partitioned"));
   assert.equal((await response.json()).personalData, false);
 });
 
