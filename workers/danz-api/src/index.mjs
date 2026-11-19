@@ -136,6 +136,32 @@ export default {
       }
     }
 
+    // Sonde ephemere de cookie cross-site, strictement sans identite ni session.
+    // Sert UNIQUEMENT a valider la compatibilite github.io -> workers.dev.
+    if (method === "GET" && url.pathname === "/session-probe") {
+      if (request.headers.get("Origin") !== DANZ_ORIGIN) {
+        return json({ ok: false, reason: "origin_not_allowed" }, 403, headers);
+      }
+      headers.set("Access-Control-Allow-Credentials", "true");
+      const step = url.searchParams.get("step");
+      if (step === "set") {
+        headers.append("Set-Cookie",
+          "danz_probe=1; Path=/session-probe; Max-Age=60; HttpOnly; Secure; SameSite=None");
+        return json({ ok: true, step: "set", personalData: false }, 200, headers);
+      }
+      if (step === "check") {
+        const received = (request.headers.get("Cookie") || "")
+          .split(";").some(value => value.trim() === "danz_probe=1");
+        return json({ ok: true, step: "check", cookieReceived: received, personalData: false }, 200, headers);
+      }
+      if (step === "clear") {
+        headers.append("Set-Cookie",
+          "danz_probe=; Path=/session-probe; Max-Age=0; HttpOnly; Secure; SameSite=None");
+        return json({ ok: true, step: "clear", personalData: false }, 200, headers);
+      }
+      return json({ ok: false, error: "unknown_probe_step" }, 400, headers);
+    }
+
     if (method === "GET" && (url.pathname === "/" || url.pathname === "/health")) {
       return json({
         ok: true,
