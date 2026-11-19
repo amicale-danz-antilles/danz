@@ -2,13 +2,23 @@
 // Ne jamais commiter les fichiers SQL (dont auth.users), ni les fichiers R2.
 // Usage: node migration/verify-local-backup.mjs /chemin/vers/backup-prive
 // Ce controle ne remplace PAS une restauration complete dans un environnement isole.
-import { readFileSync, statSync, existsSync } from "node:fs";
+import { readFileSync, statSync, existsSync, openSync, readSync, closeSync } from "node:fs";
 import { join, resolve, relative } from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const contract=JSON.parse(readFileSync(new URL("./source-contract.json",import.meta.url),"utf8"));
 const digest=b=>createHash("sha256").update(b).digest("hex");
+const digestFile=filepath=>{
+  // Hachage par blocs pour conserver peu de RAM, y compris avec de gros albums.
+  const h=createHash("sha256"), buffer=Buffer.allocUnsafe(1024*1024);
+  const fd=openSync(filepath,"r");
+  try {
+    let n;
+    while((n=readSync(fd,buffer,0,buffer.length,null))>0)h.update(buffer.subarray(0,n));
+  } finally { closeSync(fd); }
+  return h.digest("hex");
+};
 const safeName=n=>/^[a-z_]+$/.test(n);
 const escaped=n=>n.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
 
@@ -78,7 +88,7 @@ export function verifyLocalBackup(directory,{requireAssets=true}={}) {
           }
           try{
             const stat=statSync(p);
-            if(!stat.isFile()||stat.size!==item.bytes || digest(readFileSync(p))!==item.sha256){
+            if(!stat.isFile()||stat.size!==item.bytes || digestFile(p)!==item.sha256){
               report.issues.push("file_mismatch");continue;
             }
             report.checkedFiles++;
