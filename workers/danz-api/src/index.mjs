@@ -146,17 +146,17 @@ export default {
       const step = url.searchParams.get("step");
       if (step === "set") {
         headers.append("Set-Cookie",
-          "danz_probe=1; Path=/session-probe; Max-Age=60; HttpOnly; Secure; SameSite=None");
+          "__Host-danz_probe=1; Path=/; Max-Age=60; HttpOnly; Secure; SameSite=None; Partitioned");
         return json({ ok: true, step: "set", personalData: false }, 200, headers);
       }
       if (step === "check") {
         const received = (request.headers.get("Cookie") || "")
-          .split(";").some(value => value.trim() === "danz_probe=1");
+          .split(";").some(value => value.trim() === "__Host-danz_probe=1");
         return json({ ok: true, step: "check", cookieReceived: received, personalData: false }, 200, headers);
       }
       if (step === "clear") {
         headers.append("Set-Cookie",
-          "danz_probe=; Path=/session-probe; Max-Age=0; HttpOnly; Secure; SameSite=None");
+          "__Host-danz_probe=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None; Partitioned");
         return json({ ok: true, step: "clear", personalData: false }, 200, headers);
       }
       return json({ ok: false, error: "unknown_probe_step" }, 400, headers);
