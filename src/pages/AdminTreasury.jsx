@@ -8,8 +8,8 @@ import TreasuryV2Preview from './TreasuryV2Preview.jsx'
 import '../treasury-v2.css'
 
 const TABS = [
-  ['preview', 'Nouvelle trésorerie V2 · aperçu'],
-  ['overview', 'Accueil'],
+  ['preview', 'Tableau de bord V2'],
+  ['overview', 'Ancien tableau de bord'],
   ['cashflow', '＋ / − Opérations'],
   ['history', 'Historique'],
   ['events', 'Événements'],
@@ -19,7 +19,7 @@ const TABS = [
 export default function AdminTreasury() {
   const { isAdmin, isTreasurer, loading, refreshProfile } = useAuth()
   const [params] = useSearchParams()
-  const [tab, setTab] = useState(() => TABS.some(([name]) => name === params.get('tab')) ? params.get('tab') : 'overview')
+  const [tab, setTab] = useState(() => TABS.some(([name]) => name === params.get('tab')) ? params.get('tab') : ['income','expense'].includes(params.get('action')) ? 'cashflow' : 'preview')
   const initialAction = ['income','expense'].includes(params.get('action')) ? params.get('action') : ''
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
