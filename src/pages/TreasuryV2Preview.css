@@ -52,3 +52,10 @@
 @media(min-width:780px){.danz-v2-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.danz-panel{padding:18px}.danz-v2-preview{gap:18px}}
 @media(max-width:380px){.danz-v2-grid{gap:7px}.danz-metric{padding:10px}.danz-panel{padding:11px}.danz-subnav button{font-size:.72rem}.danz-batch-footer{grid-template-columns:1fr}.danz-action-row{grid-template-columns:28px minmax(0,1fr) auto;gap:6px}.danz-action-row>span:last-child{display:none}}
 @media(prefers-reduced-motion:reduce){.danz-v2-preview *{scroll-behavior:auto!important;transition:none!important}}
+
+/* Parent navigation wraps instead of requiring horizontal panning. */
+.treasury-v2.danz-v2-active{grid-template-columns:minmax(0,1fr);gap:14px}
+.treasury-v2.danz-v2-active .tv2-tabs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));overflow:visible}
+.treasury-v2.danz-v2-active .tv2-tabs button{min-width:0;min-height:44px;white-space:normal;line-height:1.25;padding:7px 4px}
+.danz-v2-active .tv2-heading-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+@media(max-width:720px){.treasury-v2.danz-v2-active .tv2-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}.danz-v2-active .tv2-page-title{padding:12px;gap:8px}.danz-v2-active .tv2-page-title h1{font-size:1.35rem}.danz-v2-active .tv2-page-title p{font-size:.77rem}.danz-v2-active .tv2-heading-actions{font-size:.75rem}.danz-v2-active .tv2-role{font-size:.65rem;padding:5px 8px}}
