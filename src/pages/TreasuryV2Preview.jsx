@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createWorkspace, summarizeWorkspace, simulateSettlement, parseEuros } from '../lib/treasuryV2Workspace.js'
 import './TreasuryV2Preview.css'
+import TreasuryV2BatchPanel from './TreasuryV2BatchPanel.jsx'
 const euro = cents => (cents/100).toLocaleString('fr-FR',{style:'currency',currency:'EUR'})
 export default function TreasuryV2Preview(){
  const [workspace,setWorkspace]=useState(null)
@@ -40,6 +41,7 @@ export default function TreasuryV2Preview(){
     <div className="danz-v2-total"><span>Trésorerie disponible</span><strong>{euro(summary.available)}</strong><small>Situation simulée au {summary.asOf}</small></div>
     <div className="danz-v2-grid">{[['Banque',summary.bank],['Caisse espèces',summary.cash],['Créances restantes',summary.receivables],['Remboursements dus',summary.payables],['Après réserve des remboursements',summary.afterReserve],['Situation nette projetée',summary.net]].map(([label,cents])=><article key={label}><span>{label}</span><strong>{euro(cents)}</strong></article>)}</div>
     <div className="tv2-panel"><h3>Créances et remboursements</h3><div className="danz-v2-scroll"><table><thead><tr><th>Personne / référence</th><th>Nature</th><th>Initial</th><th>Restant</th></tr></thead><tbody>{summary.residuals.map(i=><tr key={i.id}><td>{i.label}</td><td>{i.kind==='receivable'?'À encaisser':'À rembourser'}</td><td>{euro(i.cents)}</td><td>{euro(i.remaining)}</td></tr>)}</tbody></table></div></div>
+    <TreasuryV2BatchPanel key={workspace.asOf} workspace={workspace} onChange={setWorkspace}/>
     <form className="tv2-panel danz-v2-form" onSubmit={submit}><h3>Simuler une régularisation</h3><label>Créance ou remboursement<select required value={itemId} onChange={e=>setItemId(e.target.value)}><option value="">Sélectionner</option>{remaining.map(i=><option key={i.id} value={i.id}>{i.label} — {euro(i.remaining)}</option>)}</select></label><label>Montant en euros<input required inputMode="decimal" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0,00"/></label><label>Compte<select value={account} onChange={e=>setAccount(e.target.value)}><option value="512">Banque</option><option value="530">Espèces</option></select></label><label>Date<input type="date" min={summary.asOf} required value={date} onChange={e=>setDate(e.target.value)}/></label><button className="primary-button" disabled={!remaining.length}>Simuler le règlement</button>{notice&&<p role="status">{notice}</p>}</form>
     <div className="tv2-panel"><h3>Journal en partie double</h3><div className="danz-v2-scroll"><table><thead><tr><th>Date</th><th>Opération</th><th>Compte</th><th>Débit</th><th>Crédit</th></tr></thead><tbody>{workspace.entries.flatMap(e=>e.lines.map((l,i)=><tr key={e.id+':'+i}><td>{e.date}</td><td>{e.label}</td><td>{l.account}</td><td>{l.side==='D'?euro(l.cents):'—'}</td><td>{l.side==='C'?euro(l.cents):'—'}</td></tr>))}</tbody></table></div><p>Chaque opération est équilibrée et le total des créances et dettes est rapproché du journal.</p></div>
   </>}
