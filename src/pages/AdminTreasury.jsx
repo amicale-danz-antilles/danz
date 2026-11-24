@@ -4,9 +4,11 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { supabase } from '../lib/supabase.js'
 import TreasuryDashboard from './TreasuryDashboard.jsx'
 import LegacyTreasury from './LegacyTreasury.jsx'
+import TreasuryV2Preview from './TreasuryV2Preview.jsx'
 import '../treasury-v2.css'
 
 const TABS = [
+  ['preview', 'Nouvelle trésorerie V2 · aperçu'],
   ['overview', 'Accueil'],
   ['cashflow', '＋ / − Opérations'],
   ['history', 'Historique'],
@@ -63,6 +65,6 @@ export default function AdminTreasury() {
     <nav className="tv2-tabs" aria-label="Sections de la trésorerie">
       {TABS.map(([key, label]) => <button type="button" key={key} className={tab === key ? 'active' : ''} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>{label}</button>)}
     </nav>
-    {tab === 'advanced' ? <div className="tv2-legacy"><LegacyTreasury /></div> : <TreasuryDashboard view={tab} initialAction={initialAction} onAdvanced={() => setTab('advanced')} onView={setTab} />}
+    {tab === 'preview' ? <TreasuryV2Preview /> : tab === 'advanced' ? <div className="tv2-legacy"><LegacyTreasury /></div> : <TreasuryDashboard view={tab} initialAction={initialAction} onAdvanced={() => setTab('advanced')} onView={setTab} />}
   </div>
 }
