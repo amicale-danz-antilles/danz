@@ -24,19 +24,21 @@ export default function TreasuryV2BatchPanel({workspace,onChange}){
    onChange(next);setDraft({});setText('');setNotice(rows.length+' règlement(s) simulé(s), total '+euro(total)+'. Aucun enregistrement en production.')
   }catch(err){setErrors([err.message])}
  }
- return <section className="tv2-panel danz-v2-form">
-  <h3>Encaissements et régularisations collectives</h3>
-  <p>Cocher uniquement les personnes ayant réellement payé. Pour importer un relevé, coller une ligne par personne : Nom Prénom : montant €.</p>
+ return <section className="danz-panel danz-v2-form">
+  <h3>Simuler des règlements collectifs</h3>
+  <p className="danz-muted">Cocher les personnes ayant payé, saisir le montant et choisir le compte. Aucun règlement n’est enregistré en production.</p><details className="danz-import-details"><summary>Coller une liste de règlements</summary><p className="danz-muted">Une ligne par personne : Nom Prénom : montant €.</p>
   <label>Liste des règlements<textarea rows={4} value={text} onChange={e=>setText(e.target.value)} placeholder={'Personne A : 10,00 €\nPersonne B : 5 €'}/></label>
-  <button type="button" className="ghost-button" disabled={!text.trim()} onClick={importList}>Analyser la liste (sans encaisser)</button>
+  <button type="button" className="ghost-button" disabled={!text.trim()} onClick={importList}>Analyser la liste (sans encaisser)</button></details>
   {errors.length>0&&<div role="alert" className="alert error">{errors.map((error,i)=><p key={i}>{error}</p>)}</div>}
   <form onSubmit={submit} className="danz-v2-form">
    <label>Date de règlement<input type="date" min={summary.asOf} value={day} onChange={e=>{setDate(e.target.value);setErrors([])}} required/></label>
-   <div className="danz-v2-scroll"><table><thead><tr><th>Valider</th><th>Personne</th><th>Reste dû</th><th>Reçu (€)</th><th>Compte</th></tr></thead><tbody>
-    {people.map(i=>{const d=draft[i.id]||{};return <tr key={i.id}><td><input type="checkbox" aria-label={'Sélectionner '+i.label} disabled={!i.remaining} checked={!!d.checked} onChange={e=>update(i.id,{checked:e.target.checked,amount:d.amount??(i.remaining/100).toFixed(2)})}/></td><td>{i.label}{!i.remaining?' · Soldé':''}</td><td>{euro(i.remaining)}</td><td><input aria-label={'Montant reçu '+i.label} inputMode="decimal" value={d.amount||''} disabled={!d.checked||!i.remaining} onChange={e=>update(i.id,{amount:e.target.value})}/></td><td><select aria-label={'Compte '+i.label} value={d.account||''} disabled={!d.checked||!i.remaining} onChange={e=>update(i.id,{account:e.target.value})}><option value="">Choisir</option><option value="512">Banque</option><option value="530">Espèces</option></select></td></tr>})}
-   </tbody></table></div>
-   <p>{selected.length} sélectionné(s) · {euro(total)} à encaisser</p>
-   <button className="primary-button" disabled={!valid||!rows.length||errors.length>0}>Simuler la validation du lot</button>
+   <div className="danz-batch-list">
+    {people.map(i=>{const d=draft[i.id]||{};return <article key={i.id} className={'danz-batch-person'+(d.checked&&i.remaining?' is-selected':'')}>
+      <label className="danz-batch-head"><input type="checkbox" disabled={!i.remaining} checked={!!d.checked&&i.remaining>0} onChange={e=>update(i.id,{checked:e.target.checked,amount:d.amount??(i.remaining/100).toFixed(2)})}/><span><b>{i.label}</b><small>{i.remaining?'Reste dû':'Soldé'}</small></span><strong>{euro(i.remaining)}</strong></label>
+      {d.checked&&i.remaining>0&&<div className="danz-batch-fields"><label>Montant reçu (€)<input inputMode="decimal" value={d.amount||''} onChange={e=>update(i.id,{amount:e.target.value})}/></label><label>Compte<select value={d.account||''} onChange={e=>update(i.id,{account:e.target.value})}><option value="">Choisir</option><option value="512">Banque</option><option value="530">Espèces</option></select></label></div>}
+    </article>})}
+   </div>
+   <div className="danz-batch-footer"><div><small>{selected.length} sélectionné(s)</small><strong>{euro(total)}</strong></div><button className="primary-button" disabled={!valid||!rows.length||errors.length>0}>Simuler la validation</button></div>
   </form>{notice&&<p role="status">{notice}</p>}
  </section>
 }
