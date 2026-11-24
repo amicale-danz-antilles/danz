@@ -59,3 +59,21 @@
 .treasury-v2.danz-v2-active .tv2-tabs button{min-width:0;min-height:44px;white-space:normal;line-height:1.25;padding:7px 4px}
 .danz-v2-active .tv2-heading-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
 @media(max-width:720px){.treasury-v2.danz-v2-active .tv2-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}.danz-v2-active .tv2-page-title{padding:12px;gap:8px}.danz-v2-active .tv2-page-title h1{font-size:1.35rem}.danz-v2-active .tv2-page-title p{font-size:.77rem}.danz-v2-active .tv2-heading-actions{font-size:.75rem}.danz-v2-active .tv2-role{font-size:.65rem;padding:5px 8px}}
+
+/* Single settlement list, directional color plus explicit text. */
+.danz-v2-preview .danz-subnav{grid-template-columns:repeat(3,minmax(0,1fr))}
+.danz-unified-totals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.danz-unified-totals>div{display:grid;gap:5px;padding:12px;border:1px solid var(--dv-line);border-radius:12px}
+.danz-unified-totals small{font-size:.76rem;color:var(--dv-muted)}
+.danz-unified-totals strong{font-size:clamp(1.2rem,5vw,1.6rem);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.danz-in{color:#147355}.danz-out{color:#ad453a}
+.danz-unified-person.is-in{border-left:3px solid #299574}.danz-unified-person.is-out{border-left:3px solid #c86051}
+.danz-unified .danz-batch-head>span b{font-size:.86rem;overflow-wrap:anywhere}
+.danz-unified .danz-batch-head>strong{font-size:.9rem}
+.danz-unified .danz-batch-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+.danz-unified .danz-exact{grid-column:1/-1;justify-self:start}
+.danz-unified .danz-overpayment{grid-column:1/-1;display:grid;gap:7px;background:#fff4dc;color:#754b14;padding:10px;border-radius:9px;font-size:.8rem;line-height:1.4}
+.danz-overpayment>span:last-child,.danz-unified .danz-settled-toggle{display:flex;align-items:center;gap:9px;min-height:44px}
+.danz-overpayment input,.danz-settled-toggle input{width:22px;height:22px;accent-color:#19776a;flex:none}
+.danz-unified .danz-batch-footer strong{font-size:1.1rem}
+@media(max-width:350px){.danz-unified .danz-batch-fields{grid-template-columns:1fr}.danz-unified .danz-batch-head{gap:5px;grid-template-columns:24px minmax(0,1fr) auto}}
