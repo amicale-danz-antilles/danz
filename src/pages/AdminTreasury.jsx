@@ -8,12 +8,12 @@ import TreasuryV2Preview from './TreasuryV2Preview.jsx'
 import '../treasury-v2.css'
 
 const TABS = [
-  ['preview', 'Tableau de bord V2'],
-  ['overview', 'Ancien tableau de bord'],
-  ['cashflow', '＋ / − Opérations'],
+  ['preview', 'Accueil V2'],
+  ['overview', 'Ancien accueil'],
+  ['cashflow', 'Opérations'],
   ['history', 'Historique'],
   ['events', 'Événements'],
-  ['export', 'Exportation Excel'],
+  ['export', 'Excel'],
 ]
 
 export default function AdminTreasury() {
@@ -57,10 +57,10 @@ export default function AdminTreasury() {
     </section>
   </div>
 
-  return <div className="treasury-v2">
+  return <div className={'treasury-v2'+(tab==='preview'?' danz-v2-active':'')}>
     <header className="tv2-page-title">
-      <div><span className="tv2-eyebrow">Amicale DANZ · Accès nominatif</span><h1>Finances de l’Amicale</h1><p>Soldes réels, recettes et dépenses, remboursements, historique complet et Excel modifiable.</p></div>
-      <div className="tv2-heading-actions"><span className="tv2-role">Administrateur + Trésorier</span><Link className="ghost-button tv2-people-link" to="/administration/utilisateurs">Gérer les utilisateurs et les doublons →</Link></div>
+      <div><span className="tv2-eyebrow">Amicale DANZ · Accès nominatif</span><h1>Finances de l’Amicale</h1><p>Trésorerie et gestion financière.</p></div>
+      <div className="tv2-heading-actions"><span className="tv2-role">Administrateur + Trésorier</span><Link className="ghost-button tv2-people-link" to="/administration/utilisateurs">Utilisateurs →</Link></div>
     </header>
     <nav className="tv2-tabs" aria-label="Sections de la trésorerie">
       {TABS.map(([key, label]) => <button type="button" key={key} className={tab === key ? 'active' : ''} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>{label}</button>)}
