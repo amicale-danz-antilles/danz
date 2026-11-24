@@ -37,7 +37,7 @@ export default function TreasuryV2Preview(){
  useEffect(()=>{loadReference();return()=>{loadSequence.current++}},[loadReference])
  const summary=workspace?summarizeWorkspace(workspace):null
  const reset=()=>{loadReference()}
- const applySimulation=next=>{setWorkspace(next);setSimulated(true)}
+ const applySimulation=next=>{setWorkspace(next);setSimulated(true);setDate(summarizeWorkspace(next).asOf)}
  const read=async event=>{
   const file=event.target.files?.[0];event.target.value='';if(!file)return
   const seq=++loadSequence.current;setLoading(true);setError('');setNotice('')
@@ -96,7 +96,7 @@ export default function TreasuryV2Preview(){
    </>}
    {section==='receipts'&&<>
     <section className="danz-panel"><div className="danz-panel-heading"><div><h3>Paiements en attente</h3><small>{debtors.length} personne(s)</small></div><strong className="danz-section-total">{euro(summary.receivables)}</strong></div><label className="danz-field">Rechercher une personne<input type="search" value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Nom ou prénom"/></label><ul className="danz-person-list">{visibleDebtors.map(i=><li key={i.id}><div><b>{i.label}</b><small>{i.remaining===i.cents?'En attente':'Partiellement réglé · initial '+euro(i.cents)}</small></div><strong>{euro(i.remaining)}</strong></li>)}</ul>{!visibleDebtors.length&&<p>Aucun paiement correspondant.</p>}</section>
-    <TreasuryV2BatchPanel key={generation} workspace={workspace} onChange={applySimulation}/>
+    <details className="danz-panel danz-tools"><summary>Simuler des règlements groupés</summary><TreasuryV2BatchPanel key={generation} workspace={workspace} onChange={applySimulation}/></details>
    </>}
    {section==='refunds'&&<section className="danz-panel"><div className="danz-panel-heading"><h3>Remboursements dus</h3><strong className="danz-section-total">{euro(summary.payables)}</strong></div><ul className="danz-person-list">{payables.map(i=><li key={i.id}><div><b>{i.label}</b><small>À rembourser</small></div><strong>{euro(i.remaining)}</strong></li>)}</ul>{!payables.length&&<p>Aucun remboursement en attente.</p>}
     <form className="danz-v2-form" onSubmit={submit}><h3>Simuler un remboursement</h3><label>Personne<select required value={itemId} onChange={e=>setItemId(e.target.value)}><option value="">Sélectionner</option>{payables.map(i=><option key={i.id} value={i.id}>{i.label} — {euro(i.remaining)}</option>)}</select></label><label>Montant en euros<input required inputMode="decimal" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0,00"/></label><label>Compte<select value={account} onChange={e=>setAccount(e.target.value)}><option value="512">Banque</option><option value="530">Espèces</option></select></label><label>Date<input type="date" min={summary.asOf} required value={date} onChange={e=>setDate(e.target.value)}/></label><button className="primary-button" disabled={!payables.length||!payables.some(i=>i.id===itemId)}>Simuler le remboursement</button>{notice&&<p role="status">{notice}</p>}</form>
