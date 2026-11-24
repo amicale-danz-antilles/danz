@@ -2,7 +2,7 @@ import { parseEuros, simulateSettlement, summarizeWorkspace } from './treasuryV2
 const normalize = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('fr').replace(/[^\p{L}\p{N}]+/gu,' ').trim()
 const nameKey = value => normalize(value).split(' ').sort().join(' ')
 const clean = line => line.trim().replace(/^[-•*]\s*/, '')
-export function parseReceiptList(text, workspace) {
+export function parseReceiptList(text, workspace, {allowOverpayment=false}={}) {
  if(typeof text!=='string'||text.length>30000) throw new Error('Liste invalide ou trop volumineuse')
  const items=summarizeWorkspace(workspace).residuals.filter(i=>i.kind==='receivable')
  const rows=[], errors=[], seen=new Set()
@@ -17,7 +17,7 @@ export function parseReceiptList(text, workspace) {
   let cents
   try{cents=parseEuros(match[2])}catch{errors.push('Ligne '+(index+1)+' : montant invalide');continue}
   if(seen.has(item.id)){errors.push('Ligne '+(index+1)+' : doublon');continue}
-  if(cents>item.remaining){errors.push('Ligne '+(index+1)+' : montant supérieur au reste dû');continue}
+  if(!item.remaining||(!allowOverpayment&&cents>item.remaining)){errors.push('Ligne '+(index+1)+' : montant supérieur au reste dû');continue}
   seen.add(item.id);rows.push({itemId:item.id,label:item.label,cents})
  }
  return {rows,errors}
@@ -31,6 +31,17 @@ export function applyReceiptBatch(workspace, batch) {
   if(!initial.residuals.some(i=>i.id===row.itemId&&i.kind==='receivable'))throw new Error('Créance inconnue')
   seen.add(row.itemId)
   next=simulateSettlement(next,{id:batch.id+':'+index,itemId:row.itemId,cents:row.cents,account:row.account,date:batch.date})
+ }
+ return next
+}
+
+export function applySettlementBatch(workspace,batch){
+ if(!batch||typeof batch.id!=='string'||!batch.id.trim()||batch.id.length>100||!Array.isArray(batch.rows)||batch.rows.length<1||batch.rows.length>100)throw new Error('Lot invalide')
+ const seen=new Set();let next=workspace
+ for(const [index,row] of batch.rows.entries()){
+  if(!row||seen.has(row.itemId))throw new Error('Personne ou dette présente plusieurs fois')
+  seen.add(row.itemId)
+  next=simulateSettlement(next,{id:batch.id+':'+index,itemId:row.itemId,cents:row.cents,account:row.account,date:batch.date,allowOverpayment:row.allowOverpayment===true})
  }
  return next
 }
