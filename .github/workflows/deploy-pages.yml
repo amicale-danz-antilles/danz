@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: 22
       - name: Installer les dépendances
-        run: npm install --no-fund --no-audit
+        run: npm ci --no-fund --no-audit
       - name: Bloquer un déploiement avec vulnérabilité haute
         run: npm audit --audit-level=high
       - name: Construire l'application

@@ -1,6 +1,28 @@
 const PREFIX='danz-offline-v2'
 const LEGACY_PREFIXES=['danz-offline-v1:']
 const PRIVATE_MEDIA_CACHE='danz-private-thumbs-v2'
+const EPOCH_PREFIX='danz-offline-epoch:'
+const userEpochs=new Map()
+const observedEpochs=new Map()
+let epochSequence=0
+const newEpoch=()=>globalThis.crypto?.randomUUID?.()||`${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${++epochSequence}`
+
+// Clearing a user's cache immediately invalidates every in-flight sync, even
+// before React has unmounted it. Epochs also separate later sessions' media.
+export function getOfflineDataEpoch(userId){
+ const store=storage()
+ try{
+  const persisted=store?.getItem(`${EPOCH_PREFIX}${userId}`)
+  if(persisted&&persisted!==observedEpochs.get(userId)){
+   observedEpochs.set(userId,persisted)
+   userEpochs.set(userId,persisted)
+  }
+ }catch{}
+ if(!userEpochs.has(userId))userEpochs.set(userId,newEpoch())
+ const epoch=userEpochs.get(userId)
+ try{if(store){store.setItem(`${EPOCH_PREFIX}${userId}`,epoch);observedEpochs.set(userId,epoch)}}catch{}
+ return epoch
+}
 
 // Les copies textuelles restent disponibles trois semaines. Elles sont remplacées
 // dès qu'une synchronisation plus récente réussit et supprimées à la déconnexion.
@@ -42,7 +64,13 @@ export function readOfflineData(userId,name){
 }
 
 export function clearOfflineData(userId){
- const store=storage();if(store&&userId){
+ const store=storage()
+ if(userId){
+  const epoch=newEpoch()
+  userEpochs.set(userId,epoch)
+  try{if(store){store.setItem(`${EPOCH_PREFIX}${userId}`,epoch);observedEpochs.set(userId,epoch)}}catch{}
+ }
+ if(store&&userId){
   try{
    const prefixes=[`${PREFIX}:${userId}:`,...LEGACY_PREFIXES.map(prefix=>`${prefix}${userId}:`)]
    for(let i=store.length-1;i>=0;i-=1){const k=store.key(i);if(k&&prefixes.some(prefix=>k.startsWith(prefix)))store.removeItem(k)}
@@ -54,8 +82,11 @@ export function clearOfflineData(userId){
    const mediaMarker=`/danz/offline-media/${encodeURIComponent(userId)}/`
    const legacyMarker=`/danz/offline-thumb/${encodeURIComponent(userId)}/`
    await Promise.all(requests.filter(request=>{
-    const path=new URL(request.url).pathname
-    return path.startsWith(mediaMarker)||path.startsWith(legacyMarker)
+    const url=new URL(request.url)
+    const path=url.pathname
+    if(!path.startsWith(mediaMarker)&&!path.startsWith(legacyMarker))return false
+    // A delayed purge must not remove media written by a later login.
+    return url.searchParams.get('danz-epoch')!==getOfflineDataEpoch(userId)
    }).map(request=>cache.delete(request)))
   }).catch(()=>{})
  }

@@ -7,3 +7,6 @@ dist
 # Données de migration privées et comptes réels : ne jamais commiter.
 migration-private/
 *.migration-export.json
+
+/cloudflare-dist/
+/cloudflare-dist.tmp/

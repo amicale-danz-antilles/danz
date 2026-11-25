@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase.js'
-import { readOfflineData, saveOfflineData } from '../lib/offlineCache.js'
+import { getOfflineDataEpoch, saveOfflineData } from '../lib/offlineCache.js'
 import { resolvePrivateMediaBatch } from '../lib/mediaStorage.js'
 import useOnlineStatus from '../hooks/useOnlineStatus.js'
 
@@ -13,51 +13,73 @@ const EVENT_HISTORY_DAYS = 120
 const mediaVersion = (value) => String(value || 'v1').replace(/[^a-zA-Z0-9]/g, '').slice(-36) || 'v1'
 const mediaPath = (userId, scope, id, version) => `/danz/offline-media/${encodeURIComponent(userId)}/${encodeURIComponent(scope)}/${encodeURIComponent(id)}-${mediaVersion(version)}`
 
-async function findExistingMedia(userId, scope, id) {
-  if (!('caches' in window)) return null
+async function findExistingMedia(userId, scope, id, sync) {
+  if (!('caches' in window) || !sync.isCurrent()) return null
   try {
     const cache = await caches.open(PRIVATE_MEDIA_CACHE)
+    if (!sync.isCurrent()) return null
     const prefix = `/danz/offline-media/${encodeURIComponent(userId)}/${encodeURIComponent(scope)}/${encodeURIComponent(id)}-`
     const requests = await cache.keys()
-    const existing = requests.find((request) => new URL(request.url).pathname.startsWith(prefix))
-    return existing ? new URL(existing.url).pathname : null
+    if (!sync.isCurrent()) return null
+    const existing = requests.find((request) => {
+      const url = new URL(request.url)
+      const epoch = url.searchParams.get('danz-epoch')
+      return url.pathname.startsWith(prefix) && (!epoch || epoch === sync.epoch)
+    })
+    if (!existing) return null
+    const url = new URL(existing.url)
+    return url.pathname + url.search
   } catch { return null }
 }
 
-async function cachePrivateMedia(userId, scope, item, sourceUrl, version) {
-  if (!('caches' in window)) return null
-  const existing = await findExistingMedia(userId, scope, item.id)
+async function cachePrivateMedia(userId, scope, item, sourceUrl, version, sync) {
+  if (!('caches' in window) || !sync.isCurrent()) return null
+  const existing = await findExistingMedia(userId, scope, item.id, sync)
+  if (!sync.isCurrent()) return null
   const declaredSize = Number(item.file_size || 0)
   if (!sourceUrl || (declaredSize && declaredSize > MAX_OFFLINE_MEDIA)) return existing
   try {
     const response = await fetch(sourceUrl, { cache: 'no-store' })
+    if (!sync.isCurrent()) return null
     if (!response.ok) return existing
     const blob = await response.blob()
+    if (!sync.isCurrent()) return null
     if (blob.size > MAX_OFFLINE_MEDIA) return existing
-    const path = mediaPath(userId, scope, item.id, version)
+    const path = `${mediaPath(userId, scope, item.id, version)}?danz-epoch=${encodeURIComponent(sync.epoch)}&danz-sync=${encodeURIComponent(sync.token)}`
     const cache = await caches.open(PRIVATE_MEDIA_CACHE)
+    if (!sync.isCurrent()) return null
     const headers = new Headers({
       'Content-Type': blob.type || item.mime_type || 'image/jpeg',
       'Cache-Control': 'private, max-age=1814400',
       'X-Danz-Cached-At': new Date().toISOString(),
     })
-    await cache.put(new Request(new URL(path, window.location.origin)), new Response(blob, { headers }))
+    const request = new Request(new URL(path, window.location.origin))
+    if (!sync.isCurrent()) return null
+    await cache.put(request, new Response(blob, { headers }))
+    if (!sync.isCurrent()) {
+      // The key belongs only to this sync. Never delete a newer session's copy.
+      await cache.delete(request)
+      return null
+    }
     return path
-  } catch { return existing }
+  } catch { return sync.isCurrent() ? existing : null }
 }
 
-async function prunePrivateMedia(userId, keepPaths) {
-  if (!('caches' in window)) return
+async function prunePrivateMedia(userId, keepPaths, sync) {
+  if (!('caches' in window) || !sync.isCurrent()) return
   try {
     const cache = await caches.open(PRIVATE_MEDIA_CACHE)
+    if (!sync.isCurrent()) return
     const requests = await cache.keys()
+    if (!sync.isCurrent()) return
     const marker = `/danz/offline-media/${encodeURIComponent(userId)}/`
     const legacyMarker = `/danz/offline-thumb/${encodeURIComponent(userId)}/`
     await Promise.all(requests.filter((request) => {
-      const path = new URL(request.url).pathname
+      const url = new URL(request.url)
+      const path = url.pathname
       if (path.startsWith(legacyMarker)) return true
-      return path.startsWith(marker) && !keepPaths.has(path)
-    }).map((request) => cache.delete(request)))
+      return path.startsWith(marker) && !keepPaths.has(path + url.search)
+    }).map((request) => sync.isCurrent() ? cache.delete(request) : Promise.resolve(false)))
   } catch {}
 }
 
@@ -71,15 +93,27 @@ const offlineAlbumMeta = (album) => album ? {
 
 export default function OfflineDataSync({ userId }) {
   const online = useOnlineStatus()
+  const activeUserId = useRef(userId)
+  activeUserId.current = userId
 
   useEffect(() => {
     if (!userId || !online || !supabase) return undefined
     let cancelled = false
     let running = false
     let lastRunAt = 0
+    const epoch = getOfflineDataEpoch(userId)
+    const sync = {
+      epoch,
+      token: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      isCurrent: () => !cancelled && activeUserId.current === userId && getOfflineDataEpoch(userId) === epoch,
+    }
+    const save = (name, data) => { if (sync.isCurrent()) saveOfflineData(userId, name, data) }
+    const { data: authListener } = supabase.auth.onAuthStateChange((_, nextSession) => {
+      if (nextSession?.user?.id !== userId) cancelled = true
+    })
 
     const syncOnce = async (force = false) => {
-      if (cancelled || running || !navigator.onLine) return
+      if (!sync.isCurrent() || running || !navigator.onLine) return
       if (!force && Date.now() - lastRunAt < MIN_REFRESH_GAP_MS) return
       running = true
       lastRunAt = Date.now()
@@ -94,10 +128,10 @@ export default function OfflineDataSync({ userId }) {
           supabase.from('news').select('id,title,summary,content,audience,publish_at,published_at,created_at').eq('published', true).order('publish_at', { ascending: false }).limit(8),
           supabase.from('bureau_members').select('role_key,role_label,full_name,sort_order').order('sort_order'),
         ])
-        if (cancelled) return
+        if (!sync.isCurrent()) return
 
         const deals = dealsResult.data || []
-        if (!dealsResult.error) saveOfflineData(userId, 'good-deals', deals)
+        if (!dealsResult.error) save('good-deals', deals)
 
         const polls = pollsResult.data || []
         if (!pollsResult.error && polls.length) {
@@ -113,8 +147,9 @@ export default function OfflineDataSync({ userId }) {
               ? supabase.from('poll_question_answers').select('poll_id,question_id,answer_boolean,answer_number,answer_text').eq('user_id', userId).in('poll_id', questionnaireIds)
               : Promise.resolve({ data: [], error: null }),
           ])
+          if (!sync.isCurrent()) return
           if (!optionsResult.error && !votesResult.error && !questionsResult.error && !questionnaireAnswersResult.error) {
-            saveOfflineData(userId, 'polls', {
+            save('polls', {
               polls,
               options: optionsResult.data || [],
               votes: votesResult.data || [],
@@ -123,20 +158,22 @@ export default function OfflineDataSync({ userId }) {
             })
           }
         } else if (!pollsResult.error) {
-          saveOfflineData(userId, 'polls', { polls: [], options: [], votes: [], questions: [], questionAnswers: [] })
+          save('polls', { polls: [], options: [], votes: [], questions: [], questionAnswers: [] })
         }
 
         const albums = albumsResult.data || []
         const albumUrls = !albumsResult.error ? await resolvePrivateMediaBatch(albums, { entity: 'album', fallbackBucket: 'gallery' }) : new Map()
+        if (!sync.isCurrent()) return
         const offlineAlbums = []
         const albumByEvent = new Map()
         if (!albumsResult.error) {
           for (const album of albums) {
-            if (cancelled) return
+            if (!sync.isCurrent()) return
             const event = album.event
             if (!event) continue
             const sourceUrl = albumUrls.get(album.id) || album.image_url || null
-            const offlineThumb = await cachePrivateMedia(userId, 'album', album, sourceUrl, album.updated_at || album.file_size)
+            const offlineThumb = await cachePrivateMedia(userId, 'album', album, sourceUrl, album.updated_at || album.file_size, sync)
+            if (!sync.isCurrent()) return
             if (offlineThumb) keepMedia.add(offlineThumb)
             const row = {
               id: album.id,
@@ -151,7 +188,7 @@ export default function OfflineDataSync({ userId }) {
             offlineAlbums.push(row)
             albumByEvent.set(album.event_id, row)
           }
-          saveOfflineData(userId, 'albums', offlineAlbums)
+          save('albums', offlineAlbums)
         }
 
         const events = eventsResult.data || []
@@ -169,6 +206,7 @@ export default function OfflineDataSync({ userId }) {
             : Promise.resolve({ data: [], error: null }),
         ])
 
+        if (!sync.isCurrent()) return
         const eventAssets = eventAssetsResult.data || []
         const newsAssets = newsAssetsResult.data || []
         const newsCoverAssets = newsAssets.filter((asset) => asset.is_cover)
@@ -177,31 +215,36 @@ export default function OfflineDataSync({ userId }) {
           newsAssetsResult.error ? Promise.resolve(new Map()) : resolvePrivateMediaBatch(newsCoverAssets, { entity: 'attachment', fallbackBucket: 'content' }),
         ])
 
+        if (!sync.isCurrent()) return
         const eventAssetByEvent = new Map(eventAssets.map((asset) => [asset.event_id, asset]))
         const agendaAlbums = {}
         const agendaCovers = {}
         for (const event of events) {
+          if (!sync.isCurrent()) return
           const album = albumByEvent.get(event.id)
           if (album) agendaAlbums[event.id] = offlineAlbumMeta(album)
           const explicit = eventAssetByEvent.get(event.id)
           let cover = album?.offline_thumb || null
           if (explicit) {
             const sourceUrl = eventAssetUrls.get(explicit.id) || null
-            const cached = await cachePrivateMedia(userId, 'event', explicit, sourceUrl, explicit.id)
+            const cached = await cachePrivateMedia(userId, 'event', explicit, sourceUrl, explicit.id, sync)
+            if (!sync.isCurrent()) return
             if (cached) { keepMedia.add(cached); cover = cached }
           }
           if (cover) agendaCovers[event.id] = cover
         }
-        if (!eventsResult.error) saveOfflineData(userId, 'agenda', { items: events, albums: agendaAlbums, covers: agendaCovers })
+        if (!eventsResult.error) save('agenda', { items: events, albums: agendaAlbums, covers: agendaCovers })
 
         const dashboardNews = []
         if (!newsResult.error) {
           for (const item of news) {
+            if (!sync.isCurrent()) return
             const assets = newsAssets.filter((asset) => asset.news_id === item.id)
             const coverAsset = assets.find((asset) => asset.is_cover)
             let cover = null
             if (coverAsset) {
-              cover = await cachePrivateMedia(userId, 'news', coverAsset, newsCoverUrls.get(coverAsset.id) || null, coverAsset.id)
+              cover = await cachePrivateMedia(userId, 'news', coverAsset, newsCoverUrls.get(coverAsset.id) || null, coverAsset.id, sync)
+              if (!sync.isCurrent()) return
               if (cover) keepMedia.add(cover)
             }
             dashboardNews.push({ ...item, cover, assets: assets.map((asset) => ({ id: asset.id, file_name: asset.file_name, is_cover: asset.is_cover, mime_type: asset.mime_type, file_size: asset.file_size })) })
@@ -214,13 +257,13 @@ export default function OfflineDataSync({ userId }) {
             cover: agendaCovers[event.id] || null,
             album: offlineAlbumMeta(albumByEvent.get(event.id)),
           }))
-          saveOfflineData(userId, 'dashboard', { news: dashboardNews, events: dashboardEvents, bureau: bureauResult.data || [] })
+          save('dashboard', { news: dashboardNews, events: dashboardEvents, bureau: bureauResult.data || [] })
         }
 
         const mediaSyncComplete = !albumsResult.error && !eventsResult.error && !newsResult.error && !eventAssetsResult.error && !newsAssetsResult.error
-        if (mediaSyncComplete) await prunePrivateMedia(userId, keepMedia)
+        if (mediaSyncComplete) await prunePrivateMedia(userId, keepMedia, sync)
 
-        saveOfflineData(userId, 'offline-sync', {
+        save('offline-sync', {
           syncedAt: new Date().toISOString(),
           retentionDays: 21,
           goodDeals: dealsResult.error ? null : deals.length,
@@ -241,6 +284,7 @@ export default function OfflineDataSync({ userId }) {
     document.addEventListener('visibilitychange', onVisible)
     return () => {
       cancelled = true
+      authListener.subscription.unsubscribe()
       window.clearTimeout(timer)
       window.clearInterval(interval)
       window.removeEventListener('focus', onVisible)

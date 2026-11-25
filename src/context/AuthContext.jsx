@@ -1,15 +1,20 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { clearOfflineData, readOfflineData, saveOfflineData } from '../lib/offlineCache.js'
+import { clearPrivateMediaUrlCache } from '../lib/mediaStorage.js'
+import useOnlineStatus from '../hooks/useOnlineStatus.js'
 
 const AuthContext = createContext(null)
 const PROFILE_FIELDS = '*'
 const PROFILE_TIMEOUT_MS = 9000
 
-const withTimeout = (promise, timeoutMs = PROFILE_TIMEOUT_MS) => Promise.race([
-  promise,
-  new Promise((_, reject) => window.setTimeout(() => reject(new Error('timeout')), timeoutMs)),
-])
+const withTimeout = (promise, timeoutMs = PROFILE_TIMEOUT_MS) => {
+  let timer
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => { timer = window.setTimeout(() => reject(new Error('timeout')), timeoutMs) }),
+  ]).finally(() => window.clearTimeout(timer))
+}
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
@@ -17,14 +22,37 @@ export function AuthProvider({ children }) {
   const [sessionReady, setSessionReady] = useState(false)
   const [profileUserId, setProfileUserId] = useState(null)
   const [profileRevision, setProfileRevision] = useState(0)
+  const [verifiedProfileUserId, setVerifiedProfileUserId] = useState(null)
+  const online = useOnlineStatus()
+  const sessionUserId = useRef(null)
+  const sessionRevision = useRef(0)
+  const identityRevision = useRef(0)
+
+  const applySession = useCallback((nextSession) => {
+    const nextUserId = nextSession?.user?.id || null
+    const previousUserId = sessionUserId.current
+    if (previousUserId !== nextUserId) {
+      identityRevision.current += 1
+      clearPrivateMediaUrlCache()
+      if (previousUserId && !nextUserId) clearOfflineData(previousUserId)
+      setProfile(null)
+      setProfileUserId(null)
+      setVerifiedProfileUserId(null)
+    }
+    sessionUserId.current = nextUserId
+    sessionRevision.current += 1
+    setSession(nextSession)
+    setSessionReady(true)
+  }, [])
 
   useEffect(() => {
     if (!supabase) { setSessionReady(true); return undefined }
     let mounted = true
 
+    const initialRevision = sessionRevision.current
     withTimeout(supabase.auth.getSession()).then(({ data, error }) => {
       if (!mounted) return
-      if (!error) setSession(data.session)
+      if (!error && sessionRevision.current === initialRevision) applySession(data.session)
       setSessionReady(true)
     }).catch(() => {
       if (!mounted) return
@@ -33,19 +61,12 @@ export function AuthProvider({ children }) {
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!mounted) return
-      setSession(nextSession)
-      setSessionReady(true)
-      if (!nextSession?.user) {
-        setProfile(null)
-        setProfileUserId(null)
-        return
-      }
-      setProfileUserId((current) => current === nextSession.user.id ? current : null)
-      if (event === 'SIGNED_IN' || event === 'USER_UPDATED') setProfileRevision((value) => value + 1)
+      applySession(nextSession)
+      if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') setProfileRevision((value) => value + 1)
     })
 
     return () => { mounted = false; listener.subscription.unsubscribe() }
-  }, [])
+  }, [applySession])
 
   useEffect(() => {
     if (!supabase || !sessionReady) return undefined
@@ -56,58 +77,68 @@ export function AuthProvider({ children }) {
       if (!currentUserId) {
         setProfile(null)
         setProfileUserId(null)
+        setVerifiedProfileUserId(null)
         return
       }
 
-      const cached = readOfflineData(currentUserId, 'profile')
-      if (!navigator.onLine && cached?.active) {
+      const requestIdentity = identityRevision.current
+      const isCurrent = () => !cancelled && sessionUserId.current === currentUserId && identityRevision.current === requestIdentity
+      const storedProfile = readOfflineData(currentUserId, 'profile')
+      const cached = storedProfile?.id === currentUserId && storedProfile.active === true ? storedProfile : null
+      if (!online) {
         setProfile(cached)
+        setVerifiedProfileUserId(null)
         setProfileUserId(currentUserId)
         return
       }
 
       try {
         const { data, error } = await withTimeout(supabase.from('profiles').select(PROFILE_FIELDS).eq('id', currentUserId).maybeSingle())
-        if (cancelled) return
+        if (!isCurrent()) return
         if (error) throw error
 
-        if (!data?.active) {
+        if (data?.id !== currentUserId || !data?.active) {
           clearOfflineData(currentUserId)
           setProfile(null)
+          setVerifiedProfileUserId(null)
           setProfileUserId(currentUserId)
           await supabase.auth.signOut({ scope: 'local' })
           return
         }
 
         setProfile(data)
+        setVerifiedProfileUserId(currentUserId)
         setProfileUserId(currentUserId)
         saveOfflineData(currentUserId, 'profile', data)
       } catch (_) {
-        if (cancelled) return
-        if (cached?.active) setProfile(cached)
+        if (!isCurrent()) return
+        setProfile(cached)
+        setVerifiedProfileUserId(null)
         setProfileUserId(currentUserId)
       }
     }
 
     loadProfile()
     return () => { cancelled = true }
-  }, [session?.user?.id, sessionReady, profileRevision])
+  }, [session?.user?.id, sessionReady, profileRevision, online])
 
   useEffect(() => {
     if (!supabase) return undefined
     let refreshing = false
+    let cancelled = false
     const refreshOnResume = async () => {
       if (refreshing || document.visibilityState === 'hidden') return
       refreshing = true
       try {
-        const { data } = await withTimeout(supabase.auth.getSession(), 6000)
-        if (data?.session) {
-          setSession(data.session)
-          setProfileUserId((current) => current === data.session.user.id ? current : null)
-          setProfileRevision((value) => value + 1)
-        }
+        const revision = sessionRevision.current
+        const { data, error } = await withTimeout(supabase.auth.getSession(), 6000)
+        if (cancelled || sessionRevision.current !== revision) return
+        if (error) throw error
+        applySession(data?.session || null)
+        setProfileRevision((value) => value + 1)
       } catch (_) {
-        // Le profil mis en cache reste utilisable si le réseau tarde à revenir.
+        // Le cache permet la lecture, jamais l'administration sans profil vérifié.
+        if (!cancelled) setVerifiedProfileUserId(null)
       } finally {
         refreshing = false
       }
@@ -116,31 +147,43 @@ export function AuthProvider({ children }) {
     window.addEventListener('pageshow', refreshOnResume)
     document.addEventListener('visibilitychange', onVisibility)
     return () => {
+      cancelled = true
       window.removeEventListener('pageshow', refreshOnResume)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [])
+  }, [applySession])
 
   const loading = !sessionReady || Boolean(session?.user?.id && profileUserId !== session.user.id)
+
+  const currentUserId = session?.user?.id || null
+  const profileMatchesUser = Boolean(currentUserId && profileUserId === currentUserId && profile?.id === currentUserId)
+  const verifiedAdmin = online && profileMatchesUser && verifiedProfileUserId === currentUserId && profile?.role === 'admin' && profile?.active === true
 
   const value = useMemo(() => ({
     session,
     user: session?.user ?? null,
     profile,
-    isAdmin: profile?.role === 'admin' && profile?.active === true,
-    isTreasurer: profile?.role === 'admin' && profile?.active === true && profile?.is_treasurer === true,
-    hasAccess: profile?.active === true,
+    isAdmin: verifiedAdmin,
+    isTreasurer: verifiedAdmin && profile?.is_treasurer === true,
+    hasAccess: profileMatchesUser && profile?.active === true,
     loading,
     configured: isSupabaseConfigured,
     refreshProfile: () => setProfileRevision((value) => value + 1),
     signIn: async (email, password) => {
       if (!supabase) throw new Error('Supabase n’est pas encore configuré.')
       const normalizedEmail = email.trim().toLowerCase()
+      const startRevision = sessionRevision.current
       const { data, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password })
       if (error) throw error
+      if (sessionRevision.current === startRevision) applySession(data.session)
+      const signedInUserId = data.user.id
+      const signedInIdentity = identityRevision.current
+      const stillSignedIn = () => sessionUserId.current === signedInUserId && identityRevision.current === signedInIdentity
+      if (!stillSignedIn()) throw new Error('La session a changé. Reconnectez-vous.')
 
       const { data: accountProfile, error: profileError } = await supabase.from('profiles').select(PROFILE_FIELDS).eq('id', data.user.id).maybeSingle()
-      if (profileError || !accountProfile) {
+      if (!stillSignedIn()) throw new Error('La session a changé. Reconnectez-vous.')
+      if (profileError || accountProfile?.id !== signedInUserId) {
         await supabase.auth.signOut({ scope: 'local' })
         throw new Error('Votre profil utilisateur est introuvable. Contactez un administrateur.')
       }
@@ -152,7 +195,7 @@ export function AuthProvider({ children }) {
       saveOfflineData(data.user.id, 'profile', accountProfile)
       setProfile(accountProfile)
       setProfileUserId(data.user.id)
-      setSession(data.session)
+      setVerifiedProfileUserId(data.user.id)
     },
     requestMembership: async ({ firstName, lastName, applicantType, email, password }) => {
       if (!supabase) throw new Error('Supabase n’est pas encore configuré.')
@@ -191,11 +234,11 @@ export function AuthProvider({ children }) {
     },
     signOut: async () => {
       if (session?.user?.id) clearOfflineData(session.user.id)
-      setProfile(null)
-      setProfileUserId(null)
+      clearPrivateMediaUrlCache()
+      applySession(null)
       if (supabase) await supabase.auth.signOut()
     },
-  }), [session, profile, loading])
+  }), [session, profile, loading, profileMatchesUser, verifiedAdmin, applySession])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
