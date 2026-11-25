@@ -20,7 +20,7 @@ try{
  await writeFile(path.join(tmp,'_redirects'),'/ /danz/ 302\n')
  await writeFile(path.join(tmp,'index.html'),'<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Amicale DANZ Antilles</title></head><body><a href="/danz/">Accéder à l’Amicale DANZ</a></body></html>\n')
  await writeFile(path.join(tmp,'404.html'),'<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Page introuvable</title></head><body><a href="/danz/">Retour au site DANZ</a></body></html>\n')
- await writeFile(path.join(tmp,'_headers'),'/danz/\n  Cache-Control: no-cache\n/danz/sw.js\n  Cache-Control: no-cache\n/danz/manifest.webmanifest\n  Cache-Control: no-cache\n/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n')
+ await writeFile(path.join(tmp,'_headers'),'/danz/\n  Cache-Control: no-cache\n/danz/index.html\n  Cache-Control: no-cache\n/danz/sw.js\n  Cache-Control: no-cache\n/danz/manifest.webmanifest\n  Cache-Control: no-cache\n/*\n  X-Content-Type-Options: nosniff\n  X-Frame-Options: DENY\n  Content-Security-Policy: frame-ancestors \'none\'\n  Permissions-Policy: camera=(), microphone=(), geolocation=()\n  Referrer-Policy: strict-origin-when-cross-origin\n')
  await rm(target,{recursive:true,force:true})
  await rename(tmp,target)
  console.log('Cloudflare Pages : cloudflare-dist/danz/ prêt ; configuration GitHub Pages inchangée.')

@@ -1,5 +1,6 @@
 const CACHE_NAME = 'danz-shell-v43'
 const PRIVATE_MEDIA_CACHE = 'danz-private-thumbs-v2'
+const PRIVATE_MEDIA_TTL_MS = 21 * 24 * 60 * 60 * 1000
 const APP_ROOT = '/danz/'
 const OFFICIAL_LOGO = '/danz/image001-1.png?v=official-image001-1-20260914'
 const NOTIFICATION_ICON = '/danz/icon-192-v8.png?v=official-image001-1-20260914'
@@ -45,7 +46,15 @@ self.addEventListener('fetch', (event) => {
   if (url.origin === self.location.origin && isPrivateOfflineMediaPath(url.pathname)) {
     event.respondWith((async () => {
       const privateCache = await caches.open(PRIVATE_MEDIA_CACHE)
-      const cached = await privateCache.match(event.request)
+      let cached = await privateCache.match(event.request)
+      if (cached) {
+        const savedAt = Date.parse(cached.headers.get('X-Danz-Cached-At') || '')
+        const age = Date.now() - savedAt
+        if (!Number.isFinite(savedAt) || age < 0 || age > PRIVATE_MEDIA_TTL_MS) {
+          await privateCache.delete(event.request)
+          cached = null
+        }
+      }
       return cached || new Response('Média hors ligne indisponible', { status: 404, headers: { 'Content-Type': 'text/plain;charset=utf-8', 'Cache-Control': 'no-store' } })
     })())
     return

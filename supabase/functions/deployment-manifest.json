@@ -1,0 +1,77 @@
+{
+  "project_id": "axewfeanyfxkzercafen",
+  "deployed_at_utc": "2026-11-25T12:33:00Z",
+  "allowed_origins": [
+    "https://amicale-danz-antilles.github.io",
+    "https://danz-antilles.pages.dev"
+  ],
+  "test_command": "node --test supabase/functions/_shared/cors.test.mjs",
+  "functions": [
+    {
+      "name": "approve-membership-request",
+      "version": 14,
+      "verify_jwt": true,
+      "entrypoint_path": "approve-membership-request/index.ts",
+      "files": [
+        "approve-membership-request/index.ts",
+        "_shared/cors.mjs"
+      ]
+    },
+    {
+      "name": "admin-user-management",
+      "version": 6,
+      "verify_jwt": true,
+      "entrypoint_path": "admin-user-management/index.ts",
+      "files": [
+        "admin-user-management/index.ts",
+        "_shared/cors.mjs"
+      ]
+    },
+    {
+      "name": "request-membership",
+      "version": 3,
+      "verify_jwt": false,
+      "entrypoint_path": "request-membership/index.ts",
+      "files": [
+        "request-membership/index.ts",
+        "_shared/cors.mjs"
+      ]
+    },
+    {
+      "name": "admin-data-export",
+      "version": 3,
+      "verify_jwt": true,
+      "entrypoint_path": "admin-data-export/index.ts",
+      "files": [
+        "admin-data-export/index.ts",
+        "_shared/cors.mjs"
+      ]
+    },
+    {
+      "name": "admin-system-status",
+      "version": 3,
+      "verify_jwt": true,
+      "entrypoint_path": "admin-system-status/index.ts",
+      "files": [
+        "admin-system-status/index.ts",
+        "_shared/cors.mjs"
+      ]
+    }
+  ],
+  "verified_at_utc": "2026-11-25T14:53:21Z",
+  "verification": {
+    "deployed_sources_match": "All six source paths match local contents apart from one trailing newline appended locally.",
+    "http_checks": {
+      "functions": 5,
+      "checks_per_function": 4,
+      "passed": 20,
+      "allowed_origins_preflight": 200,
+      "foreign_origin_preflight": 403,
+      "admin_without_jwt": 401,
+      "empty_membership_request": 400
+    },
+    "local_tests_passed": 6,
+    "business_data_writes": false,
+    "schema_changes": false
+  }
+}

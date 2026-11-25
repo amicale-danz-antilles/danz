@@ -3,8 +3,14 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'scripts/package-cloudflare-pages.mjs'
+      - 'src/**'
+      - 'public/**'
+      - 'scripts/**'
+      - 'supabase/functions/**'
+      - 'index.html'
+      - 'vite.config.*'
       - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/cloudflare-frontend-check.yml'
 permissions:
   contents: read
@@ -17,7 +23,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
+      - run: npm run test:cloudflare
+      - run: npm run test:security
       - run: npm run build:cloudflare
+        env:
+          VITE_SUPABASE_URL: https://axewfeanyfxkzercafen.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_MknXpC-LmMbjHfv2ALiVag_km2DNMMw
       - run: test -f cloudflare-dist/danz/index.html && test -f cloudflare-dist/danz/sw.js && test -f cloudflare-dist/_redirects
       - run: npm run test:treasury && npm run test:treasury:v2

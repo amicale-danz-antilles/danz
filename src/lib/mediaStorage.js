@@ -3,6 +3,14 @@ import { supabase } from './supabase.js'
 const FALLBACK_LIMIT = 45 * 1024 * 1024
 const URL_CACHE_MS = 45 * 60 * 1000
 const mediaUrlCache = new Map()
+let mediaCacheRevision = 0
+
+// Invalidate pending signing requests too: a response from an old session must
+// never repopulate the cache after logout or an account switch.
+export function clearPrivateMediaUrlCache() {
+  mediaCacheRevision += 1
+  mediaUrlCache.clear()
+}
 
 const safeName = (name = 'fichier') => name
   .normalize('NFD')
@@ -93,6 +101,7 @@ export async function uploadPrivateMedia(file, { scope, parentId, fallbackBucket
 }
 
 export async function resolvePrivateMediaBatch(items, { entity, fallbackBucket }) {
+  const requestRevision = mediaCacheRevision
   const list = (items || []).filter(item => item?.storage_path || item?.image_url)
   const urls = new Map()
   const unresolvedR2 = []
@@ -116,6 +125,7 @@ export async function resolvePrivateMediaBatch(items, { entity, fallbackBucket }
     const { data, error } = await supabase.functions.invoke('r2-media', {
       body: { action: 'batch-view', entity, ids: unresolvedR2.map(item => item.id) },
     })
+    if (requestRevision !== mediaCacheRevision) return new Map()
     if (!error && !data?.error) {
       for (const item of unresolvedR2) {
         const url = data?.urls?.[item.id]
@@ -130,6 +140,7 @@ export async function resolvePrivateMediaBatch(items, { entity, fallbackBucket }
   if (unresolvedSupabase.length) {
     const paths = unresolvedSupabase.map(item => item.storage_path)
     const { data, error } = await supabase.storage.from(fallbackBucket).createSignedUrls(paths, 3600)
+    if (requestRevision !== mediaCacheRevision) return new Map()
     if (!error) {
       ;(data || []).forEach((entry, index) => {
         const item = unresolvedSupabase[index]
