@@ -333,6 +333,19 @@ export default function TreasuryDashboard({ view, onAdvanced, onView, initialAct
       if (e) throw e
     }, 'Espèces encaissées et dettes rapprochées.')
   }
+  const cancelMistakenDebt = (charge) => {
+    if (busy || !charge || charge.status !== 'open') return
+    if (charge.category === 'membership') return setError('Les cotisations se corrigent dans la gestion des cotisations.')
+    if (allocations.some(a=>a.charge_id===charge.id&&payments.some(p=>p.id===a.payment_id&&['confirmed','declared'].includes(p.status)))) return setError('Un paiement est lié à cette dette. Corrigez d’abord le paiement dans l’historique.')
+    const reason=window.prompt('Motif de l’annulation (au moins 5 caractères). Aucun argent ne sera déplacé.','Erreur de saisie')
+    if(reason===null)return
+    if(reason.trim().length<5||reason.trim().length>500)return setError('Indiquez un motif entre 5 et 500 caractères.')
+    if(!window.confirm('Annuler définitivement cette dette de '+formatMoney(charge.amount_cents)+' ? Elle restera dans l’historique.'))return
+    action(async()=>{
+      const {error:e}=await supabase.rpc('treasury_manage_charge',{p_id:charge.id,p_action:'cancel',p_label:null,p_amount_cents:null,p_event_id:null,p_category:null,p_reason:reason.trim()})
+      if(e)throw e
+    },'Dette annulée dans le foyer. Historique conservé, aucun mouvement de trésorerie.')
+  }
   const collectOneDebt = (charge, method) => {
     const amount = chargeResidualCents(charge, allocations, payments)
     if (!amount || !charge?.household_id) return
@@ -447,6 +460,7 @@ export default function TreasuryDashboard({ view, onAdvanced, onView, initialAct
        <div className="danz-person-trigger"><span className={'danz-direction '+(r.kind==='receipt'?'danz-in':'danz-out')} aria-hidden="true">{r.kind==='receipt'?'↙':'↗'}</span><span><b>{r.display}</b><small>{r.label}</small></span><strong className={r.kind==='receipt'?'danz-in':'danz-out'}>{r.kind==='receipt'?'+':'−'}{formatMoney(r.due)}</strong></div>
        <div className="danz-payment-edit">{r.kind==='receipt'?<>
        {allocations.some(a=>a.charge_id===r.charge.id&&payments.some(p=>p.id===a.payment_id&&p.status==='declared'))?<p className="danz-muted">Paiement déclaré à contrôler dans l’historique avant tout encaissement.</p>:<div className="danz-methods"><button type="button" disabled={busy} onClick={()=>collectOneDebt(r.charge,'cash')}>Reçu en espèces</button><button type="button" disabled={busy} onClick={()=>collectOneDebt(r.charge,'bank_transfer')}>Reçu par virement</button></div>}
+       {r.charge.category!=='membership'&&!allocations.some(a=>a.charge_id===r.charge.id&&payments.some(p=>p.id===a.payment_id&&['confirmed','declared'].includes(p.status)))&&<button type="button" className="ghost-button" disabled={busy} onClick={()=>cancelMistakenDebt(r.charge)}>Annuler la dette (erreur de saisie)</button>}
        </>:<><label>Compte de remboursement<select value={reimburseBy[r.entry.id]||'bank_transfer'} onChange={e=>setReimburseBy(old=>({...old,[r.entry.id]:e.target.value}))}><option value="bank_transfer">Virement</option><option value="cash">Espèces</option></select></label><button type="button" className="primary-button" disabled={busy} onClick={()=>reimburse(r.entry)}>Confirmer le remboursement intégral</button></>}</div>
       </article>)}</div>{!openDebtRows.length&&!pendingAdvances.length&&<p>Aucune dette ou avance enregistrée.</p>}</section>
       <button type="button" className="ghost-button" onClick={()=>onView('preview')}>Consulter la référence de reprise (lecture seule)</button>
