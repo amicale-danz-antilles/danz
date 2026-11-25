@@ -2,6 +2,24 @@
 
 Procédure revue le 25 novembre 2026. Le déploiement du frontend ne copie aucune base et ne modifie aucun solde. Supabase reste l'unique base active, avec l'authentification, les RPC et les fonctions Edge existantes. Les objets déjà présents dans Supabase Storage ou R2 restent à leur emplacement. Le pilote Workers/D1 est indépendant et ne doit pas être connecté au site réel.
 
+## Déploiement effectué
+
+Le 25 novembre 2026 à 11 h 07 (Martinique, UTC−4), le tableau de bord du compte **Amicale Danz** a confirmé le statut **success** du déploiement de production du projet Pages **`danz-antilles`**, en mode **Direct Upload**.
+
+| Élément | Valeur |
+| --- | --- |
+| Adresse du site | [https://danz-antilles.pages.dev/danz/](https://danz-antilles.pages.dev/danz/) |
+| Déploiement | `4c369659-8eb5-45af-84bf-2fc03371f098` |
+| Adresse de cette version | [https://4c369659.danz-antilles.pages.dev/danz/](https://4c369659.danz-antilles.pages.dev/danz/) |
+| Source compilée | Commit [`698e2d534b9deb2174b9a3ad7dbaae700f601dca`](https://github.com/amicale-danz-antilles/danz/commit/698e2d534b9deb2174b9a3ad7dbaae700f601dca), branche `cloudflare/frontend-parallele`, PR n°61 |
+| Contenu transmis | 37 fichiers : 35 ressources et les règles `_headers` / `_redirects` |
+
+Le libellé **Production / main** affiché par Cloudflare est la métadonnée de ce déploiement Direct Upload ; il ne signifie pas que le build a été produit depuis `main` ni qu'une intégration Git est active. Les mises à jour nécessitent un nouveau build vérifié et un nouveau téléversement. Aucun push GitHub ne publie automatiquement ce projet.
+
+Le tableau de bord affiche **0 variable d'environnement** : les deux variables publiques Supabase ont été incorporées lors de la compilation locale. Aucune clé secrète n'est nécessaire dans les ressources statiques. GitHub Pages reste actif et Supabase demeure l'unique base de données du site ; aucune donnée réelle n'a été transférée vers D1.
+
+L'ouverture de `/danz/` sur le domaine Pages affiche l'écran de connexion. Le contrôle HTTP de production confirme les SHA-256 des 33 fichiers sous `/danz/`, la redirection racine 302, une réponse 404 pour une ressource absente et les en-têtes de sécurité et de revalidation attendus. La connexion Cloudflare et le statut de publication ne valident pas les parcours membre, administrateur ou trésorier : leur recette authentifiée reste à effectuer avec les comptes existants autorisés.
+
 ## Conditions de publication et de mise en service
 
 - Utiliser le compte Cloudflare **Amicale Danz**, jamais un autre compte.
