@@ -39,7 +39,7 @@ export default function TreasuryEventListImport({data,onReload,onEvents}){
   }
   lock.current=true;setBusy(true);setError('')
   try{
-   const {data:result,error:e}=await supabase.rpc('treasury_assign_event_charges',pending.current)
+   const {data:result,error:e}=await supabase.rpc('treasury_import_event_debt_list',pending.current)
    if(e)throw e
    setCommitted(true);pending.current=null;setRows([]);setInput('');setNotice((result?.new_charges??'Les')+' dette(s) enregistrée(s) dans les foyers.')
    try{await onReload()}catch{setNotice('Dettes enregistrées. Actualiser la page pour recharger les soldes.')}
