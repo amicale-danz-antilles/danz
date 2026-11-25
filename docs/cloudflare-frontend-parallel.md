@@ -18,7 +18,7 @@ Le libellé **Production / main** affiché par Cloudflare est la métadonnée de
 
 Le tableau de bord affiche **0 variable d'environnement** : les deux variables publiques Supabase ont été incorporées lors de la compilation locale. Aucune clé secrète n'est nécessaire dans les ressources statiques. GitHub Pages reste actif et Supabase demeure l'unique base de données du site ; aucune donnée réelle n'a été transférée vers D1.
 
-L'ouverture de `/danz/` sur le domaine Pages affiche l'écran de connexion. Le contrôle HTTP de production confirme les SHA-256 des 33 fichiers sous `/danz/`, la redirection racine 302, une réponse 404 pour une ressource absente et les en-têtes de sécurité et de revalidation attendus. La connexion Cloudflare et le statut de publication ne valident pas les parcours membre, administrateur ou trésorier : leur recette authentifiée reste à effectuer avec les comptes existants autorisés.
+L'ouverture de `/danz/` sur le domaine Pages affiche l'écran de connexion. Le contrôle HTTP de production confirme les SHA-256 des 33 fichiers sous `/danz/`, la redirection racine 302, une réponse 404 pour une ressource absente et les en-têtes de sécurité et de revalidation attendus. La recette applicative en lecture seule a progressé, sans modification métier. L'accès authentifié depuis le poste professionnel reste en échec et nécessite une vérification du service informatique ; le déploiement de l'interface ne suffit pas à valider cet accès. Les opérations d'écriture et les autres profils ne sont pas attestés par cette recette.
 
 ## Conditions de publication et de mise en service
 
@@ -102,3 +102,4 @@ Conserver hors du dossier public les preuves de recette et le dossier statique v
 ## Après validation
 
 La branche d'essai ne doit pas devenir une copie figée du site. Après recette complète et décisions requises, intégrer les changements de packaging à `main`. Pour Direct Upload, reconstruire chaque nouvelle version depuis un SHA validé de `main` et publier le nouveau dossier vérifié. Si l'intégration Git est choisie, créer le projet adapté puis le configurer pour suivre `main`. La désactivation de GitHub Pages exige une décision ultérieure ; cette procédure ne l'autorise pas. L'étude D1 est décrite dans [cloudflare-d1-readiness.md](cloudflare-d1-readiness.md).
+
