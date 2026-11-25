@@ -44,11 +44,18 @@ export function simulateSettlement(workspace, operation) {
   const current=summarizeWorkspace(workspace)
   if(operation.date<current.asOf) throw new Error('Date antérieure à la dernière opération')
   const item=current.residuals.find(i=>i.id===operation.itemId)
-  if(!item || operation.cents>item.remaining) throw new Error('Montant supérieur au reste dû')
+  if(!item || item.remaining===0) throw new Error('Créance ou dette déjà soldée ou inconnue')
   const recv=item.kind==='receivable'
+  const surplus=Math.max(0,operation.cents-item.remaining)
+  if(surplus&&(!recv||operation.allowOverpayment!==true)) throw new Error('Montant supérieur au reste dû : confirmation du trop-perçu nécessaire')
   if(!recv && operation.cents>(operation.account==='512'?current.bank:current.cash)) throw new Error('Fonds insuffisants sur le compte choisi')
-  const entry=pair('settlement:'+operation.id,operation.date,(recv?'Encaissement ':'Remboursement ')+item.label,recv?operation.account:'4673',recv?'4672':operation.account,operation.cents,{itemId:item.id})
-  const next={...workspace,entries:[...workspace.entries,entry],operations:[...workspace.operations,{id:operation.id,date:operation.date,itemId:item.id,account:operation.account,cents:operation.cents}]}
+  const applied=operation.cents-surplus
+  const entry=pair('settlement:'+operation.id,operation.date,(recv?'Encaissement ':'Remboursement ')+item.label,recv?operation.account:'4673',recv?'4672':operation.account,applied,{itemId:item.id})
+  const creditId='credit:'+operation.id
+  if(surplus&&workspace.items.some(i=>i.id===creditId))throw new Error('Identifiant de trop-perçu déjà utilisé')
+  const credit=surplus?{id:creditId,label:item.label,cents:surplus,kind:'payable',subtype:'overpayment',originItemId:item.id}:null
+  if(credit){entry.lines=[line(operation.account,'D',operation.cents),line('4672','C',applied),line('4673','C',surplus)]}
+  const next={...workspace,items:credit?[...workspace.items,credit]:workspace.items,entries:[...workspace.entries,entry],operations:[...workspace.operations,{id:operation.id,date:operation.date,itemId:item.id,account:operation.account,cents:applied,receivedCents:operation.cents,surplusCents:surplus}]}
   summarizeWorkspace(next)
   return next
 }
