@@ -4,6 +4,8 @@ import { chargeResidualCents, effectiveAmicaliste, formatMoney, householdBalance
 import { optimizeImageFile } from '../lib/mediaStorage.js'
 import { accountFor, accountingDate, ledgerBalances, signedCents } from '../lib/treasuryLedger.js'
 import EventTreasury from './EventTreasury.jsx'
+import TreasuryEventListImport from './TreasuryEventListImport.jsx'
+import './TreasuryV2Preview.css'
 import { annualManagementEconomics, eventManagementEconomics } from '../lib/membershipProfitability.js'
 import { financialPositionForPerson } from '../lib/personFinance.js'
 import TreasuryJournalManager from './TreasuryJournalManager.jsx'
@@ -430,6 +432,26 @@ export default function TreasuryDashboard({ view, onAdvanced, onView, initialAct
     </section>}
 
     {view === 'events' && <EventTreasury data={data} onReload={reload} user={user} />}
+    {view === 'lists' && <TreasuryEventListImport data={data} onReload={reload} onEvents={()=>onView('events')} />}
+    {view === 'live' && <div className="danz-v2-preview">
+      <div className="danz-v2-header"><div><span className="tv2-eyebrow">Comptabilité enregistrée</span><h2>Trésorerie</h2></div><button type="button" className="danz-refresh" disabled={busy} onClick={()=>action(async()=>{},'Données rechargées.')}>↻ Actualiser</button></div>
+      <p className="danz-v2-warning" role="status"><strong>Comptes enregistrés · rapprochement à terminer</strong><span>Ces chiffres proviennent du journal officiel actuel, et peuvent différer de la référence déclarée du 24 novembre. Ne pas réenregistrer un paiement déjà comptabilisé.</span></p>
+      <section className="danz-v2-total"><span>Banque + espèces (journal)</span><strong>{opening?formatMoney(balances.bank+balances.cash):'À initialiser'}</strong><small>Fonds non ventilés exclus</small></section>
+      <div className="danz-v2-grid">{[['Banque',balances.bank],['Espèces',balances.cash],['À encaisser',dueTotal],['À rembourser',pendingAdvanceCents],['Non ventilé · à vérifier',balances.unassigned]].map(([label,cents])=><article className="danz-metric" key={label}><span className="danz-metric-label">{label}</span><strong>{opening||label==='À encaisser'||label==='À rembourser'?formatMoney(cents):'—'}</strong></article>)}</div>
+      <button type="button" className="primary-button" onClick={()=>onView('lists')}>＋ Nouvelle liste de dettes</button>
+      <section className="danz-panel danz-v2-form"><div className="danz-panel-heading"><h3>Dettes et remboursements enregistrés</h3></div><p className="danz-muted">Les boutons ci-dessous enregistrent un règlement intégral réel. Pour un règlement partiel, un trop-perçu ou un montant divergent, ne pas utiliser ces boutons : le rapprochement doit être traité séparément.</p><label>Rechercher<input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Nom, prénom ou libellé"/></label>
+      <div className="danz-batch-list">{[
+       ...openDebtRows.map(r=>({...r,kind:'receipt',id:r.charge.id,label:r.charge.label})),
+       ...pendingAdvances.map(e=>({kind:'refund',id:e.id,entry:e,display:profileById[e.advanced_by]?.full_name||offlineById[e.advanced_by_offline]?.display_name||'Personne à identifier',label:e.label,due:e.amount_cents}))
+      ].filter(r=>(r.display+' '+r.label).toLocaleLowerCase('fr').includes(query.toLocaleLowerCase('fr'))).sort((a,b)=>a.display.localeCompare(b.display,'fr')).map(r=><article key={r.kind+':'+r.id} className={'danz-batch-person danz-unified-person '+(r.kind==='receipt'?'is-in':'is-out')}>
+       <div className="danz-person-trigger"><span className={'danz-direction '+(r.kind==='receipt'?'danz-in':'danz-out')} aria-hidden="true">{r.kind==='receipt'?'↙':'↗'}</span><span><b>{r.display}</b><small>{r.label}</small></span><strong className={r.kind==='receipt'?'danz-in':'danz-out'}>{r.kind==='receipt'?'+':'−'}{formatMoney(r.due)}</strong></div>
+       <div className="danz-payment-edit">{r.kind==='receipt'?<>
+       {allocations.some(a=>a.charge_id===r.charge.id&&payments.some(p=>p.id===a.payment_id&&p.status==='declared'))?<p className="danz-muted">Paiement déclaré à contrôler dans l’historique avant tout encaissement.</p>:<div className="danz-methods"><button type="button" disabled={busy} onClick={()=>collectOneDebt(r.charge,'cash')}>Reçu en espèces</button><button type="button" disabled={busy} onClick={()=>collectOneDebt(r.charge,'bank_transfer')}>Reçu par virement</button></div>}
+       </>:<><label>Compte de remboursement<select value={reimburseBy[r.entry.id]||'bank_transfer'} onChange={e=>setReimburseBy(old=>({...old,[r.entry.id]:e.target.value}))}><option value="bank_transfer">Virement</option><option value="cash">Espèces</option></select></label><button type="button" className="primary-button" disabled={busy} onClick={()=>reimburse(r.entry)}>Confirmer le remboursement intégral</button></>}</div>
+      </article>)}</div>{!openDebtRows.length&&!pendingAdvances.length&&<p>Aucune dette ou avance enregistrée.</p>}</section>
+      <button type="button" className="ghost-button" onClick={()=>onView('preview')}>Consulter la référence de reprise (lecture seule)</button>
+    </div>}
+
 
     {view === 'overview' && <>
       {!opening && <div className="tv2-setup-warning"><strong>Initialisez vos deux soldes réels</strong><span>Revolut et caisse liquide servent de point de départ à toute la trésorerie.</span><button type="button" onClick={() => onView('export')}>Renseigner les soldes →</button></div>}

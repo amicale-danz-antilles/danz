@@ -8,8 +8,10 @@ import TreasuryV2Preview from './TreasuryV2Preview.jsx'
 import '../treasury-v2.css'
 
 const TABS = [
-  ['preview', 'Accueil V2'],
-  ['overview', 'Ancien accueil'],
+  ['live', 'Trésorerie'],
+  ['lists', 'Nouvelle liste'],
+  ['preview', 'Référence de reprise'],
+  ['overview', 'Pilotage'],
   ['cashflow', 'Opérations'],
   ['history', 'Historique'],
   ['events', 'Événements'],
@@ -19,7 +21,7 @@ const TABS = [
 export default function AdminTreasury() {
   const { isAdmin, isTreasurer, loading, refreshProfile } = useAuth()
   const [params] = useSearchParams()
-  const [tab, setTab] = useState(() => TABS.some(([name]) => name === params.get('tab')) ? params.get('tab') : ['income','expense'].includes(params.get('action')) ? 'cashflow' : 'preview')
+  const [tab, setTab] = useState(() => TABS.some(([name]) => name === params.get('tab')) ? params.get('tab') : ['income','expense'].includes(params.get('action')) ? 'cashflow' : 'live')
   const initialAction = ['income','expense'].includes(params.get('action')) ? params.get('action') : ''
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -57,7 +59,7 @@ export default function AdminTreasury() {
     </section>
   </div>
 
-  return <div className={'treasury-v2'+(tab==='preview'?' danz-v2-active':'')}>
+  return <div className={'treasury-v2'+(['preview','live','lists'].includes(tab)?' danz-v2-active':'')}>
     <header className="tv2-page-title">
       <div><span className="tv2-eyebrow">Amicale DANZ · Accès nominatif</span><h1>Finances de l’Amicale</h1><p>Trésorerie et gestion financière.</p></div>
       <div className="tv2-heading-actions"><span className="tv2-role">Administrateur + Trésorier</span><Link className="ghost-button tv2-people-link" to="/administration/utilisateurs">Utilisateurs →</Link></div>
