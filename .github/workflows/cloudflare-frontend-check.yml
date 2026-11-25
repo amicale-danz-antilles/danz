@@ -1,0 +1,23 @@
+name: Cloudflare frontend packaging
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/package-cloudflare-pages.mjs'
+      - 'package.json'
+      - '.github/workflows/cloudflare-frontend-check.yml'
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm run build:cloudflare
+      - run: test -f cloudflare-dist/danz/index.html && test -f cloudflare-dist/danz/sw.js && test -f cloudflare-dist/_redirects
+      - run: npm run test:treasury && npm run test:treasury:v2
