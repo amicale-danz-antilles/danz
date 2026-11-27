@@ -12,7 +12,7 @@ The SQL fingerprints sorted SHA-256 digests of complete JSONB rows. It is intent
 
 ## Free plan
 
-Workers Free limits: 100,000 requests/day, 10 ms CPU per invocation; D1 Free: 5 million row reads/day, 100,000 row writes/day, 5 GB total. See current official docs:
+Workers Free limits: 100,000 requests/day, 10 ms CPU per invocation; D1 Free: 5 million row reads/day, 100,000 row writes/day, 5 GB total, 500 MB per database, 10 databases per account and 50 D1 queries per Worker invocation (subject to batching rules). See current official docs:
 - https://developers.cloudflare.com/workers/platform/pricing/
 - https://developers.cloudflare.com/d1/platform/pricing/
 - https://developers.cloudflare.com/d1/platform/limits/
