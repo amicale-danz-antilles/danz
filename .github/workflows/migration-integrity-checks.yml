@@ -9,10 +9,53 @@ permissions:
 jobs:
   synthetic:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_USER: synthetic
+          POSTGRES_PASSWORD: synthetic-test-only
+          POSTGRES_DB: synthetic
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U synthetic -d synthetic"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: synthetic
+      PGPASSWORD: synthetic-test-only
+      PGDATABASE: synthetic
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - run: node --test migration-checks/*.test.mjs
+      - name: Verify PostgreSQL fingerprint SQL on synthetic fixtures only
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v psql
+          node --input-type=module -e '
+            import { requiredTables } from "./migration-checks/compare-restoration.mjs";
+            for (const schema of new Set(requiredTables.map(t=>t.split(".")[0]))) console.log("CREATE SCHEMA IF NOT EXISTS "+schema+";");
+            for (const table of requiredTables) {
+              console.log("CREATE TABLE "+table+"(id integer primary key, amount integer not null);");
+              console.log("INSERT INTO "+table+" VALUES (1,100),(2,200);");
+            }
+          ' | psql -X -qAt -v ON_ERROR_STOP=1
+          psql -X -qAt -v ON_ERROR_STOP=1 -f migration-checks/fingerprint-postgres.sql > "$RUNNER_TEMP/source.ndjson"
+          psql -X -qAt -v ON_ERROR_STOP=1 -f migration-checks/fingerprint-postgres.sql > "$RUNNER_TEMP/restored.ndjson"
+          node migration-checks/compare-restoration.mjs "$RUNNER_TEMP/source.ndjson" "$RUNNER_TEMP/restored.ndjson"
+          psql -X -qAt -v ON_ERROR_STOP=1 -c 'UPDATE public.treasury_entries SET amount=amount+1 WHERE id=1'
+          psql -X -qAt -v ON_ERROR_STOP=1 -f migration-checks/fingerprint-postgres.sql > "$RUNNER_TEMP/restored.ndjson"
+          set +e
+          node migration-checks/compare-restoration.mjs "$RUNNER_TEMP/source.ndjson" "$RUNNER_TEMP/restored.ndjson"
+          status=$?
+          set -e
+          test "$status" -eq 1
