@@ -1,6 +1,6 @@
 // Planning gate, never provisions cloud services or enables paid plans.
 // Inputs must come from current account-wide measurements, not estimates alone.
-export const limits=Object.freeze({workerRequestsDay:100000,d1RowsReadDay:5000000,d1RowsWrittenDay:100000,d1BytesTotal:5000000000,workerCpuMsPerInvocation:10})
+export const limits=Object.freeze({workerRequestsDay:100000,d1RowsReadDay:5000000,d1RowsWrittenDay:100000,d1BytesTotal:5000000000,d1LargestDatabaseBytes:500000000,d1DatabaseCount:10,d1QueriesPerInvocation:50,workerCpuMsPerInvocation:10})
 export function evaluateFreePlan(measurements){
  const problems=[]
  if(measurements?.workersPlan!=='free')problems.push('workers_free_plan_not_verified')
